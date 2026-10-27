@@ -1,41 +1,15 @@
-# MacOS
-.DS_STORE
-
-# build, dependencies, coverage and test outputs
-out
-dist
-coverage
-node_modules
-compiled
-
-# DWN data
-DATA/
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tgz
 
 # Logs
-logs
 *.log
-npm-debug.log* 
 
-# dotenv environment variable files
+# Local secrets and environment files
 .env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+.env.*
 
-# OS generated files
-*.out
-*.tgz
-*.pid
-
-# DRPM generated files
-@drg
-.registry*
-.dregistry*
-.postinstall
-.drpm/profile.json
-.drpm/registry
-.ignore
-
-# NPM
-.npmrc
+# OS files
+.DS_Store

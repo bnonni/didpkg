@@ -1,176 +1,20 @@
 {
-  "name": "drpm",
-  "version": "5.2.1",
+  "name": "didpkg-workspace",
+  "private": true,
   "type": "module",
-  "description": "Decentralized Registry Package Manager (DRPM) helps developers publish, install, find and manage Decentralized Packages (DPKs) published to Decentralized Web Nodes (DWNs). DRPM does this by looking up a Decentralized Identifier (DID) to find its DID document and parse out the DWN service endpoints. DRPM uses the endpoints to query the DWN for any matching package and package/release records.",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/types/index.d.ts",
-  "bin": {
-    "drpm": "./dist/cli/drpm.js",
-    "create-dpk": "./dist/cli/create-dpk.js"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/cjs/index.js"
-    }
-  },
-  "homepage": "https://drpm.tools",
-  "bugs": {
-    "url": "https://github.com/bnonni/drpm.tools/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/bnonni/drpm.tools.git"
-  },
   "license": "Apache-2.0",
-  "contributors": [
-    {
-      "name": "Bryan Nonni",
-      "url": "https://github.com/bnonni"
-    },
-    {
-      "name": "Daniel Buchner",
-      "url": "https://github.com/csuwildcat"
-    },
-    {
-      "name": "Zach M",
-      "url": "https://github.com/phuncti0n"
-    },
-    {
-      "name": "w3irdrobot",
-      "url": "https://github.com/w3irdrobot"
-    }
+  "workspaces": [
+    "packages/*"
   ],
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "decentralized registry package manager",
-    "decentralized registry",
-    "decentralized package manager",
-    "decentralized package registry",
-    "package registry",
-    "package manager",
-    "decentralized",
-    "decentralized applications",
-    "decentralized identity",
-    "decentralized web",
-    "web5",
-    "dpm",
-    "drpm",
-    "drg",
-    "dwn",
-    "dweb node",
-    "decentralized web node",
-    "dwn protocol",
-    "decentralized identifiers",
-    "dids",
-    "decentralized module imports",
-    "decentralized package imports",
-    "decentralized package",
-    "decentralized packages",
-    "dpks",
-    "drls",
-    "drl",
-    "decentralized resource locator",
-    "decentralized resource locators",
-    "tbd54566975",
-    "tbd",
-    "tbd-block"
-  ],
-  "publishConfig": {
-    "access": "public"
+  "engines": {
+    "bun": ">=1.4.4"
   },
   "scripts": {
-    "dev": "nodemon",
-    "start": "node ./dist/registry/server.js",
-    "prepack": "pnpm build && chmod +x ./dist/cli/drpm.js ./dist/cli/create-dpk.js ./dist/cli/init-dpk.js",
-    "clean": "rimraf dist coverage tests/compiled",
-    "wipe": "rimraf node_modules package-lock.json DATA",
-    "create": "npm create dpk",
-    "init-dpk": "npx init-dpk",
-    "tab:1": "[[ -f ~/.npmrc ]] && cp ~/.npmrc ~/.npmrc.drpm.bak || cp .npmrc ~/.npmrc",
-    "tab:2": "sh build/docker.sh",
-    "tab:3": "./dist/cli/drpm.js profile create -e http://localhost:3000",
-    "tab:4": "./dist/cli/drpm.js protocol configure",
-    "tab:5": "node ./dist/registry/server.js",
-    "tab:6": "./dist/cli/drpm.js profile get -d",
-    "test:register-hooks": "echo 'Unimplemented!' && exit 0 && pnpm build:tests; node --import ./dist/src/register.js ./tests/compiled/tests/register-hooks.spec.js",
-    "build": "pnpm build:esm && pnpm build:cjs",
-    "build:cjs": "rimraf dist/cjs && tsc -p tsconfig.cjs.json && echo '{\"type\": \"commonjs\"}' > ./dist/cjs/package.json",
-    "build:esm": "rimraf dist dist/types && tsc -p tsconfig.json && chmod +x ./dist/cli/drpm.js",
-    "build:tests": "rimraf tests/compiled && tsc -p tests/tsconfig.json",
-    "cli:install": "rm -f $HOME/.config/drpm/bin/drpm && pnpm build && ln -s $(pwd)/dist/cli/drpm.js $HOME/.config/drpm/bin/drpm",
-    "cli:version": "sh scripts/cli/version.sh",
-    "registry:start": "sh scripts/registryd/start-restart.sh",
-    "registry:stop": "sh scripts/registryd/stop.sh",
-    "registry:restart": "pnpm registry:start -- -f",
-    "registry:info": "sh scripts/registryd/info.sh",
-    "docker:push": "docker push registry.digitalocean.com/nonni/drpm-registry",
-    "docker:build": "docker build -f build/Dockerfile.registry -t registry.digitalocean.com/nonni/drpm-registry .",
-    "docker:run": "docker run -d --rm --network drpm-network -p 2092:2092 --name drpm-registry registry.digitalocean.com/nonni/drpm-registry"
-  },
-  "dependencies": {
-    "@bugsnag/cuid": "^3.1.1",
-    "@inquirer/prompts": "^7.0.1",
-    "@scure/bip39": "^1.5.4",
-    "@tbd54566975/dwn-sdk-js": "^0.5.1",
-    "@web5/agent": "^0.8.1",
-    "@web5/api": "^0.12.0",
-    "@web5/common": "^1.1.0",
-    "@web5/credentials": "^1.1.3",
-    "@web5/crypto": "^1.0.6",
-    "@web5/dids": "^1.2.0",
-    "@web5/user-agent": "^0.7.1",
-    "chalk": "^5.3.0",
-    "commander": "^12.1.0",
-    "cors": "^2.8.5",
-    "did-btc-sdk": "^1.0.0",
-    "express": "^4.21.0",
-    "fs-extra": "^11.2.0",
-    "tar": "^7.4.3",
-    "tar-stream": "^3.1.7"
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@types/body-parser": "^1.19.5",
-    "@types/chai": "^5.0.1",
-    "@types/chai-as-promised": "^8.0.1",
-    "@types/cors": "^2.8.17",
-    "@types/debug": "^4.1.12",
-    "@types/eslint": "^9.6.1",
-    "@types/express": "^5.0.0",
-    "@types/fs-extra": "^11.0.4",
-    "@types/mocha": "^10.0.9",
-    "@types/node": "^22.5.4",
-    "@types/npm": "^7.19.3",
-    "@types/tar-stream": "^3.1.3",
-    "@typescript-eslint/eslint-plugin": "^8.5.0",
-    "@typescript-eslint/parser": "^8.5.0",
-    "c8": "^10.1.2",
-    "chai": "^5.1.2",
-    "chai-as-promised": "^8.0.0",
-    "esbuild": "^0.24.0",
-    "eslint": "^9.14.0",
-    "eslint-plugin-mocha": "^10.5.0",
-    "globals": "^15.11.0",
-    "marked": "^14.1.2",
-    "mocha": "^10.8.2",
-    "mocha-junit-reporter": "^2.2.1",
-    "node-stdlib-browser": "^1.2.1",
-    "nodemon": "^3.1.7",
-    "rimraf": "^6.0.1",
-    "typescript": "^5.6.2",
-    "typescript-eslint": "^8.5.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@sphereon/pex",
-      "classic-level",
-      "esbuild"
-    ]
+    "@types/bun": "1.4.4",
+    "typescript": "7.0.2"
   }
 }
