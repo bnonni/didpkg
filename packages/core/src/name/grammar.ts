@@ -1,14 +1,14 @@
 // didpkg install-name grammar, draft 1 (2026-10-23). The grammar can change before 1.0.
-// Source: didpkg@0.0.1 (src/grammar.ts), with no change to the code.
+// Source: didpkg@0.0.1 (src/grammar.ts).
 //
 //   install-name = "@didpkg/" pkg-name "_" method [ "." case-mask ] "_" enc-id   ; direct form
 //                / "@didpkg/" pkg-name "__" did-hash                             ; hash form
 //
 // The direct form carries the full DID. The hash form carries sha256(DID) and is used
 // only when the direct form is longer than 214 characters.
-// No runtime dependencies. Runs on Node >= 18 and on Bun.
+// One runtime dependency: @noble/hashes (sha256). No Node or Bun API, so it also runs in a browser.
 
-import { createHash } from 'node:crypto';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 export const SCOPE = '@didpkg';
 export const MAX_NPM_NAME = 214; // validate-npm-package-name: warning above 214, so not valid for new packages
@@ -118,9 +118,7 @@ export function base32(bytes: Uint8Array): string {
 }
 
 export function didHash(did: string): string {
-  // node:crypto works on Node and on Bun. The bytes are the same as Bun.CryptoHasher('sha256').
-  const h = createHash('sha256').update(did, 'utf8').digest();
-  return base32(new Uint8Array(h)); // 52 characters
+  return base32(sha256(new TextEncoder().encode(did))); // 52 characters
 }
 
 // ---------- format / parse ----------

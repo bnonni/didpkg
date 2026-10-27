@@ -12,6 +12,9 @@
     "packages/core": {
       "name": "@didpkg/core",
       "version": "0.0.0",
+      "dependencies": {
+        "@noble/hashes": "2.4.0",
+      },
       "devDependencies": {
         "validate-npm-package-name": "8.0.0",
       },
@@ -19,6 +22,8 @@
   },
   "packages": {
     "@didpkg/core": ["@didpkg/core@workspace:packages/core"],
+
+    "@noble/hashes": ["@noble/hashes@2.4.0", "", {}, "sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA=="],
 
     "@types/bun": ["@types/bun@1.4.4", "", { "dependencies": { "bun-types": "1.4.4" } }, "sha512-9wkRDXUXK124pEnAutE6n/l18j+i9GC5IAHK8TmX/2nlySETmky0OU6yL5U8pW1AoKh++AN9auDCr647BfurjQ=="],
 

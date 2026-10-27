@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "validate-npm-package-name": "8.0.0"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0"
   }
 }
