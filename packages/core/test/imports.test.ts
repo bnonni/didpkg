@@ -21,7 +21,8 @@ test('core src imports no node: module and uses no Bun global', async () => {
 });
 
 // PLAN.md "Rules" item 1: only did/drivers/*.ts import a DID method library, one file per library.
-test('import borders: each DID library has one importer', async () => {
+// trust/*.ts imports only @noble/ed25519, @noble/curves, @noble/hashes, @scure/base and canonicalize.
+test('import borders: each library has only the expected importers', async () => {
   const importers: Record<string, string[]> = {};
   for (const [file, text] of await sources()) {
     for (const m of text.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)) {
@@ -33,8 +34,11 @@ test('import borders: each DID library has one importer', async () => {
   }
   for (const files of Object.values(importers)) files.sort();
   expect(importers).toEqual({
-    '@noble/hashes': ['name/grammar.ts'],
-    '@scure/base': ['did/drivers/jwk.ts', 'did/drivers/key.ts'],
+    '@noble/hashes': ['name/grammar.ts', 'trust/digest.ts', 'trust/proof.ts'],
+    '@noble/curves': ['trust/keys.ts', 'trust/proof.ts'],
+    '@noble/ed25519': ['trust/proof.ts'],
+    canonicalize: ['trust/jcs.ts'],
+    '@scure/base': ['did/drivers/jwk.ts', 'did/drivers/key.ts', 'trust/digest.ts', 'trust/keys.ts', 'trust/proof.ts'],
     '@enbox/dids': ['did/drivers/dht.ts'],
     'web-did-resolver': ['did/drivers/web.ts'],
   });
