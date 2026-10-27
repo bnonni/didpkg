@@ -51,6 +51,16 @@ test('didHash: sha256 of the UTF-8 DID in lowercase base32, 52 characters', () =
   expect(didHash('did:web:nonni.org')).toMatch(/^[a-z2-7]{52}$/);
 });
 
+test('hash form: the last character must be "a" or "q" (4 zero pad bits)', () => {
+  for (const v of vectors) expect(didHash(v.did)).toMatch(/[aq]$/);
+  const h51 = didHash('did:web:nonni.org').slice(0, 51);
+  expect(code(() => parse(`@didpkg/hello__${h51}a`))).toBe('OK');
+  expect(code(() => parse(`@didpkg/hello__${h51}q`))).toBe('OK');
+  for (const last of 'bcdefghijklmnoprstuvwxyz234567') {
+    expect(code(() => parse(`@didpkg/hello__${h51}${last}`))).toBe('E_HASH');
+  }
+});
+
 // Random DIDs from the DID Core ABNF alphabet, biased to the hard characters.
 const ALPHA = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-';
 const HEX = '0123456789abcdefABCDEF';

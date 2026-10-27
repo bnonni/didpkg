@@ -22,7 +22,8 @@ const IDCHAR = String.raw`(?:[A-Za-z0-9._-]|%[0-9A-Fa-f]{2})`;
 export const DID_RE = new RegExp(String.raw`^did:([a-z0-9]+):((?:${IDCHAR}*:)*${IDCHAR}+)$`);
 const METHOD_RE = /^[a-z0-9]+$/;
 const MASK_RE = /^[a-z2-7]*[b-z2-7]$/; // non-empty, must not end in "a" (zero group)
-const HASH_RE = /^[a-z2-7]{52}$/;
+// 256 bits in 52 base32 characters: the last character holds 1 bit and 4 zero pad bits, so it is "a" or "q".
+const HASH_RE = /^[a-z2-7]{51}[aq]$/;
 
 export class GrammarError extends Error {
   constructor(public code: string, message: string) {
