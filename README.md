@@ -8,6 +8,12 @@ Phase 1 (the first end-to-end demo) started on 2026-10-27, after the Gate 1 GO (
 
 The old drpm code is in the `legacy/*` tags, for example `legacy/v5.2.1`.
 
+## Layout
+
+| Path | npm name | Role |
+|---|---|---|
+| `packages/core` | `@didpkg/core` | `name/`: the install-name grammar (G1) and the shim request router. Phase 1 adds `did/`, `trust/` and `source/`. |
+
 ## Develop
 
 You must have Bun 1.4.4 or later.

@@ -1,0 +1,17 @@
+{
+  "name": "@didpkg/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "didpkg core: install names, DID resolution, Data Integrity verification, storage interfaces.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./name": "./src/name/index.ts",
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "validate-npm-package-name": "8.0.0"
+  }
+}

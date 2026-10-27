@@ -1,0 +1,142 @@
+[
+  {
+    "method": "dht",
+    "did": "did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y",
+    "source": "DIF did:dht spec test vector, https://raw.githubusercontent.com/decentralized-identity/did-dht/main/spec/spec.md"
+  },
+  {
+    "method": "dht",
+    "did": "did:dht:8w7ckznnw671az7nmkrd19ddctpj4spgt8sjqxkmnamdartxh1bo",
+    "source": "drpm.tools/src/registry/handlers.ts:52 (user example)"
+  },
+  {
+    "method": "web",
+    "did": "did:web:nonni.org",
+    "source": "drpm.tools/src/registry/handlers.ts:53 (user example)"
+  },
+  {
+    "method": "web",
+    "did": "did:web:identity.foundation",
+    "source": "live: https://identity.foundation/.well-known/did.json (2026-10-23)"
+  },
+  {
+    "method": "web",
+    "did": "did:web:w3c-ccg.github.io:user:alice",
+    "source": "did:web spec, https://w3c-ccg.github.io/did-method-web/"
+  },
+  {
+    "method": "web",
+    "did": "did:web:example.com%3A3000:user:alice",
+    "source": "did:web spec (port, percent-encoded colon)"
+  },
+  {
+    "method": "web",
+    "did": "did:web:localhost%3A8443",
+    "source": "synthetic: local dev with port"
+  },
+  {
+    "method": "web",
+    "did": "did:web:example.com:Users:Alice_Smith",
+    "source": "synthetic hard case: uppercase and \"_\" in path"
+  },
+  {
+    "method": "web",
+    "did": "did:web:xn--bcher-kva.example",
+    "source": "synthetic: IDN punycode host"
+  },
+  {
+    "method": "key",
+    "did": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+    "source": "did:key spec Ed25519, https://w3c-ccg.github.io/did-key-spec/"
+  },
+  {
+    "method": "key",
+    "did": "did:key:zDnaerx9CtbPJ1q36T5Ln5wYt3MQYeGRG5ehnPAmxcf5mDZpv",
+    "source": "did:key spec P-256"
+  },
+  {
+    "method": "key",
+    "did": "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
+    "source": "did:key spec secp256k1"
+  },
+  {
+    "method": "key",
+    "did": "did:key:z82LkvCwHNreneWpsgPEbV3gu1C6NFJEBg4srfJ5gdxEsMGRJUz2sG9FE42shbn2xkZJh54",
+    "source": "did:key spec P-384"
+  },
+  {
+    "method": "key",
+    "did": "did:key:zUC7EK3ZakmukHhuncwkbySmomv3FmrkmS36E4Ks5rsb6VQSRpoCrx6Hb8e2Nk6UvJFSdyw9NK1scFXJp21gNNYFjVWNgaqyGnkyhtagagCpQb5B7tagJu3HDbjQ8h5ypoHjwBb",
+    "source": "did:key spec BLS12-381 G2"
+  },
+  {
+    "method": "key",
+    "did": "did:key:z4MXj1wBzi9jUstyNsTXdri73XhfqqG5yuJPqZMmjQ93XfmstAfwa4dvQYZpYrmdxoepsb7WRaRpodDJ2HQuhjRaX8P8bStkvNCXZwxLeNB7pMSCQMMEb5GraFoGdt8fJFsUHvBhqLp9susEBpUN3WhhDffnDBMZxFKoa8qTA5JQtcubSU9fGmq9FAc3VAfyCX31EUxSPMDCkWcJCC42DP55W8ofS53RzfVddt3x2QvrCzBN2XXxowBRAfwS9jWn2qwfYP6tEuHuWny5MAKwcePWp51Ju5HbuYUiFCHg6FFAj9F6z7C8xee7LiDMFGD1QfgXduDU5vyoiwWfusXQw19kZf6yfCKeMFLeD2CQ1zHKnxyZSrxek",
+    "source": "generated: RSA-2048 key, node:crypto, multicodec rsa-pub"
+  },
+  {
+    "method": "jwk",
+    "did": "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9",
+    "source": "did:jwk spec P-256, https://github.com/quartzjer/did-jwk/blob/main/spec.md"
+  },
+  {
+    "method": "jwk",
+    "did": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9",
+    "source": "did:jwk spec X25519"
+  },
+  {
+    "method": "jwk",
+    "did": "did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6IkxtX000MmNCM0hrVWlPRFFzWFJjd2VNNlRCeWZ6RUhHTzlORDI3NEpjT1kifQ",
+    "source": "derived: Ed25519 key of the did:key spec example as did:jwk"
+  },
+  {
+    "method": "plc",
+    "did": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+    "source": "live: https://plc.directory/did:plc:ewvi7nxzyoun6zhxrhs64oiz (atproto.com)"
+  },
+  {
+    "method": "plc",
+    "did": "did:plc:z72i7hdynmk6r22z27h6tvur",
+    "source": "live: https://plc.directory/did:plc:z72i7hdynmk6r22z27h6tvur (bsky.app)"
+  },
+  {
+    "method": "webvh",
+    "did": "did:webvh:QmdmPkUdYzbr9txmx8gM2rsHPgr5L6m3gHjJGAf4vUFoGE:domain.example",
+    "source": "did:webvh v1.0 spec, https://identity.foundation/didwebvh/v1.0/"
+  },
+  {
+    "method": "webvh",
+    "did": "did:webvh:QmdmPkUdYzbr9txmx8gM2rsHPgr5L6m3gHjJGAf4vUFoGE:example.com%3A8443:dids:alice",
+    "source": "synthetic: spec SCID with port and path"
+  },
+  {
+    "method": "btcr2",
+    "did": "did:btcr2:k1q5pxw76fzmq5fttej05clqr2wlg97zrj7897783pngqwa4kvunm538sev7lgu",
+    "source": "did:btcr2 spec, https://dcdpr.github.io/did-btcr2/print.html (k hrp, key-based)"
+  },
+  {
+    "method": "btcr2",
+    "did": "did:btcr2:x1qhm2yjspwgyeq7k8980n2twxmezmd0pzyd4qpwm7h7c23wgr6u3rj3gm8cg",
+    "source": "did:btcr2 spec (x hrp, genesis-document-based)"
+  },
+  {
+    "method": "pkh",
+    "did": "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+    "source": "did:pkh spec example, https://raw.githubusercontent.com/w3c-ccg/did-pkh/main/did-pkh-method-draft.md"
+  },
+  {
+    "method": "pkh",
+    "did": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+    "source": "did:pkh spec example (Tezos, mixed case)"
+  },
+  {
+    "method": "ion",
+    "did": "did:ion:EiCZws6U61LV3YmvxmOIlt4Ap5RSJdIkb_lJXhuUPqQYBg",
+    "source": "ion-tools README, https://raw.githubusercontent.com/decentralized-identity/ion-tools/main/README.md"
+  },
+  {
+    "method": "ion",
+    "did": "did:ion:EiDERULqAU2ndqI2ha1RRrdJUf6Un0HpVqKhbNMJNUm0Rw:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnt9fV0sInVwZGF0ZUNvbW1pdG1lbnQiOiJFaUMtUHptOGpPcFh6TGJtbDNWdmNBcUVzOUFXRTQxSEF0WWdLXzd1Qm95R013In0sInN1ZmZpeERhdGEiOnsiZGVsdGFIYXNoIjoiRWlCSzFITU1rVmhoSkxpQ3k3OWFUd0tnam9mRDBOOHViQ19McmU2c2ZxZDRHdyIsInJlY292ZXJ5Q29tbWl0bWVudCI6IkVpQkhPU0hxZmFFaERjRDNtcFFLd0Y2aV9WTl9XclNwRmhlQlFyZ3ZCQ3FSVVEifX0",
+    "source": "ion-tools README long-form DID (418 chars)"
+  }
+]

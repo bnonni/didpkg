@@ -1,0 +1,282 @@
+[
+  {
+    "did": "did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y",
+    "name": "hello",
+    "installName": "@didpkg/hello_dht_i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y"
+  },
+  {
+    "did": "did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_dht_i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y"
+  },
+  {
+    "did": "did:dht:8w7ckznnw671az7nmkrd19ddctpj4spgt8sjqxkmnamdartxh1bo",
+    "name": "hello",
+    "installName": "@didpkg/hello_dht_8w7ckznnw671az7nmkrd19ddctpj4spgt8sjqxkmnamdartxh1bo"
+  },
+  {
+    "did": "did:dht:8w7ckznnw671az7nmkrd19ddctpj4spgt8sjqxkmnamdartxh1bo",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_dht_8w7ckznnw671az7nmkrd19ddctpj4spgt8sjqxkmnamdartxh1bo"
+  },
+  {
+    "did": "did:web:nonni.org",
+    "name": "hello",
+    "installName": "@didpkg/hello_web_nonni.org"
+  },
+  {
+    "did": "did:web:nonni.org",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_web_nonni.org"
+  },
+  {
+    "did": "did:web:identity.foundation",
+    "name": "hello",
+    "installName": "@didpkg/hello_web_identity.foundation"
+  },
+  {
+    "did": "did:web:identity.foundation",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_web_identity.foundation"
+  },
+  {
+    "did": "did:web:w3c-ccg.github.io:user:alice",
+    "name": "hello",
+    "installName": "@didpkg/hello_web_w3c-ccg.github.io_user_alice"
+  },
+  {
+    "did": "did:web:w3c-ccg.github.io:user:alice",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_web_w3c-ccg.github.io_user_alice"
+  },
+  {
+    "did": "did:web:example.com%3A3000:user:alice",
+    "name": "hello",
+    "installName": "@didpkg/hello_web.aam_example.com.3a3000_user_alice"
+  },
+  {
+    "did": "did:web:example.com%3A3000:user:alice",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_web.aam_example.com.3a3000_user_alice"
+  },
+  {
+    "did": "did:web:localhost%3A8443",
+    "name": "hello",
+    "installName": "@didpkg/hello_web.abq_localhost.3a8443"
+  },
+  {
+    "did": "did:web:localhost%3A8443",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_web.abq_localhost.3a8443"
+  },
+  {
+    "did": "did:web:example.com:Users:Alice_Smith",
+    "name": "hello",
+    "installName": "@didpkg/hello_web.aaiim_example.com_users_alice-smith"
+  },
+  {
+    "did": "did:web:example.com:Users:Alice_Smith",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_web.aaiim_example.com_users_alice-smith"
+  },
+  {
+    "did": "did:web:xn--bcher-kva.example",
+    "name": "hello",
+    "installName": "@didpkg/hello_web_xn--bcher-kva.example"
+  },
+  {
+    "did": "did:web:xn--bcher-kva.example",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_web_xn--bcher-kva.example"
+  },
+  {
+    "did": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+    "name": "hello",
+    "installName": "@didpkg/hello_key.ixcqfxbqq_z6mkhaxgbzdvotdkl5257faiztigic2qtklgpbnnegta2dok"
+  },
+  {
+    "did": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_key.ixcqfxbqq_z6mkhaxgbzdvotdkl5257faiztigic2qtklgpbnnegta2dok"
+  },
+  {
+    "did": "did:key:zDnaerx9CtbPJ1q36T5Ln5wYt3MQYeGRG5ehnPAmxcf5mDZpv",
+    "name": "hello",
+    "installName": "@didpkg/hello_key.ie3f3rqm_zdnaerx9ctbpj1q36t5ln5wyt3mqyegrg5ehnpamxcf5mdzpv"
+  },
+  {
+    "did": "did:key:zDnaerx9CtbPJ1q36T5Ln5wYt3MQYeGRG5ehnPAmxcf5mDZpv",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_key.ie3f3rqm_zdnaerx9ctbpj1q36t5ln5wyt3mqyegrg5ehnpamxcf5mdzpv"
+  },
+  {
+    "did": "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
+    "name": "hello",
+    "installName": "@didpkg/hello_key.iolhp5y6y_zq3shokfts3brhcdqrn82rudfczeswl1zdcejwekudpqiybme"
+  },
+  {
+    "did": "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_key.iolhp5y6y_zq3shokfts3brhcdqrn82rudfczeswl1zdcejwekudpqiybme"
+  },
+  {
+    "did": "did:key:z82LkvCwHNreneWpsgPEbV3gu1C6NFJEBg4srfJ5gdxEsMGRJUz2sG9FE42shbn2xkZJh54",
+    "name": "hello",
+    "installName": "@didpkg/hello_key.jmenh4el44bq_z82lkvcwhnrenewpsgpebv3gu1c6nfjebg4srfj5gdxesmgrjuz2sg9fe42shbn2xkzjh54"
+  },
+  {
+    "did": "did:key:z82LkvCwHNreneWpsgPEbV3gu1C6NFJEBg4srfJ5gdxEsMGRJUz2sG9FE42shbn2xkZJh54",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_key.jmenh4el44bq_z82lkvcwhnrenewpsgpebv3gu1c6nfjebg4srfj5gdxesmgrjuz2sg9fe42shbn2xkzjh54"
+  },
+  {
+    "did": "did:key:zUC7EK3ZakmukHhuncwkbySmomv3FmrkmS36E4Ks5rsb6VQSRpoCrx6Hb8e2Nk6UvJFSdyw9NK1scFXJp21gNNYFjVWNgaqyGnkyhtagagCpQb5B7tagJu3HDbjQ8h5ypoHjwBb",
+    "name": "hello",
+    "installName": "@didpkg/hello_key.pqiaqq4hsjlrtt3qqavczbe_zuc7ek3zakmukhhuncwkbysmomv3fmrkms36e4ks5rsb6vqsrpocrx6hb8e2nk6uvjfsdyw9nk1scfxjp21gnnyfjvwngaqygnkyhtagagcpqb5b7tagju3hdbjq8h5ypohjwbb"
+  },
+  {
+    "did": "did:key:zUC7EK3ZakmukHhuncwkbySmomv3FmrkmS36E4Ks5rsb6VQSRpoCrx6Hb8e2Nk6UvJFSdyw9NK1scFXJp21gNNYFjVWNgaqyGnkyhtagagCpQb5B7tagJu3HDbjQ8h5ypoHjwBb",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx__k4wn3i5a6dqloodzgkglyolvpnll3tuo2tbzaly2fmu3sgxzvwkq"
+  },
+  {
+    "did": "did:key:z4MXj1wBzi9jUstyNsTXdri73XhfqqG5yuJPqZMmjQ93XfmstAfwa4dvQYZpYrmdxoepsb7WRaRpodDJ2HQuhjRaX8P8bStkvNCXZwxLeNB7pMSCQMMEb5GraFoGdt8fJFsUHvBhqLp9susEBpUN3WhhDffnDBMZxFKoa8qTA5JQtcubSU9fGmq9FAc3VAfyCX31EUxSPMDCkWcJCC42DP55W8ofS53RzfVddt3x2QvrCzBN2XXxowBRAfwS9jWn2qwfYP6tEuHuWny5MAKwcePWp51Ju5HbuYUiFCHg6FFAj9F6z7C8xee7LiDMFGD1QfgXduDU5vyoiwWfusXQw19kZf6yfCKeMFLeD2CQ1zHKnxyZSrxek",
+    "name": "hello",
+    "installName": "@didpkg/hello__lmrerr4agy3bcqzsfqotqib3n3moc7dvbvqrodkpr36hv7jvuzcq"
+  },
+  {
+    "did": "did:key:z4MXj1wBzi9jUstyNsTXdri73XhfqqG5yuJPqZMmjQ93XfmstAfwa4dvQYZpYrmdxoepsb7WRaRpodDJ2HQuhjRaX8P8bStkvNCXZwxLeNB7pMSCQMMEb5GraFoGdt8fJFsUHvBhqLp9susEBpUN3WhhDffnDBMZxFKoa8qTA5JQtcubSU9fGmq9FAc3VAfyCX31EUxSPMDCkWcJCC42DP55W8ofS53RzfVddt3x2QvrCzBN2XXxowBRAfwS9jWn2qwfYP6tEuHuWny5MAKwcePWp51Ju5HbuYUiFCHg6FFAj9F6z7C8xee7LiDMFGD1QfgXduDU5vyoiwWfusXQw19kZf6yfCKeMFLeD2CQ1zHKnxyZSrxek",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx__lmrerr4agy3bcqzsfqotqib3n3moc7dvbvqrodkpr36hv7jvuzcq"
+  },
+  {
+    "did": "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9",
+    "name": "hello",
+    "installName": "@didpkg/hello__goobl6n3s26agxgbm2aolmhsowtroyffgmfnuas56cvxkyz7iasq"
+  },
+  {
+    "did": "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx__goobl6n3s26agxgbm2aolmhsowtroyffgmfnuas56cvxkyz7iasq"
+  },
+  {
+    "did": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9",
+    "name": "hello",
+    "installName": "@didpkg/hello_jwk.es64k5z2uly5vo47hf5cgo_eyjrdhkioijps1ailcjjcnyioijymju1mtkilcj1c2uioijlbmmilcj4ijoim3a3ymzyddl3ylruvzjiqzdputfoei1euthoymvhze5yzngtrkctsuswocj9"
+  },
+  {
+    "did": "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx__go6c6vbtk3fzf4lvo7u4j3yzhsgwzfg4xhiums264zcpob55siiq"
+  },
+  {
+    "did": "did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6IkxtX000MmNCM0hrVWlPRFFzWFJjd2VNNlRCeWZ6RUhHTzlORDI3NEpjT1kifQ",
+    "name": "hello",
+    "installName": "@didpkg/hello_jwk.ek76dcyog433tw6z7ei_eyjjcnyioijfzdi1nte5iiwia3r5ijoit0tqiiwieci6ikxtx000mmncm0hrvwlprffzwfjjd2vnnlrcewz6ruhhtzlordi3nepjt1kifq"
+  },
+  {
+    "did": "did:jwk:eyJjcnYiOiJFZDI1NTE5Iiwia3R5IjoiT0tQIiwieCI6IkxtX000MmNCM0hrVWlPRFFzWFJjd2VNNlRCeWZ6RUhHTzlORDI3NEpjT1kifQ",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_jwk.ek76dcyog433tw6z7ei_eyjjcnyioijfzdi1nte5iiwia3r5ijoit0tqiiwieci6ikxtx000mmncm0hrvwlprffzwfjjd2vnnlrcewz6ruhhtzlordi3nepjt1kifq"
+  },
+  {
+    "did": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+    "name": "hello",
+    "installName": "@didpkg/hello_plc_ewvi7nxzyoun6zhxrhs64oiz"
+  },
+  {
+    "did": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_plc_ewvi7nxzyoun6zhxrhs64oiz"
+  },
+  {
+    "did": "did:plc:z72i7hdynmk6r22z27h6tvur",
+    "name": "hello",
+    "installName": "@didpkg/hello_plc_z72i7hdynmk6r22z27h6tvur"
+  },
+  {
+    "did": "did:plc:z72i7hdynmk6r22z27h6tvur",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_plc_z72i7hdynmk6r22z27h6tvur"
+  },
+  {
+    "did": "did:webvh:QmdmPkUdYzbr9txmx8gM2rsHPgr5L6m3gHjJGAf4vUFoGE:domain.example",
+    "name": "hello",
+    "installName": "@didpkg/hello_webvh.rkaezfzw_qmdmpkudyzbr9txmx8gm2rshpgr5l6m3ghjjgaf4vufoge_domain.example"
+  },
+  {
+    "did": "did:webvh:QmdmPkUdYzbr9txmx8gM2rsHPgr5L6m3gHjJGAf4vUFoGE:domain.example",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_webvh.rkaezfzw_qmdmpkudyzbr9txmx8gm2rshpgr5l6m3ghjjgaf4vufoge_domain.example"
+  },
+  {
+    "did": "did:webvh:QmdmPkUdYzbr9txmx8gM2rsHPgr5L6m3gHjJGAf4vUFoGE:example.com%3A8443:dids:alice",
+    "name": "hello",
+    "installName": "@didpkg/hello_webvh.rkaezfzwaay_qmdmpkudyzbr9txmx8gm2rshpgr5l6m3ghjjgaf4vufoge_example.com.3a8443_dids_alice"
+  },
+  {
+    "did": "did:webvh:QmdmPkUdYzbr9txmx8gM2rsHPgr5L6m3gHjJGAf4vUFoGE:example.com%3A8443:dids:alice",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_webvh.rkaezfzwaay_qmdmpkudyzbr9txmx8gm2rshpgr5l6m3ghjjgaf4vufoge_example.com.3a8443_dids_alice"
+  },
+  {
+    "did": "did:btcr2:k1q5pxw76fzmq5fttej05clqr2wlg97zrj7897783pngqwa4kvunm538sev7lgu",
+    "name": "hello",
+    "installName": "@didpkg/hello_btcr2_k1q5pxw76fzmq5fttej05clqr2wlg97zrj7897783pngqwa4kvunm538sev7lgu"
+  },
+  {
+    "did": "did:btcr2:k1q5pxw76fzmq5fttej05clqr2wlg97zrj7897783pngqwa4kvunm538sev7lgu",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_btcr2_k1q5pxw76fzmq5fttej05clqr2wlg97zrj7897783pngqwa4kvunm538sev7lgu"
+  },
+  {
+    "did": "did:btcr2:x1qhm2yjspwgyeq7k8980n2twxmezmd0pzyd4qpwm7h7c23wgr6u3rj3gm8cg",
+    "name": "hello",
+    "installName": "@didpkg/hello_btcr2_x1qhm2yjspwgyeq7k8980n2twxmezmd0pzyd4qpwm7h7c23wgr6u3rj3gm8cg"
+  },
+  {
+    "did": "did:btcr2:x1qhm2yjspwgyeq7k8980n2twxmezmd0pzyd4qpwm7h7c23wgr6u3rj3gm8cg",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_btcr2_x1qhm2yjspwgyeq7k8980n2twxmezmd0pzyd4qpwm7h7c23wgr6u3rj3gm8cg"
+  },
+  {
+    "did": "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+    "name": "hello",
+    "installName": "@didpkg/hello_pkh_eip155_1_0xb9c5714089478a327f09197987f16f9e5d936e8a"
+  },
+  {
+    "did": "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_pkh_eip155_1_0xb9c5714089478a327f09197987f16f9e5d936e8a"
+  },
+  {
+    "did": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+    "name": "hello",
+    "installName": "@didpkg/hello_pkh.b2yepsm_tz_tz2bftypeyrzxd5aibchbxn3wczhx7bqbmbq"
+  },
+  {
+    "did": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_pkh.b2yepsm_tz_tz2bftypeyrzxd5aibchbxn3wczhx7bqbmbq"
+  },
+  {
+    "did": "did:ion:EiCZws6U61LV3YmvxmOIlt4Ap5RSJdIkb_lJXhuUPqQYBg",
+    "name": "hello",
+    "installName": "@didpkg/hello_ion.wpbs5fto_eiczws6u61lv3ymvxmoilt4ap5rsjdikb-ljxhuupqqybg"
+  },
+  {
+    "did": "did:ion:EiCZws6U61LV3YmvxmOIlt4Ap5RSJdIkb_lJXhuUPqQYBg",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_ion.wpbs5fto_eiczws6u61lv3ymvxmoilt4ap5rsjdikb-ljxhuupqqybg"
+  },
+  {
+    "did": "did:ion:EiDERULqAU2ndqI2ha1RRrdJUf6Un0HpVqKhbNMJNUm0Rw:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnt9fV0sInVwZGF0ZUNvbW1pdG1lbnQiOiJFaUMtUHptOGpPcFh6TGJtbDNWdmNBcUVzOUFXRTQxSEF0WWdLXzd1Qm95R013In0sInN1ZmZpeERhdGEiOnsiZGVsdGFIYXNoIjoiRWlCSzFITU1rVmhoSkxpQ3k3OWFUd0tnam9mRDBOOHViQ19McmU2c2ZxZDRHdyIsInJlY292ZXJ5Q29tbWl0bWVudCI6IkVpQkhPU0hxZmFFaERjRDNtcFFLd0Y2aV9WTl9XclNwRmhlQlFyZ3ZCQ3FSVVEifX0",
+    "name": "hello",
+    "installName": "@didpkg/hello__wzizwtcae4ncyh46mmzcdwrxzb33enaprbkmntdkxfdnycwqn2wa"
+  },
+  {
+    "did": "did:ion:EiDERULqAU2ndqI2ha1RRrdJUf6Un0HpVqKhbNMJNUm0Rw:eyJkZWx0YSI6eyJwYXRjaGVzIjpbeyJhY3Rpb24iOiJyZXBsYWNlIiwiZG9jdW1lbnQiOnt9fV0sInVwZGF0ZUNvbW1pdG1lbnQiOiJFaUMtUHptOGpPcFh6TGJtbDNWdmNBcUVzOUFXRTQxSEF0WWdLXzd1Qm95R013In0sInN1ZmZpeERhdGEiOnsiZGVsdGFIYXNoIjoiRWlCSzFITU1rVmhoSkxpQ3k3OWFUd0tnam9mRDBOOHViQ19McmU2c2ZxZDRHdyIsInJlY292ZXJ5Q29tbWl0bWVudCI6IkVpQkhPU0hxZmFFaERjRDNtcFFLd0Y2aV9WTl9XclNwRmhlQlFyZ3ZCQ3FSVVEifX0",
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "installName": "@didpkg/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx__wzizwtcae4ncyh46mmzcdwrxzb33enaprbkmntdkxfdnycwqn2wa"
+  }
+]
