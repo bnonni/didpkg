@@ -9,12 +9,19 @@
   "exports": {
     ".": "./src/index.ts",
     "./name": "./src/name/index.ts",
+    "./did": "./src/did/index.ts",
+    "./did/dht": "./src/did/drivers/dht.ts",
+    "./did/web": "./src/did/drivers/web.ts",
+    "./did/conformance": "./src/did/conformance.ts",
     "./package.json": "./package.json"
   },
   "devDependencies": {
     "validate-npm-package-name": "8.0.0"
   },
   "dependencies": {
-    "@noble/hashes": "2.4.0"
+    "@enbox/dids": "0.1.14",
+    "@noble/hashes": "2.4.0",
+    "@scure/base": "2.4.0",
+    "web-did-resolver": "3.2.0"
   }
 }

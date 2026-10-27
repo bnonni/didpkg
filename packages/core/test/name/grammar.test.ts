@@ -5,6 +5,7 @@ import validate from 'validate-npm-package-name';
 import { format, formatDirect, parse, bindHash, didHash, GrammarError, DID_RE, MAX_NPM_NAME } from '../../src/name/grammar.ts';
 import * as pkg from '../../src/name/index.ts';
 import * as core from '../../src/index.ts';
+import * as did from '../../src/did/index.ts';
 
 const vectors: { method: string; did: string }[] = await Bun.file(new URL('./vectors.json', import.meta.url)).json();
 // golden.json: format(did, name) from the research codec (research/phase3/name-grammar/grammar.ts).
@@ -38,7 +39,7 @@ test('golden: format() output is byte-for-byte the research codec output', () =>
 
 test('name/index and the core index export the public API', () => {
   expect(Object.keys(pkg).sort()).toEqual(['GrammarError', 'bindHash', 'didHash', 'format', 'formatDirect', 'parse', 'route']);
-  expect(Object.keys(core).sort()).toEqual(Object.keys(pkg).sort());
+  expect(Object.keys(core).sort()).toEqual([...Object.keys(pkg), ...Object.keys(did)].sort());
   expect(pkg.format('did:web:nonni.org', 'hello')).toBe('@didpkg/hello_web_nonni.org');
   const e = code(() => pkg.parse('@other/x'));
   expect(e).toBe('E_SCOPE');
