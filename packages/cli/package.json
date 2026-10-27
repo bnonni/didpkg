@@ -1,0 +1,17 @@
+{
+  "name": "didpkg",
+  "version": "0.0.1",
+  "private": true,
+  "description": "didpkg CLI: install names now; id, publish and the npm shim in Phase 1.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "didpkg": "./src/cli.ts"
+  },
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "dependencies": {
+    "@didpkg/core": "workspace:*"
+  }
+}
