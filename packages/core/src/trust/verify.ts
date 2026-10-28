@@ -11,11 +11,17 @@ import { keyForRelationship, publicKeyOf, toMultikey } from './keys.ts';
 import { verifyProof, type DataIntegrityProof } from './proof.ts';
 import { parseIndex, parseRelease, proofsOf, type DidPkgIndex, type DidPkgRelease } from './release.ts';
 
-/** The reads that the verifier needs. Each value is untrusted. `null` means absent. */
+/**
+ * The reads that the verifier needs. Each value is untrusted. `null` means absent.
+ * `PackageSource` (source/) implements it over every storage endpoint of the publisher.
+ */
 export interface ReleaseReader {
-  getIndex(did: string, name: string): Promise<unknown>;
-  getRelease(did: string, name: string, version: string): Promise<unknown>;
-  getTarball(did: string, name: string, version: string): Promise<Uint8Array | null>;
+  /** Every index copy from every endpoint. Empty if no endpoint has one. */
+  getIndexes(did: string, name: string): Promise<unknown[]>;
+  /** A release copy whose contentDigest is `digest`. */
+  getRelease(did: string, name: string, version: string, digest: string): Promise<unknown>;
+  /** A tarball copy with the size and the sha512 of `dist`. */
+  getTarball(did: string, name: string, version: string, dist: { integrity: string; size: number }): Promise<Uint8Array | null>;
 }
 
 /** The TOFU pin of one DID and package, like a line in the SSH known_hosts file. */
@@ -104,19 +110,22 @@ export async function verifyIndex(o: VerifyIndexOptions): Promise<VerifiedIndex>
   }
   if (doc.id !== o.did) throw new PolicyError('DID_RESOLUTION', `the resolver returned ${doc.id}, not ${o.did}`);
 
-  // 2. The index must have a proof by a key that is in assertionMethod now.
-  const raw = await o.reader.getIndex(o.did, o.name);
-  if (raw === null || raw === undefined) throw new PolicyError('INDEX_MISSING', `no index for ${pinId(o.did, o.name)}`);
-  const index = parseIndex(raw);
-  if (index.publisher !== o.did || index.name !== o.name) {
-    throw new PolicyError('INDEX_FIELDS', `the index is for ${pinId(index.publisher, index.name)}`);
+  // 2. Every index copy. The highest sequence with a proof by a current assertionMethod key wins.
+  // If no copy is valid, the error of the first copy (the DWN first) is the result.
+  const copies = await o.reader.getIndexes(o.did, o.name);
+  if (copies.length === 0) throw new PolicyError('INDEX_MISSING', `no index for ${pinId(o.did, o.name)}`);
+  let best: { index: DidPkgIndex; epochMethod: string } | undefined;
+  let firstError: unknown;
+  for (const raw of copies) {
+    try {
+      const copy = await checkIndex(raw, o.did, o.name, doc);
+      if (!best || copy.index.sequence > best.index.sequence) best = copy;
+    } catch (e) {
+      firstError ??= e;
+    }
   }
-  let epochMethod: string | undefined;
-  for (const proof of proofsOf(index)) {
-    epochMethod = await verifies(index, proof, doc);
-    if (epochMethod) break;
-  }
-  if (!epochMethod) throw new PolicyError('INDEX_SIGNATURE', 'no index proof by a current assertionMethod key');
+  if (!best) throw firstError;
+  const { index, epochMethod } = best;
   const epochKey = toMultikey(publicKeyOf(keyForRelationship(doc, epochMethod)));
   const indexDigest = contentDigest(index);
 
@@ -158,7 +167,7 @@ export async function verifyRelease(o: VerifyReleaseOptions): Promise<VerifiedRe
   if (entry.status === 'deprecated') warnings.push({ code: 'DEPRECATED', message: `${o.version} is deprecated${note}` });
 
   // 5. The manifest: the digest in the index, the fields, and the proof.
-  const raw = await o.reader.getRelease(o.did, o.name, o.version);
+  const raw = await o.reader.getRelease(o.did, o.name, o.version, entry.digest);
   if (raw === null || raw === undefined) throw new PolicyError('MANIFEST_MISSING', `no manifest for ${o.version}`);
   const release = parseRelease(raw);
   if (contentDigest(release) !== entry.digest) throw new PolicyError('MANIFEST_DIGEST', 'the manifest is not the manifest in the signed index');
@@ -168,7 +177,7 @@ export async function verifyRelease(o: VerifyReleaseOptions): Promise<VerifiedRe
   const manifestKey = await manifestKeyOf(release, doc);
 
   // 6. The tarball: hash all bytes before one byte goes to npm.
-  const tarball = await o.reader.getTarball(o.did, o.name, o.version);
+  const tarball = await o.reader.getTarball(o.did, o.name, o.version, release.dist);
   if (!tarball) throw new PolicyError('TARBALL_MISSING', `no tarball for ${o.version}`);
   if (tarball.length !== release.dist.size || (await sri('sha512', tarball)) !== release.dist.integrity) {
     throw new PolicyError('INTEGRITY', 'the tarball bytes are not the bytes in the signed manifest');
@@ -185,6 +194,19 @@ export async function verifyRelease(o: VerifyReleaseOptions): Promise<VerifiedRe
     releases: { ...pin?.releases, [o.version]: entry.digest },
   });
   return { ...verified, release, tarball, manifestKey };
+}
+
+// Step 2 for one index copy: the schema, the fields, and a proof by a key in assertionMethod now.
+async function checkIndex(raw: unknown, did: string, name: string, doc: DidDocument) {
+  const index = parseIndex(raw);
+  if (index.publisher !== did || index.name !== name) {
+    throw new PolicyError('INDEX_FIELDS', `the index is for ${pinId(index.publisher, index.name)}`);
+  }
+  for (const proof of proofsOf(index)) {
+    const epochMethod = await verifies(index, proof, doc);
+    if (epochMethod) return { index, epochMethod };
+  }
+  throw new PolicyError('INDEX_SIGNATURE', 'no index proof by a current assertionMethod key');
 }
 
 // L2: a proof by a pinned key. The DID document does not hold that key now, so a one-key document checks it.

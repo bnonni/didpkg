@@ -14,6 +14,7 @@
     "./did/web": "./src/did/drivers/web.ts",
     "./did/conformance": "./src/did/conformance.ts",
     "./trust": "./src/trust/index.ts",
+    "./source": "./src/source/index.ts",
     "./package.json": "./package.json"
   },
   "devDependencies": {

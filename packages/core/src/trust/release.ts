@@ -57,7 +57,7 @@ export interface DidPkgIndex {
 const SHA512_SRI = /^sha512-[A-Za-z0-9+/]{86}==$/;
 const SHA256_DIGEST = /^sha256-[A-Za-z0-9+/]{43}=$/;
 // SemVer 2.0.0, the regular expression that semver.org gives.
-const SEMVER =
+export const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
 type Json = Record<string, unknown>;

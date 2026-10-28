@@ -20,8 +20,13 @@ export class MemReader implements ReleaseReader {
   releases = new Map<string, DidPkgRelease>();
   tarballs = new Map<string, Uint8Array>();
 
+  /** The head index, or null. A test helper: the verifier reads `getIndexes`. */
   async getIndex(did: string, name: string) {
     return structuredClone(this.indexes.get(`${did}/${name}`) ?? null);
+  }
+  async getIndexes(did: string, name: string) {
+    const head = await this.getIndex(did, name);
+    return head ? [head] : [];
   }
   async getRelease(did: string, name: string, version: string) {
     return structuredClone(this.releases.get(`${did}/${name}@${version}`) ?? null);
