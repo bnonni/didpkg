@@ -1,6 +1,6 @@
 # ADR 0001: Gate 1 (Phase 0 go/no-go)
 
-- Status: ACCEPTED: GO (2026-10-27, 16:45 EDT). Exit criterion 3 is still open: the +6 h and +24 h decay checks run after the decision. See [Decision](#decision).
+- Status: ACCEPTED: GO (2026-10-27, 16:45 EDT). Exit criterion 3 closed on 2026-10-28 at 11:25 EDT: the DID did not decay in 24 h, and the public keyless re-PUT passed. See [Decision](#decision).
 - Date: 2026-10-27 (spike 06 added 15:10 EDT, decision 16:45 EDT)
 - Deciders: bnonni (go/no-go), agent (evidence)
 - Evidence folder: `~/spikes/didpkg-p0/` (re-run: `./run-all.sh`). The evidence paths below are relative to this folder. Since the reboot commit (2026-10-27), this file is in `bnonni/didpkg` `docs/adr/`.
@@ -28,7 +28,7 @@ PLAN.md Phase 0 proves 6 risky links before the build starts. Spike 06 (the publ
 | Spike | Result | Evidence |
 |---|---|---|
 | 01 did:dht | Local: 6/6 (second-process resolve, keyless re-PUT, tampered PUT rejected, failover). Public: PUT 204 at 2026-10-27T15:24:51Z; both `relay.pkarr.org` and `pkarr.pubky.org` resolve, all checks pass. Payload 521 bytes (limit 1000). Type test: only the exact string `DIDPackageRepository` is accepted (3/3). | `01-did-dht/results/` |
-| 01 decay | +2 h (2026-10-27T17:25Z): PASS. Both relays resolve, versionId 1793113192, all checks pass (4.4 s each). PENDING: +6 h (17:25 EDT), +24 h then a keyless re-PUT (2026-10-28 11:25 EDT). | `01-did-dht/results/decay.jsonl` |
+| 01 decay | +2 h (2026-10-27T17:25Z), +6 h (2026-10-27T21:25Z) and +24 h (2026-10-28T15:25Z): PASS. Both relays resolve, versionId 1793113192, signature valid, all checks pass (4.4 s each at +2 h, less than 1 s each at +6 h and +24 h). Keyless re-PUT to `relay.pkarr.org` at 2026-10-28T15:25:09Z: 204. Check after the re-PUT (15:25:41Z): PASS on both relays, same versionId. `pkarr.pubky.org` never got a direct PUT. | `01-did-dht/results/decay.jsonl` |
 | 02 sign and publish | 9/9. The W3C `eddsa-jcs-2022` vector is byte-exact. Only `#didpkg-1` signs. Layout v1 for 2 versions; both verify end to end. | `02-sign-publish/results-bun-1.4.4.json` |
 | 03 real hosts | 17/17. Anonymous GET, same bytes, `access-control-allow-origin: *` on both hosts. `verifyRelease` passes with no override. | `03-pages/results-bun-1.4.4.json` |
 | 04 shim install | 9/9. npm 11, pnpm 11 and `bun add` install from the real hosts in a clean HOME with one `.npmrc` line and a cold cache. Frozen installs pass on pnpm and bun. `npm ci` fails with EINTEGRITY if the shim changes the bytes. | `04-shim-install/results-bun-1.4.4.json` |
@@ -39,9 +39,9 @@ PLAN.md Phase 0 proves 6 risky links before the build starts. Spike 06 (the publ
 
 ## Exit criteria
 
-1. Spikes 01-06 pass with the exact pins on Bun 1.4.4: YES (decay check pending, see 3). `run-all.sh` on 2026-10-27 at 14:54 EDT: all gate spikes pass, Node 5/5.
+1. Spikes 01-06 pass with the exact pins on Bun 1.4.4: YES (decay check: see 3). `run-all.sh` on 2026-10-27 at 14:54 EDT: all gate spikes pass, Node 5/5.
 2. Clean HOME install with npm, pnpm add, and `npm ci` fails on changed bytes: YES, from the static mirror (spike 04) and from the DWN only (spike 06).
-3. Decay times recorded, and a keyless re-PUT brings the DID back: OPEN. The GO decision does not wait for it (see [Decision](#decision)).
+3. Decay times recorded, and a keyless re-PUT brings the DID back: YES (2026-10-28). No decay in 24 h on both relays. The public keyless re-PUT got 204, and the DID resolves after it. The DID did not expire, thus the public test did not show a return from expiry. See the note on relay caching in [Decision](#decision).
 4. `did-trust-model/run-all.sh` and `name-grammar` `bun test` on Bun 1.4.4: YES.
 5. This ADR records versions, hours, the Node result, the bun result and the decision: YES.
 
@@ -89,12 +89,12 @@ Reasons:
 3. The +2 h public check passed on both relays.
 4. A failed public re-PUT changes only the did:dht retention commands: the re-PUT in `didpkg publish`, `didpkg id republish` and the re-PUT at install. It does not change `@didpkg/core` `name/` and `trust/`, or `@didpkg/adapter-dwn`.
 
-Open after the decision (systemd user timers, output in `01-did-dht/results/decay.jsonl`):
+Checks after the decision (systemd user timers, output in `01-did-dht/results/decay.jsonl`):
 
-1. +6 h check: 2026-10-27, 17:25 EDT.
-2. +24 h check, then a keyless re-PUT: 2026-10-28, 11:25 EDT.
+1. +6 h check: 2026-10-27, 17:25 EDT. PASS.
+2. +24 h check, then a keyless re-PUT: 2026-10-28, 11:25 EDT. PASS.
 
-The agent adds both results to the "01 decay" row and to exit criterion 3.
+The "01 decay" row and exit criterion 3 have the results.
 
 If the public keyless re-PUT does not bring the DID back:
 
@@ -103,3 +103,5 @@ If the public keyless re-PUT does not bring the DID back:
 3. Move the did:dht retention design to decision 6 (before Phase 2).
 
 If the DID stays resolvable at +24 h with no re-PUT, record it as a note on relay caching. The decision stays GO.
+
+Note on relay caching (2026-10-28): the DID stayed resolvable at +24 h with no re-PUT, on both relays. The cause is not known: a relay cache, or DHT nodes that keep the record. `pkarr.pubky.org` got the record only through the DHT or its own cache. Thus 24 h is not a measured DHT lifetime. Decision 6 (did:dht retention, before Phase 2) must not use it as a proven value. The did:web fallback does not apply. The decision stays GO.
