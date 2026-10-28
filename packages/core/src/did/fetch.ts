@@ -20,6 +20,7 @@ export class FetchError extends Error {
 export interface FetchLimits {
   fetch?: FetchLike;
   signal?: AbortSignal;
+  /** `Infinity`: no own timer. Then only `signal` sets the time limit. */
   timeoutMs?: number;
   maxBytes?: number;
   /** Allows http and private addresses. Only for tests and local relays. */
@@ -38,8 +39,8 @@ export async function fetchBytes(url: string, limits: FetchLimits = {}): Promise
   const timeoutMs = limits.timeoutMs ?? SOURCE_TIMEOUT_MS;
   const maxBytes = limits.maxBytes ?? MAX_RESPONSE_BYTES;
   const doFetch: FetchLike = limits.fetch ?? ((u, init) => fetch(u, init));
-  const timeout = AbortSignal.timeout(timeoutMs);
-  const signal = limits.signal ? AbortSignal.any([limits.signal, timeout]) : timeout;
+  const timeout = Number.isFinite(timeoutMs) ? AbortSignal.timeout(timeoutMs) : undefined;
+  const signal = AbortSignal.any([limits.signal, timeout].filter((s) => s !== undefined));
   let current = checkUrl(url, allowPrivate);
 
   for (let hop = 0; ; hop++) {
@@ -62,7 +63,7 @@ export async function fetchBytes(url: string, limits: FetchLimits = {}): Promise
       return { status: res.status, url: current.href, body: await readCapped(res, maxBytes, host) };
     } catch (e) {
       if (e instanceof FetchError) throw e;
-      if (timeout.aborted) throw new FetchError(`${host}: no response in ${timeoutMs} ms`, true);
+      if (timeout?.aborted) throw new FetchError(`${host}: no response in ${timeoutMs} ms`, true);
       if (signal.aborted) throw new FetchError(`${host}: aborted`, true);
       throw new FetchError(`${host}: ${e instanceof Error ? e.message : String(e)}`, true);
     }

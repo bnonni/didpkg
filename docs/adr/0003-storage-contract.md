@@ -4,7 +4,7 @@
 - Date: 2026-10-27
 - Deciders: bnonni (DWN first, 2026-10-27), agent (the merge of the prototypes)
 - Code: `packages/core/src/source/`, the `ReleaseReader` change and `checkRelease` in `packages/core/src/trust/verify.ts`. Tests: `packages/core/test/source/`.
-- Amended: 2026-10-27, section 8 (the npm packument, chunk C4b).
+- Amended: 2026-10-27, section 8 (the npm packument, chunk C4b); section 7 items 1-5 (the static HTTPS adapter, chunk C5). Code: `packages/adapter-https/`.
 
 ## Context
 
@@ -141,6 +141,14 @@ The spike 06 shape is final (`~/spikes/didpkg-p0/06-dwn/protocol.json`, 30 of 30
 
 PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<name>/<version>.tgz`. The repository root `didpkg.json` stays optional. Phase 1 does not read or write it. A later version can add it to `StoredFile`, because v1 adds members only.
 
+`packages/adapter-https` reads and writes this layout:
+
+1. The reader (`httpsAdapter`) reads only a `DIDPackageRepository` endpoint with `https:` and no private host (`isPrivateHost`). The test option `allowLoopback` also allows `http:` and `https:` on `localhost`, `127.0.0.0/8` and `[::1]`. It uses `fetchBytes` from `did/`: a redirect only to the same host and protocol, no own timer (the `PackageSource` signal sets the time limit).
+2. Only HTTP 404 and 410 mean "absent". Each other status, also 403, is a failed endpoint. Thus a broken mirror cannot make a published file look absent (404 instead of 502).
+3. Each path segment is `encodeURIComponent` of the name or the version. Only `+` changes (`%2B`), because some hosts read a literal `+` as a space. Each segment must match `^[0-9A-Za-z][0-9A-Za-z.+-]*$`, also for a direct caller.
+4. The writer (`DirWriter`, entry point `@didpkg/adapter-https/dir`) does not change a published release or tarball, because a lockfile holds their integrity. The same bytes again is a no-op, so a failed publish can run again. Each write is a temporary file and a rename.
+5. The reader entry point uses no Node API, so it runs in a browser. Only `dir.ts` uses `node:fs`.
+
 ### 8. The npm packument
 
 `buildPackument` (`source/packument.ts`) makes the packument from the result of `verifyIndex`. The shim (C10) sends it.
@@ -170,3 +178,5 @@ PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<na
 4. A `writer(target, credentials)` factory in `StorageAdapter`: the credentials have no common type.
 5. One reader method per file kind (`getIndex`, `getRelease`, `getTarball`): 3 methods per adapter for 1 map from a file to a path.
 6. A packument that skips a version with an absent or bad manifest (spike `lib/shim.ts`): a host can hide the newest version, and the `latest` fallback then selects an older version.
+7. HTTP 403 as "absent" (some S3 buckets answer 403 for a missing key): a broken mirror then hides a file with a 404 result. Such a bucket must allow the list permission, or it serves 502.
+8. A `DirWriter` that replaces a published file (spike `proto.ts`): a new tarball for an old version breaks each lockfile with the old integrity.

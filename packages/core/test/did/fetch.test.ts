@@ -81,6 +81,10 @@ test('fetchBytes: a timeout and a network failure are transient', async () => {
   const aborted = reason(fetchBytes('https://a.example/x', { fetch: hangingFetch, signal: controller.signal }));
   controller.abort();
   expect((await aborted).message).toBe('a.example: aborted');
+  const caller = new AbortController();
+  const callerOnly = reason(fetchBytes('https://a.example/x', { fetch: hangingFetch, signal: caller.signal, timeoutMs: Infinity }));
+  setTimeout(() => caller.abort(), 20);
+  expect((await callerOnly).message).toBe('a.example: aborted');
   const down = await reason(fetchBytes('https://a.example/x', { fetch: async () => { throw new TypeError('fetch failed'); } }));
   expect([down.message, down.transient]).toEqual(['a.example: fetch failed', true]);
 });

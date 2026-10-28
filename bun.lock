@@ -9,6 +9,13 @@
         "typescript": "7.0.2",
       },
     },
+    "packages/adapter-https": {
+      "name": "@didpkg/adapter-https",
+      "version": "0.0.0",
+      "dependencies": {
+        "@didpkg/core": "workspace:*",
+      },
+    },
     "packages/cli": {
       "name": "didpkg",
       "version": "0.0.1",
@@ -37,6 +44,8 @@
     },
   },
   "packages": {
+    "@didpkg/adapter-https": ["@didpkg/adapter-https@workspace:packages/adapter-https"],
+
     "@didpkg/core": ["@didpkg/core@workspace:packages/core"],
 
     "@dnsquery/dns-packet": ["@dnsquery/dns-packet@6.1.1", "", { "dependencies": { "@leichtgewicht/ip-codec": "^2.0.4", "utf8-codec": "^1.0.0" } }, "sha512-WXTuFvL3G+74SchFAtz3FgIYVOe196ycvGsMgvSH/8Goptb1qpIQtIuM4SOK9G9lhMWYpHxnXyy544ZhluFOew=="],

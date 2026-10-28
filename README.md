@@ -13,6 +13,7 @@ The old drpm code is in the `legacy/*` tags, for example `legacy/v5.2.1`.
 | Path | npm name | Role |
 |---|---|---|
 | `packages/core` | `@didpkg/core` | `name/`: the install-name grammar (G1) and the shim request router. Phase 1 adds `did/`, `trust/` and `source/`. |
+| `packages/adapter-https` | `@didpkg/adapter-https` | The static HTTPS mirror (`DIDPackageRepository`): the reader `httpsAdapter` and the `dir:` writer `DirWriter` (ADR 0003 section 7). |
 | `packages/cli` | `didpkg` | `didpkg name` and `didpkg parse` (from `didpkg@0.0.1`). Phase 1 adds `id`, `publish` and `shim`. |
 
 ## Develop

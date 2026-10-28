@@ -1,0 +1,17 @@
+{
+  "name": "@didpkg/adapter-https",
+  "version": "0.0.0",
+  "private": true,
+  "description": "didpkg storage adapter for a static HTTPS mirror (DIDPackageRepository): a reader and a dir: writer.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./dir": "./src/dir.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@didpkg/core": "workspace:*"
+  }
+}
