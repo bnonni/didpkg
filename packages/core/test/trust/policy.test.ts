@@ -216,3 +216,46 @@ describe('a key of another DID', () => {
     expect(await outcome(() => verify({ did, version: '1.0.0', resolver, reader, trust: new Map() }))).toBe('INDEX_FIELDS');
   });
 });
+
+describe('the did:dht update key #0', () => {
+  const did = 'did:dht:df6h6n9zksp86p7d957xtmmu3w64mwb8mdcza6iu8p9ew8i9jq4o';
+  let update: Key, release: Key;
+  const resolver = new FakeResolver();
+
+  beforeAll(async () => {
+    [update, release] = [await newKey(did, '0'), await newKey(did, 'didpkg-1')];
+    resolver.set(did, [update, release]); // the did:dht spec puts #0 in assertionMethod
+  });
+
+  test('the release key passes', async () => {
+    const reader = new MemReader();
+    await publish(reader, { did, version: '1.0.0', tarball: tgz('a'), signers: [release.signer] });
+    expect((await verify({ did, version: '1.0.0', resolver, reader, trust: new Map() })).manifestKey).toBe('current-key');
+  });
+
+  test('an index proof by #0 fails, also next to a release key proof and in warn mode', async () => {
+    for (const signers of [[update.signer], [release.signer, update.signer]]) {
+      const reader = new MemReader();
+      await publish(reader, { did, version: '1.0.0', tarball: tgz('a'), signers: [release.signer], indexSigners: signers });
+      expect(await outcome(() => verify({ did, version: '1.0.0', resolver, reader, trust: new Map(), mode: 'warn' }))).toBe('INDEX_SIGNATURE');
+    }
+  });
+
+  test('a manifest proof by #0 fails, even if the index lists it', async () => {
+    for (const signers of [[update.signer], [release.signer, update.signer]]) {
+      const reader = new MemReader();
+      await publish(reader, { did, version: '1.0.0', tarball: tgz('a'), signers, indexSigners: [release.signer] });
+      expect(await outcome(() => verify({ did, version: '1.0.0', resolver, reader, trust: new Map(), mode: 'warn' }))).toBe('MANIFEST_SIGNATURE');
+    }
+  });
+
+  test('#0 of another method is a release key', async () => {
+    const web = 'did:web:pkg.example';
+    const key = await newKey(web, '0');
+    const r = new FakeResolver();
+    r.set(web, [key]);
+    const reader = new MemReader();
+    await publish(reader, { did: web, version: '1.0.0', tarball: tgz('a'), signers: [key.signer] });
+    expect((await verify({ did: web, version: '1.0.0', resolver: r, reader, trust: new Map() })).manifestKey).toBe('current-key');
+  });
+});

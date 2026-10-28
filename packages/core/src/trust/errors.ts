@@ -44,7 +44,7 @@ export type PolicyCode =
   | 'INDEX_SCHEMA'
   /** The index publisher or name is not the requested DID or name. */
   | 'INDEX_FIELDS'
-  /** No index proof by a key that is in assertionMethod now. */
+  /** No index proof by a key that is in assertionMethod now, or an index proof by the did:dht update key #0. */
   | 'INDEX_SIGNATURE'
   /** The index key is new, and no pinned key co-signs the index. */
   | 'KEY_CHANGED'
@@ -66,7 +66,7 @@ export type PolicyCode =
   | 'MANIFEST_DIGEST'
   /** The manifest publisher, name or version is not the requested value. */
   | 'MANIFEST_FIELDS'
-  /** A manifest proof names a method of another DID. */
+  /** A manifest proof names a method of another DID, or the did:dht update key #0. */
   | 'MANIFEST_SIGNATURE'
   | 'TARBALL_MISSING'
   /** The tarball size or sha512 is not the value in the signed manifest. */

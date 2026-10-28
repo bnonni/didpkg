@@ -83,6 +83,11 @@ export interface VerifiedRelease extends VerifiedIndex {
 
 const pinId = (did: string, name: string) => `${did}/${name}`;
 
+// The did:dht identity key #0 is the DID update key (PLAN.md Rules item 4). The did:dht spec puts #0 in
+// assertionMethod (spec.md section "Identity Key Pair"), but only a release key signs releases. A proof by #0
+// shows a hot update key, and a thief with #0 can sign with no DID document change. Thus a #0 proof fails.
+const updateKeyOf = (did: string) => (did.startsWith('did:dht:') ? `${did}#0` : undefined);
+
 /** The proof `proof` of the object, if it verifies against the document. A non-TrustError is a defect, so it escapes. */
 async function verifies(object: { proof: unknown }, proof: DataIntegrityProof, doc: DidDocument): Promise<string | undefined> {
   try {
@@ -218,7 +223,12 @@ async function checkIndex(raw: unknown, did: string, name: string, doc: DidDocum
   if (index.publisher !== did || index.name !== name) {
     throw new PolicyError('INDEX_FIELDS', `the index is for ${pinId(index.publisher, index.name)}`);
   }
-  for (const proof of proofsOf(index)) {
+  const proofs = proofsOf(index);
+  const updateKey = updateKeyOf(did);
+  if (updateKey && proofs.some((p) => p.verificationMethod === updateKey)) {
+    throw new PolicyError('INDEX_SIGNATURE', `the did:dht update key ${updateKey} signed the index`);
+  }
+  for (const proof of proofs) {
     const epochMethod = await verifies(index, proof, doc);
     if (epochMethod) return { index, epochMethod };
   }
@@ -245,6 +255,7 @@ async function manifestKeyOf(release: DidPkgRelease, doc: DidDocument): Promise<
     if (typeof method !== 'string' || !method.startsWith(`${doc.id}#`)) {
       throw new PolicyError('MANIFEST_SIGNATURE', `the manifest proof method ${String(method)} is not a method of ${doc.id}`);
     }
+    if (method === updateKeyOf(doc.id)) throw new PolicyError('MANIFEST_SIGNATURE', `the did:dht update key ${method} signed the manifest`);
   }
   for (const proof of proofs) if (await verifies(release, proof, doc)) return 'current-key';
   return 'index';
