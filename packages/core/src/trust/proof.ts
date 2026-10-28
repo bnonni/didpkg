@@ -15,7 +15,7 @@ export type Cryptosuite = (typeof CRYPTOSUITES)[number];
 
 const SUITE_ALG: Record<Cryptosuite, KeyAlg> = { 'eddsa-jcs-2022': 'Ed25519', 'bip340-jcs-2025': 'secp256k1' };
 // XML Schema 1.1 dateTimeStamp (a time zone is necessary).
-const DATE_TIME_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+export const DATE_TIME_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 export interface DataIntegrityProof {
   type: 'DataIntegrityProof';
