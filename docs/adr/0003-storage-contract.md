@@ -4,7 +4,7 @@
 - Date: 2026-10-27
 - Deciders: bnonni (DWN first, 2026-10-27), agent (the merge of the prototypes)
 - Code: `packages/core/src/source/`, the `ReleaseReader` change and `checkRelease` in `packages/core/src/trust/verify.ts`. Tests: `packages/core/test/source/`.
-- Amended: 2026-10-27, section 8 (the npm packument, chunk C4b); section 7 items 1-5 (the static HTTPS adapter, chunk C5). Code: `packages/adapter-https/`.
+- Amended: 2026-10-27, section 8 (the npm packument, chunk C4b); section 7 items 1-5 (the static HTTPS adapter, chunk C5); section 6 items 5-9 (the DWN writer, chunk C6). Code: `packages/adapter-https/`, `packages/adapter-dwn/`.
 
 ## Context
 
@@ -137,6 +137,14 @@ The spike 06 shape is final (`~/spikes/didpkg-p0/06-dwn/protocol.json`, 30 of 30
 3. The reader yields one copy per `contextId`. Thus two `package` records with one name give two candidates.
 4. No `$recordLimit` `strategy` (PLAN.md DWN rule 1). CI installs the protocol on the pinned server (C6).
 
+`packages/adapter-dwn` writes this protocol (C6). The reader is chunk C7.
+
+5. The writer (`DwnWriter`, entry point `@didpkg/adapter-dwn/writer`) signs each DWN message with a key of the DID document, `#didpkg-1`. It never uses the did:dht update key `#0`. The DWN signature is not a trust input.
+6. The DWN keeps more than one record with one `version` tag, and a DRL read gives the newest. `$immutable` stops only an update of one record. Thus the writer refuses to replace a published release or tarball: before a write, it compares the `dataCid` of each record with that tag. The same bytes again is a no-op, so a failed publish can run again.
+7. A name has one `package` record. After a race of two publishes, the writer uses the oldest record, so each write goes to one context. A package has one `index` record, updated in place. After a race, the writer updates the newest index record, because a reader reads that record.
+8. `installProtocol` is a separate call. `publish` does not install the protocol. The entry point `.` does not load the DWN SDK, so the reader (C7) stays small.
+9. The tests run the pinned `@enbox/dwn-server` 0.1.45 (a devDependency) as a child process on 127.0.0.1, with the rate limits off. CI runs them.
+
 ### 7. The static layout v1
 
 PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<name>/<version>.tgz`. The repository root `didpkg.json` stays optional. Phase 1 does not read or write it. A later version can add it to `StoredFile`, because v1 adds members only.
@@ -180,3 +188,4 @@ PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<na
 6. A packument that skips a version with an absent or bad manifest (spike `lib/shim.ts`): a host can hide the newest version, and the `latest` fallback then selects an older version.
 7. HTTP 403 as "absent" (some S3 buckets answer 403 for a missing key): a broken mirror then hides a file with a 404 result. Such a bucket must allow the list permission, or it serves 502.
 8. A `DirWriter` that replaces a published file (spike `proto.ts`): a new tarball for an old version breaks each lockfile with the old integrity.
+9. A DWN writer that relies only on `$immutable` (spike `lib/dwn-writer.ts`): a second record with the same `version` tag replaces the file for each reader.

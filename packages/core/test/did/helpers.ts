@@ -51,7 +51,7 @@ export async function dhtFixture(endpoints: string[] = ['https://pkg.example.com
     out.set(v, 72);
     return out;
   }
-  return { did: bearer.uri, id, document: bearer.document, seq: message.seq, v: message.v, payload };
+  return { did: bearer.uri, id, bearer, document: bearer.document, seq: message.seq, v: message.v, payload };
 }
 
 export const bytesResponse = (b: Uint8Array) => new Response(b, { headers: { 'content-type': 'application/pkarr.org/relays#payload' } });

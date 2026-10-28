@@ -1,0 +1,23 @@
+{
+  "name": "@didpkg/adapter-dwn",
+  "version": "0.0.0",
+  "private": true,
+  "description": "didpkg storage adapter for the publisher DWN (DecentralizedWebNode): the protocol and a writer.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./writer": "./src/writer.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@didpkg/core": "workspace:*",
+    "@enbox/dwn-clients": "0.4.37",
+    "@enbox/dwn-sdk-js": "0.4.29",
+    "@noble/ed25519": "3.2.0"
+  },
+  "devDependencies": {
+    "@enbox/dwn-server": "0.1.45"
+  }
+}
