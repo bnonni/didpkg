@@ -33,6 +33,12 @@ The demo (`demo/e2e.ts`) starts a Pkarr relay, a `dwn-server` and a static mirro
 bun demo/e2e.ts
 ```
 
+The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dwn-server` with a tenant allowlist, Traefik for TLS and the route allowlist, and a daily backup. The runbook is [docs/deploy.md](docs/deploy.md). The stack test starts the same files with a demo CA and a local relay. It needs Docker with Compose 2.24 or later, openssl and curl.
+
+```sh
+bun deploy/test/stack.ts
+```
+
 ## Security
 
 See [SECURITY.md](SECURITY.md).

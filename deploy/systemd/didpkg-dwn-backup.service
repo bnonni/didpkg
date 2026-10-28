@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up the didpkg demo DWN data
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/didpkg/deploy/backup.sh

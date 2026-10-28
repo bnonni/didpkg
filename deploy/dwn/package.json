@@ -1,0 +1,10 @@
+{
+  "name": "didpkg-dwn",
+  "private": true,
+  "dependencies": {
+    "@enbox/dwn-server": "0.1.45"
+  },
+  "overrides": {
+    "cborg": "6.1.5"
+  }
+}

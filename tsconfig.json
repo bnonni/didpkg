@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["packages/*/src", "packages/*/test", "demo"]
+  "include": ["packages/*/src", "packages/*/test", "demo", "deploy/test"]
 }

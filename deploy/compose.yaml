@@ -1,0 +1,75 @@
+# The didpkg demo DWN (PLAN.md Phase 1 item 6). Runbook: docs/deploy.md. Test: bun deploy/test/stack.ts.
+# Only Traefik is on the internet (port 443, TLS from Let's Encrypt). The dwn-server port is not published.
+name: didpkg-dwn
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  dwn:
+    build: ./dwn
+    image: didpkg-dwn:0.1.45
+    restart: unless-stopped
+    init: true
+    security_opt: [no-new-privileges:true]
+    environment:
+      DWN_BASE_URL: https://${DWN_DOMAIN:?set DWN_DOMAIN in deploy/.env}
+      DS_PORT: "3000"
+      # didpkg uses no subscriptions.
+      DS_WEBSOCKET_SERVER: "off"
+      # The default did:dht gateway of @enbox/dids failed for a live DID; relay.pkarr.org served it (ADR 0001).
+      DID_DHT_GATEWAY_URI: https://relay.pkarr.org
+      # The tenant allowlist (ADR 0001, "From spike 06", item 3). Only a DID that tenant.sh adds can write.
+      # There is no proof-of-work and no provider auth, so a DID cannot add itself.
+      DWN_REGISTRATION_STORE_URL: sqlite://data/registration.db
+      DWN_TTL_CACHE_URL: sqlite://data/registration.db
+      DWN_ADMIN_TOKEN: ${DWN_ADMIN_TOKEN:?set DWN_ADMIN_TOKEN in deploy/.env}
+      # The server sees only the address of Traefik, so its limit for each IP is one limit for all clients.
+      # Traefik limits each client IP (traefik/dynamic.yml). All tenants are demo DIDs: no limit for each tenant.
+      DWN_RATE_LIMIT_REQUESTS_PER_SECOND: "0"
+      DWN_RATE_LIMIT_TENANT_REQUESTS_PER_SECOND: "0"
+      # The server keeps each request body in memory. Traefik refuses a larger body first.
+      MAX_RECORD_DATA_SIZE: 16mb
+    volumes:
+      - dwn-data:/app/data
+    healthcheck:
+      test: ["CMD", "bun", "-e", "process.exit((await fetch('http://127.0.0.1:3000/health')).ok ? 0 : 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      start_interval: 1s
+      retries: 3
+    logging: *logging
+
+  traefik:
+    image: traefik:v3.7.16@sha256:1336e85aaed293bd63d005086e0dd013b04078b26aaeb1c18b26a2f928af7e65
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      dwn:
+        condition: service_healthy
+    command:
+      - --entrypoints.websecure.address=:443
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      # The TLS-ALPN challenge needs only port 443.
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:?set ACME_EMAIL in deploy/.env}
+      - --certificatesresolvers.le.acme.storage=/acme/acme.json
+      - --global.checknewversion=false
+      - --global.sendanonymoususage=false
+      - --log.level=INFO
+    environment:
+      DWN_DOMAIN: ${DWN_DOMAIN}
+    ports:
+      - "443:443"
+    volumes:
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - acme:/acme
+    logging: *logging
+
+volumes:
+  dwn-data: {}
+  acme: {}

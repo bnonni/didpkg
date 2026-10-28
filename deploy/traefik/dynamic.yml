@@ -1,0 +1,32 @@
+# The routes of the demo DWN. Only the routes that didpkg uses pass. Each other request gets 404, for example
+# /admin, /metrics, /registration, /connect and the WebSocket on "/".
+# The reader uses GET /<did>/query and GET /<did>/read/...; the writer uses GET /info and POST /.
+http:
+  routers:
+    dwn:
+      entryPoints: [websecure]
+      rule: >-
+        Host(`{{ env "DWN_DOMAIN" }}`) && (
+        (Method(`GET`) && (Path(`/health`) || Path(`/info`) || PathRegexp(`^/did:[a-z0-9]+:[^/]+/(query|read)(/|$)`)))
+        || (Method(`POST`) && Path(`/`)))
+      middlewares: [per-ip-limit, body-limit]
+      service: dwn
+      tls:
+        certResolver: le
+
+  middlewares:
+    # 20 requests a second for each client IP, burst 50. The didpkg reader sends 15 a second, burst 40.
+    per-ip-limit:
+      rateLimit:
+        average: 20
+        burst: 50
+    # MAX_RECORD_DATA_SIZE (16 MiB) plus 1 MiB for the JSON-RPC message. A larger body gets 413.
+    body-limit:
+      buffering:
+        maxRequestBodyBytes: 17825792
+
+  services:
+    dwn:
+      loadBalancer:
+        servers:
+          - url: http://dwn:3000
