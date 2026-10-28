@@ -4,7 +4,7 @@
 - Date: 2026-10-27
 - Deciders: bnonni (DWN first, 2026-10-27), agent (the merge of the prototypes)
 - Code: `packages/core/src/source/`, the `ReleaseReader` change and `checkRelease` in `packages/core/src/trust/verify.ts`. Tests: `packages/core/test/source/`.
-- Amended: 2026-10-27, section 8 (the npm packument, chunk C4b); section 7 items 1-5 (the static HTTPS adapter, chunk C5); section 6 items 5-9 (the DWN writer, chunk C6). Code: `packages/adapter-https/`, `packages/adapter-dwn/`.
+- Amended: 2026-10-27, section 8 (the npm packument, chunk C4b); section 7 items 1-5 (the static HTTPS adapter, chunk C5); section 6 items 5-9 (the DWN writer, chunk C6); section 5 item 4 and section 6 items 10-13 (the DWN reader and the caches, chunk C7). Code: `packages/adapter-https/`, `packages/adapter-dwn/`.
 
 ## Context
 
@@ -91,6 +91,8 @@ interface StorageWriter {
 | `SourceError('UNAVAILABLE')` | No usable copy, and at least one endpoint failed or sent bad JSON. | 502 |
 | `SourceError('MISMATCH')` | Copies arrived, but no copy has the signed digest. | 502 |
 
+4. `PackageSource` keeps each release copy that has the signed digest. The key is the DID, the name, the version and the digest, so a kept copy is never stale. The limit is 8 MiB (`RELEASE_CACHE_BYTES`), the oldest out first. The source does not keep a tarball or an index.
+
 ### 6. The DWN protocol v1
 
 The spike 06 shape is final (`~/spikes/didpkg-p0/06-dwn/protocol.json`, 30 of 30 checks on `@enbox/dwn-server` 0.1.45):
@@ -137,13 +139,17 @@ The spike 06 shape is final (`~/spikes/didpkg-p0/06-dwn/protocol.json`, 30 of 30
 3. The reader yields one copy per `contextId`. Thus two `package` records with one name give two candidates.
 4. No `$recordLimit` `strategy` (PLAN.md DWN rule 1). CI installs the protocol on the pinned server (C6).
 
-`packages/adapter-dwn` writes this protocol (C6). The reader is chunk C7.
+`packages/adapter-dwn` writes this protocol (C6) and reads it (C7).
 
 5. The writer (`DwnWriter`, entry point `@didpkg/adapter-dwn/writer`) signs each DWN message with a key of the DID document, `#didpkg-1`. It never uses the did:dht update key `#0`. The DWN signature is not a trust input.
 6. The DWN keeps more than one record with one `version` tag, and a DRL read gives the newest. `$immutable` stops only an update of one record. Thus the writer refuses to replace a published release or tarball: before a write, it compares the `dataCid` of each record with that tag. The same bytes again is a no-op, so a failed publish can run again.
 7. A name has one `package` record. After a race of two publishes, the writer uses the oldest record, so each write goes to one context. A package has one `index` record, updated in place. After a race, the writer updates the newest index record, because a reader reads that record.
 8. `installProtocol` is a separate call. `publish` does not install the protocol. The entry point `.` does not load the DWN SDK, so the reader (C7) stays small.
 9. The tests run the pinned `@enbox/dwn-server` 0.1.45 (a devDependency) as a child process on 127.0.0.1, with the rate limits off. CI runs them.
+10. The reader (`dwnAdapter`, entry point `.`) uses only `fetchBytes` on the anonymous routes of item 2. It has no DWN SDK and no keys. It reads only https with no private host, as `adapter-https` (`allowLoopback` is for tests). The DID goes in the path as it is, because dwn-server 0.1.45 does not decode the segment. `canRead` refuses a DID with a character outside the DID Core syntax, so the DID is always one path segment.
+11. Only HTTP 404 means absent. A query reply must be HTTP 200 with `status.code` 200 and an `entries` array, else the endpoint failed. The reader uses at most 8 contextIds (`MAX_CONTEXTS`), each alphanumeric and used one time.
+12. The DWN allows 20 requests a second per tenant (burst 50). Thus the adapter keeps the contextIds of a name for 5 minutes (`CONTEXT_TTL_MS`) and the index copies for 5 s (`INDEX_TTL_MS`). It does not keep an empty contextId result or a failure. Concurrent reads share one request. With section 5 item 4, an install of one version sends 4 requests (query, index, release, tarball). A second install in 5 s sends only the tarball request. A packument sends 2 requests plus 1 for each listed version.
+13. Open: the reader does not limit its own request rate. A cold packument with more than about 48 listed versions can get HTTP 429 from a server with the default limits, and then the result is 502. C10 decides: a rate limit in the reader, or a retry after 429.
 
 ### 7. The static layout v1
 
@@ -174,7 +180,7 @@ PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<na
 - Good: an adapter is small. It maps 3 file kinds to its layout and yields bytes.
 - Cost: the verifier and `PackageSource` both resolve the DID. The `DidResolver` cache (single-flight) makes the second resolution free.
 - Open: if the DWN is down, a stale mirror can serve an older valid index. The pin stops a rollback in the same key epoch. On first use, the user gets the older index. Same in spike 06.
-- Cost: a packument reads each listed manifest. The DWN limit is 20 requests per second per tenant, so the DWN reader (C7) caches manifests by digest.
+- Cost: a packument reads each listed manifest. The DWN limit is 20 requests per second per tenant. Thus `PackageSource` keeps each release by its signed digest (section 5 item 4), and the DWN reader keeps the contextIds and the index copies (section 6 item 12).
 - Open: two versions that differ only in build metadata (`1.0.0+a`, `1.0.0+b`) have one precedence. npm and pnpm can confuse them. The packument sorts them by code unit. `didpkg publish` (C9) can reject build metadata.
 - Open: two valid copies with one sequence and different content (equivocation) are not detected at read time. The first copy wins. The pin detects it later (`EQUIVOCATION`).
 
@@ -189,3 +195,5 @@ PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<na
 7. HTTP 403 as "absent" (some S3 buckets answer 403 for a missing key): a broken mirror then hides a file with a 404 result. Such a bucket must allow the list permission, or it serves 502.
 8. A `DirWriter` that replaces a published file (spike `proto.ts`): a new tarball for an old version breaks each lockfile with the old integrity.
 9. A DWN writer that relies only on `$immutable` (spike `lib/dwn-writer.ts`): a second record with the same `version` tag replaces the file for each reader.
+10. A release cache in the DWN reader, keyed by the contextId and the version (the plan before C7): the reader does not know the signed digest, so a kept copy can be stale or wrong. The `PackageSource` cache is content-addressed and serves each adapter.
+11. A DID that is percent-encoded in the DWN read path: dwn-server 0.1.45 does not decode the segment, so the reader gets an empty tenant and no error.

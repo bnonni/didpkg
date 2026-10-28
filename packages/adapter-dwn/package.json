@@ -2,7 +2,7 @@
   "name": "@didpkg/adapter-dwn",
   "version": "0.0.0",
   "private": true,
-  "description": "didpkg storage adapter for the publisher DWN (DecentralizedWebNode): the protocol and a writer.",
+  "description": "didpkg storage adapter for the publisher DWN (DecentralizedWebNode): the protocol, a reader and a writer.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

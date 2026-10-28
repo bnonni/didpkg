@@ -14,6 +14,8 @@ export const MAX_JSON_BYTES = 256 * 1024;
 export const MAX_TARBALL_BYTES = 64 * 1024 * 1024;
 export const JSON_TIMEOUT_MS = 5_000;
 export const TARBALL_TIMEOUT_MS = 30_000;
+/** A release is content-addressed, so a kept copy with the signed digest is never stale. */
+export const RELEASE_CACHE_BYTES = 8 * 1024 * 1024;
 
 /**
  * No endpoint gave usable bytes. UNAVAILABLE: each endpoint failed or sent bad JSON.
@@ -65,6 +67,9 @@ function check(name: string, version?: string) {
 
 export class PackageSource implements ReleaseReader {
   readonly #o: PackageSourceOptions;
+  /** The release bytes per did, name, version and signed digest, the oldest first. */
+  readonly #releases = new Map<string, Uint8Array>();
+  #releaseBytes = 0;
 
   constructor(options: PackageSourceOptions) {
     this.#o = options;
@@ -105,13 +110,33 @@ export class PackageSource implements ReleaseReader {
     return values;
   }
 
-  /** The first release copy, in endpoint order, whose contentDigest is the digest in the signed index. */
+  /**
+   * The first release copy, in endpoint order, whose contentDigest is the digest in the signed index.
+   * A packument reads each listed release, so the source keeps them (ADR 0003 section 5 item 4).
+   */
   async getRelease(did: string, name: string, version: string, digest: string): Promise<unknown> {
     check(name, version);
+    const key = `${did}\n${name}@${version}\n${digest}`;
+    const kept = this.#releases.get(key);
+    if (kept) return parseJson(kept)!.value;
     return this.#first(did, { kind: 'release', name, version }, MAX_JSON_BYTES, this.#o.jsonTimeoutMs ?? JSON_TIMEOUT_MS, async (bytes) => {
       const value = parseJson(bytes)?.value;
-      return isObject(value) && contentDigest(value) === digest ? value : undefined;
+      if (!isObject(value) || contentDigest(value) !== digest) return undefined;
+      this.#keep(key, bytes);
+      return value;
     });
+  }
+
+  // A copy, so a later change to the buffer of the adapter cannot change a kept release.
+  #keep(key: string, bytes: Uint8Array) {
+    if (this.#releases.has(key)) return;
+    this.#releases.set(key, bytes.slice());
+    this.#releaseBytes += bytes.length;
+    for (const [k, b] of this.#releases) {
+      if (this.#releaseBytes <= RELEASE_CACHE_BYTES) break;
+      this.#releases.delete(k);
+      this.#releaseBytes -= b.length;
+    }
   }
 
   /** The first tarball copy, in endpoint order, with the size and the sha512 in the signed release. */

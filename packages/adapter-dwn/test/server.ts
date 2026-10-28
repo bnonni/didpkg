@@ -1,9 +1,12 @@
-// Test helpers: a fake Pkarr relay and the pinned @enbox/dwn-server 0.1.45 as a child process on 127.0.0.1.
+// Test helpers: a fake Pkarr relay, the pinned @enbox/dwn-server 0.1.45 as a child process on 127.0.0.1,
+// and a publisher with both.
 // A crash must not leave a dwn-server child on the port: the exit handler kills each child.
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dhtFixture } from '../../core/test/did/helpers.ts';
+import { DwnWriter, ed25519MessageSigner } from '../src/writer.ts';
 
 /** GET /<z32 id> gives the stored did:dht payload. The dwn-server resolves the publisher DID through it. */
 export function startRelay(payloads: Map<string, Uint8Array>) {
@@ -60,4 +63,23 @@ export async function startDwn(o: { relayUrl: string }) {
     await Bun.sleep(100);
   }
   return { url, pid: proc.pid, stop };
+}
+
+/** A new did:dht publisher per run, with the release key #didpkg-1, its relay and a dwn-server with the protocol. */
+export async function startPublisher() {
+  const fx = await dhtFixture();
+  const keyId = `${fx.did}#didpkg-1`;
+  const vm = fx.document.verificationMethod!.find((v) => v.id === keyId)!;
+  const { privateKeys } = await fx.bearer.export();
+  const seed = new Uint8Array(Buffer.from(privateKeys!.find((k) => k.x === vm.publicKeyJwk!.x)!.d!, 'base64url'));
+  const signer = ed25519MessageSigner(seed, keyId);
+  const relay = startRelay(new Map([[fx.id, await fx.payload()]]));
+  const dwn = await startDwn({ relayUrl: relay.url });
+  const writer = new DwnWriter({ dwnUrl: dwn.url, did: fx.did, signer });
+  await writer.installProtocol();
+  const stop = async () => {
+    await dwn.stop();
+    relay.stop();
+  };
+  return { fx, keyId, signer, dwn, writer, stop };
 }

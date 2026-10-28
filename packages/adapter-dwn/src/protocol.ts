@@ -1,5 +1,5 @@
 // The DWN protocol v1 (ADR 0003 section 6). The spike 06 shape is final.
-// This file has no imports, so the reader entry point (C7) does not load the DWN SDK.
+// This file has no imports, so the reader entry point does not load the DWN SDK.
 
 export const DIDPKG_PROTOCOL = 'https://didpkg.dev/protocols/repository/v1';
 

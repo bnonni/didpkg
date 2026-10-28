@@ -1,34 +1,14 @@
 // DwnWriter against the pinned @enbox/dwn-server 0.1.45 (a child process). The publisher is a new did:dht per run,
 // served by a fake relay. The writer signs with #didpkg-1. The reads are the anonymous DRL routes of ADR 0003 section 6.
-import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { afterAll, expect, test } from 'bun:test';
 import { HttpDwnRpcClient } from '@enbox/dwn-clients';
 import { RecordsWrite } from '@enbox/dwn-sdk-js';
-import { dhtFixture } from '../../core/test/did/helpers.ts';
 import { DIDPKG_PROTOCOL, protocolDefinition } from '../src/index.ts';
 import { DwnWriter, ed25519MessageSigner } from '../src/writer.ts';
-import { startDwn, startRelay } from './server.ts';
+import { startPublisher } from './server.ts';
 
-const fx = await dhtFixture();
-const keyId = `${fx.did}#didpkg-1`;
-const seed = await (async () => {
-  const vm = fx.document.verificationMethod!.find((v) => v.id === keyId)!;
-  const { privateKeys } = await fx.bearer.export();
-  return new Uint8Array(Buffer.from(privateKeys!.find((k) => k.x === vm.publicKeyJwk!.x)!.d!, 'base64url'));
-})();
-const signer = ed25519MessageSigner(seed, keyId);
-const relay = startRelay(new Map([[fx.id, await fx.payload()]]));
-let dwn: Awaited<ReturnType<typeof startDwn>>;
-let writer: DwnWriter;
-
-beforeAll(async () => {
-  dwn = await startDwn({ relayUrl: relay.url });
-  writer = new DwnWriter({ dwnUrl: dwn.url, did: fx.did, signer });
-  await writer.installProtocol();
-}, 30_000);
-afterAll(async () => {
-  await dwn?.stop();
-  relay.stop();
-});
+const { fx, keyId, signer, dwn, writer, stop } = await startPublisher();
+afterAll(stop);
 
 const te = new TextEncoder();
 const json = (v: unknown) => te.encode(JSON.stringify(v));

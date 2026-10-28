@@ -209,3 +209,21 @@ test('a bad name or version is a caller bug and never reaches an adapter', async
   await expect(source.getTarball(DID, 'Hello', '1.0.0', dist)).rejects.toBeInstanceOf(TypeError);
   expect(host.reads).toEqual([]);
 });
+
+test('a release with the signed digest is read one time; a copy with another digest is not kept', async () => {
+  const dwn = Host.from(mem);
+  const good = dwn.files.get('1.0.0.release')!;
+  dwn.files.set('1.0.0.release', [enc({ swapped: true })]);
+  const { release, source } = make({ 'fake://dwn': dwn });
+  expect(await codeOf(release)).toBe('MISMATCH');
+  dwn.files.set('1.0.0.release', good);
+  await release();
+  await release();
+  // The kept copy is a copy: a later change to the adapter buffer does not change it.
+  good[0]!.fill(0);
+  expect((await release()).release.version).toBe('1.0.0');
+  // The digest is part of the key: another signed digest for the version does not get the kept copy.
+  expect(await codeOf(() => source.getRelease(DID, NAME, '1.0.0', 'sha256-other'))).toBe('MISMATCH');
+  expect(dwn.reads.filter((r) => r.file === '1.0.0.release').length).toBe(3);
+  expect(dwn.reads.filter((r) => r.file === '1.0.0.tarball').length).toBe(3);
+});
