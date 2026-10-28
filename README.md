@@ -4,7 +4,7 @@ didpkg is a package manager with the DID (Decentralized Identifier) of the publi
 
 ## Status
 
-Phase 1 (the first end-to-end demo) started on 2026-10-27, after the Gate 1 GO ([ADR 0001](docs/adr/0001-go-no-go.md)). The code is not usable yet. The npm package `didpkg@0.0.1` holds only the install-name codec.
+Phase 1 (the first end-to-end demo) started on 2026-10-27, after the Gate 1 GO ([ADR 0001](docs/adr/0001-go-no-go.md)). Phase 1 exit criteria 1-4 pass (2026-10-28). The Gate 2 decision is open in [ADR 0002](docs/adr/0002-continue.md). The code is a demo, not a release. The npm package `didpkg@0.0.1` holds only the install-name codec.
 
 The old drpm code is in the `legacy/*` tags, for example `legacy/v5.2.1`.
 
