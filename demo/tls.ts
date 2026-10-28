@@ -71,5 +71,6 @@ export async function startProxy(host: string, sitePort: number) {
 
 /** The environment of a child that resolves the did:web host: the proxy for https, and the demo CA. */
 export const proxyEnv = (proxyUrl: string, caFile: string) => ({
-  HTTPS_PROXY: proxyUrl, NO_PROXY: '127.0.0.1,localhost', NODE_EXTRA_CA_CERTS: caFile,
+  // Node fetch uses HTTPS_PROXY only with NODE_USE_ENV_PROXY=1. Bun ignores that variable.
+  HTTPS_PROXY: proxyUrl, NO_PROXY: '127.0.0.1,localhost', NODE_EXTRA_CA_CERTS: caFile, NODE_USE_ENV_PROXY: '1',
 });

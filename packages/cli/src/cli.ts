@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-// didpkg CLI. Source: didpkg@0.0.1 (src/cli.ts). It needs Bun 1.4.4 or later, the same floor as the shim.
+// didpkg CLI. Source: didpkg@0.0.1 (src/cli.ts). From the repo it runs on Bun 1.4.4 or later. The npm package
+// is the build.ts bundle, dist/cli.js, for Node 22 or later. The CI job `package` tests it.
 import { existsSync, readFileSync } from 'node:fs';
 import { format, parse, GrammarError } from '@didpkg/core/name';
 import { createDht, endpoint } from './id/dht.ts';
@@ -146,7 +147,7 @@ async function shimCommand(args: string[]): Promise<string> {
   if (!/^\d{1,5}$/.test(port) || Number(port) > 65535) throw new UsageError(`--port: ${port} is not a port`);
   const mode = values['--mode']![0] ?? 'enforce';
   if (mode !== 'enforce' && mode !== 'warn') throw new UsageError(`--mode: ${mode} is not enforce or warn`);
-  const shim = startShim({
+  const shim = await startShim({
     port: Number(port), mode, allowLoopback: loopback,
     relays: values['--relay']!.map((r) => endpoint(r, 'relay')),
     log: (line) => process.stderr.write(`${line}\n`),

@@ -7,6 +7,7 @@
 // All servers are on 127.0.0.1: a Pkarr relay, the pinned dwn-server 0.1.45, a static server, and the TLS
 // site of W behind a CONNECT proxy (see tls.ts).
 // Run from the repo root after `bun install`: bun demo/e2e.ts. It needs npm, pnpm 11, Node and openssl on the PATH.
+// DIDPKG_BIN=<path> runs that didpkg command in place of src/cli.ts on Bun, for example the npm package bin on Node.
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, normalize } from 'node:path';
@@ -18,6 +19,7 @@ import { makeCerts, proxyEnv, startProxy, WEB_HOST } from './tls.ts';
 const LIMIT_MS = 5 * 60_000;
 const EXPECTED = 'hello from didpkg';
 const cli = fileURLToPath(new URL('../packages/cli/src/cli.ts', import.meta.url));
+const didpkgCmd = process.env.DIDPKG_BIN ? [process.env.DIDPKG_BIN] : [process.execPath, cli];
 const pkgSrc = fileURLToPath(new URL('./hello', import.meta.url));
 const tmp = mkdtempSync(join(tmpdir(), 'didpkg-demo-'));
 const t0 = performance.now();
@@ -67,7 +69,7 @@ function startMirror(dir: string, tls?: { cert: string; key: string }) {
 /** User B's shim. Its first stdout line is JSON with the URL. Its request log goes to a file. */
 async function startShim(home: string, relayUrl: string, env: Record<string, string>) {
   const log = join(home, 'shim.log');
-  const p = Bun.spawn([process.execPath, cli, 'shim', 'start', '--port', '0', '--relay', relayUrl, '--allow-loopback'], {
+  const p = Bun.spawn([...didpkgCmd, 'shim', 'start', '--port', '0', '--relay', relayUrl, '--allow-loopback'], {
     env: { PATH: process.env.PATH!, HOME: home, ...env }, stdin: 'ignore', stdout: 'pipe', stderr: Bun.file(log),
   });
   const stop = async () => {
@@ -127,7 +129,7 @@ try {
 
   // Publisher A: the passphrases come from the environment, so no prompt opens.
   const envA = { HOME: newHome('home-a'), DIDPKG_PASSPHRASE: 'demo release passphrase', DIDPKG_UPDATE_PASSPHRASE: 'demo update passphrase' };
-  const didpkg = async (...args: string[]) => JSON.parse(await run([process.execPath, cli, ...args], tmp, envA));
+  const didpkg = async (...args: string[]) => JSON.parse(await run([...didpkgCmd, ...args], tmp, envA));
   const id = await step('A: didpkg id create (did:dht, #dwn and DIDPackageRepository services)', () =>
     didpkg('id', 'create', 'demo', '--dwn', dwn.url, '--repo', `${mirror.url}/`, '--relay', relay.url));
   const tarball = await step('A: npm pack demo/hello', async () => {
@@ -141,7 +143,7 @@ try {
 
   // Publisher W: did:web. The did.json goes on the TLS site before the publish, because the DWN resolves the DID.
   const envW = { HOME: newHome('home-w'), DIDPKG_PASSPHRASE: 'demo web passphrase' };
-  const didpkgW = async (...args: string[]) => JSON.parse(await run([process.execPath, cli, ...args], tmp, envW));
+  const didpkgW = async (...args: string[]) => JSON.parse(await run([...didpkgCmd, ...args], tmp, envW));
   const idW = await step(`W: didpkg id create --web ${WEB_HOST} (#dwn and DIDPackageRepository services)`, () =>
     didpkgW('id', 'create', 'web', '--web', WEB_HOST, '--dwn', dwn.url, '--repo', `${webMirror.url}/`));
   if (idW.documentUrl !== `${webMirror.url}/.well-known/did.json`) throw new Error(`the did.json URL is ${idW.documentUrl}`);

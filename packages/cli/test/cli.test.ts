@@ -1,4 +1,4 @@
-// Runs src/cli.ts on Bun. Tests from didpkg@0.0.1 (test/cli.test.ts); the Node runs are gone, because the CLI needs Bun.
+// Runs src/cli.ts on Bun. Tests from didpkg@0.0.1 (test/cli.test.ts). The CI job `package` runs the Node bundle (build.ts).
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

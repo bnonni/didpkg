@@ -4,6 +4,7 @@
 // pnpm and `bun add` too.
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -146,6 +147,16 @@ describe('shim start', () => {
     expect(new URL(shimUrl).hostname).toBe('127.0.0.1');
     const r = await fetch(`${shimUrl}/${installName}`, { headers: { host: 'evil.example' } });
     expect(r.status).toBe(421);
+  });
+
+  test('refuses a request target that is not a path (absolute form) with 400', async () => {
+    const { host, port } = new URL(shimUrl);
+    const head = await new Promise<string>((resolve, reject) => {
+      let data = '';
+      const s = connect(Number(port), '127.0.0.1', () => s.write(`GET http://evil.example/${installName} HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`));
+      s.on('data', (d) => (data += d.toString())).on('end', () => resolve(data)).on('error', reject);
+    });
+    expect(head).toStartWith('HTTP/1.1 400 ');
   });
 
   test('npm install, then npm ci from the lockfile', async () => {

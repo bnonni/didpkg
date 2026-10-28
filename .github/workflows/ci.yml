@@ -57,6 +57,35 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: for i in 1 2 3; do bun demo/e2e.ts; done
 
+  # The npm package didpkg on Node 22, the engines floor: pack it, install it in a clean global prefix,
+  # run it with no Bun on the PATH, then run the demo with the installed bin.
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm install --global pnpm@11.4.0
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Pack the package (prepack runs build.ts)
+        working-directory: packages/cli
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+      - name: Install the tarball in a clean global prefix
+        run: npm install --global --prefix "$RUNNER_TEMP/global" --no-audit --no-fund "$RUNNER_TEMP"/didpkg-*.tgz
+      - name: Run didpkg with no Bun on the PATH
+        run: |
+          node_dir="$(dirname "$(command -v node)")"
+          env PATH="$RUNNER_TEMP/global/bin:$node_dir:/usr/bin:/bin" sh -c '! command -v bun && node --version && didpkg --version && didpkg --help && didpkg name did:web:nonni.org hello'
+      - name: Run the demo with the installed bin
+        run: DIDPKG_BIN="$RUNNER_TEMP/global/bin/didpkg" bun demo/e2e.ts
+
   # The deploy files of the demo DWN (deploy/), with a demo CA and a local relay in place of the public services.
   deploy:
     runs-on: ubuntu-24.04

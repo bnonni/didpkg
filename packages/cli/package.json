@@ -1,17 +1,41 @@
 {
   "name": "didpkg",
-  "version": "0.0.1",
-  "private": true,
-  "description": "didpkg CLI: install names now; id, publish and the npm shim in Phase 1.",
+  "version": "0.1.0",
+  "description": "didpkg CLI: install names, publisher DIDs, signed releases, and a local npm shim that installs packages by DID.",
+  "keywords": [
+    "did",
+    "decentralized-identifier",
+    "package-manager",
+    "npm",
+    "install-name",
+    "dwn",
+    "didpkg"
+  ],
+  "homepage": "https://didpkg.dev",
+  "bugs": {
+    "url": "https://github.com/bnonni/didpkg/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bnonni/didpkg.git",
+    "directory": "packages/cli"
+  },
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
-    "didpkg": "./src/cli.ts"
+    "didpkg": "dist/cli.js"
   },
+  "files": [
+    "dist"
+  ],
   "engines": {
-    "bun": ">=1.4.4"
+    "node": ">=22"
   },
-  "dependencies": {
+  "scripts": {
+    "build": "bun build.ts",
+    "prepack": "bun build.ts"
+  },
+  "devDependencies": {
     "@didpkg/adapter-dwn": "workspace:*",
     "@didpkg/adapter-https": "workspace:*",
     "@didpkg/core": "workspace:*",

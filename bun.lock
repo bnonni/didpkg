@@ -31,11 +31,11 @@
     },
     "packages/cli": {
       "name": "didpkg",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "bin": {
-        "didpkg": "./src/cli.ts",
+        "didpkg": "dist/cli.js",
       },
-      "dependencies": {
+      "devDependencies": {
         "@didpkg/adapter-dwn": "workspace:*",
         "@didpkg/adapter-https": "workspace:*",
         "@didpkg/core": "workspace:*",
