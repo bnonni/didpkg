@@ -189,3 +189,35 @@ test('a failed endpoint throws, and the failure is not kept', async () => {
   const reader = dwnAdapter({ allowLoopback: true }).reader(endpoint(dwn.url), { fetch });
   await expect(all(reader, { kind: 'tarball', name: NAME, version: '1.0.0' }, 10)).rejects.toThrow('larger than 10 bytes');
 });
+
+/** A DWN with one package context and no records. It records the time of each request. */
+function stubDwn() {
+  const times: number[] = [];
+  const f = (async (url: string) => {
+    times.push(Date.now());
+    if (new URL(url).pathname.endsWith('/query')) return Response.json({ status: { code: 200 }, entries: [{ contextId: 'ctx1' }] });
+    return new Response('absent', { status: 404 });
+  }) as typeof fetch;
+  return { fetch: f, times };
+}
+const drain = async (it: AsyncIterable<Uint8Array>) => {
+  for await (const _ of it) { /* no copies */ }
+};
+
+test('rate limit: a burst, then one request each 1/rate s per DWN origin (ADR 0003 section 6 item 13)', async () => {
+  const { fetch, times } = stubDwn();
+  const reader = dwnAdapter({ requestsPerSecond: 20, burst: 2 }).reader(endpoint('https://dwn.example'), { fetch });
+  const options = { signal: AbortSignal.timeout(5_000), maxBytes: 1024 };
+  await Promise.all(['1.0.0', '1.1.0', '1.2.0', '1.3.0'].map((version) => drain(reader.read({ kind: 'release', name: NAME, version }, options))));
+  expect(times).toHaveLength(5); // 1 query, 4 reads
+  expect(times[1]! - times[0]!).toBeLessThan(25);
+  expect(times[4]! - times[0]!).toBeGreaterThanOrEqual(140);
+});
+
+test('rate limit: an abort during the wait stops the read', async () => {
+  const { fetch, times } = stubDwn();
+  const reader = dwnAdapter({ requestsPerSecond: 1, burst: 1 }).reader(endpoint('https://dwn.example'), { fetch });
+  const read = drain(reader.read({ kind: 'release', name: NAME, version: '1.0.0' }, { signal: AbortSignal.timeout(50), maxBytes: 1024 }));
+  await expect(read).rejects.toThrow();
+  expect(times).toHaveLength(1); // the query; the read waits for its slot
+});

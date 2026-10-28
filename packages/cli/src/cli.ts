@@ -2,10 +2,11 @@
 // didpkg CLI. Source: didpkg@0.0.1 (src/cli.ts). It needs Bun 1.4.4 or later, the same floor as the shim.
 import { existsSync, readFileSync } from 'node:fs';
 import { format, parse, GrammarError } from '@didpkg/core/name';
-import { createDht } from './id/dht.ts';
+import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
 import { idPaths, readIdentity } from './id/store.ts';
 import { publish } from './publish/publish.ts';
+import { startShim } from './shim/start.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const VERSION: string = pkg.version;
@@ -20,6 +21,8 @@ Usage:
   didpkg id show <alias>          Print the public data of an identity as JSON
   didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
                                   Sign an npm pack tarball with #didpkg-1 and write it to each target
+  didpkg shim start [--port <n>] [--relay <url>]... [--mode enforce|warn] [--allow-loopback]
+                                  Serve verified @didpkg packages to npm on 127.0.0.1 (default port 2092)
   didpkg --help                   Print this help
   didpkg --version                Print the version
 
@@ -29,6 +32,7 @@ Examples:
   didpkg parse @didpkg/hello_web_nonni.org
   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
+  didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key #0), else from the terminal.
@@ -114,6 +118,27 @@ async function publishCommand(args: string[]): Promise<string> {
   return `${JSON.stringify(r, null, 2)}\n`;
 }
 
+/** Runs until SIGINT or SIGTERM. Prints the shim URL as JSON on stdout, and one line per request on stderr. */
+async function shimCommand(args: string[]): Promise<string> {
+  const [sub, ...rest] = args;
+  if (sub !== 'start') throw new UsageError(sub === undefined ? '"shim" needs a subcommand: start' : `unknown shim subcommand ${JSON.stringify(sub)}`);
+  const loopback = rest.includes('--allow-loopback');
+  const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--port', '--relay', '--mode']);
+  if (positional.length !== 0) throw new UsageError(`"shim start" takes no arguments (got ${positional.length})`);
+  if (values['--port']!.length > 1 || values['--mode']!.length > 1) throw new UsageError('use --port and --mode one time');
+  const port = values['--port']![0] ?? '2092';
+  if (!/^\d{1,5}$/.test(port) || Number(port) > 65535) throw new UsageError(`--port: ${port} is not a port`);
+  const mode = values['--mode']![0] ?? 'enforce';
+  if (mode !== 'enforce' && mode !== 'warn') throw new UsageError(`--mode: ${mode} is not enforce or warn`);
+  const shim = startShim({
+    port: Number(port), mode, allowLoopback: loopback,
+    relays: values['--relay']!.map((r) => endpoint(r, 'relay')),
+    log: (line) => process.stderr.write(`${line}\n`),
+  });
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void shim.stop().then(() => process.exit(0)));
+  return `${JSON.stringify({ url: shim.url, npmrc: `@didpkg:registry=${shim.url}/` })}\n`;
+}
+
 async function run(argv: string[]): Promise<string> {
   const [cmd, ...args] = argv;
   if (cmd === '-h' || cmd === '--help' || cmd === 'help') return HELP;
@@ -138,6 +163,8 @@ async function run(argv: string[]): Promise<string> {
       return id(args);
     case 'publish':
       return publishCommand(args);
+    case 'shim':
+      return shimCommand(args);
     default:
       throw new UsageError(`unknown command ${JSON.stringify(cmd)}`);
   }

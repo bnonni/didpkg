@@ -11,6 +11,12 @@ export const MAX_QUERY_BYTES = 1024 * 1024;
 export const MAX_CONTEXTS = 8;
 export const CONTEXT_TTL_MS = 5 * 60_000;
 export const INDEX_TTL_MS = 5_000;
+/**
+ * The request rate per DWN origin. dwn-server 0.1.45 allows 20 requests a second per tenant and 30 per IP,
+ * each with a burst of 50. Without a limit, a cold packument of about 48 versions got HTTP 429 (ADR 0003 section 6 item 13).
+ */
+export const REQUESTS_PER_SECOND = 15;
+export const REQUEST_BURST = 40;
 const MAX_CACHE_ENTRIES = 1000;
 
 export interface DwnAdapterOptions {
@@ -20,6 +26,10 @@ export interface DwnAdapterOptions {
   contextTtlMs?: number;
   /** How long the reader keeps the index copies of a name. 0: concurrent reads share one request, and nothing more. */
   indexTtlMs?: number;
+  /** The request rate per DWN origin. Default: REQUESTS_PER_SECOND. */
+  requestsPerSecond?: number;
+  /** The requests per DWN origin that do not wait. Default: REQUEST_BURST. */
+  burst?: number;
 }
 
 // The same rule as adapter-https: the WHATWG URL parser writes each IPv4 form as 4 decimal parts.
@@ -52,17 +62,52 @@ class TtlCache<T> {
   }
 }
 
+/** A token bucket per origin (the GCRA form): `burst` requests go at once, then one request each 1/rate s. */
+class RateLimit {
+  /** The theoretical arrival time per origin. */
+  readonly #tat = new Map<string, number>();
+  readonly #gapMs: number;
+
+  constructor(perSecond: number, readonly burst: number) {
+    this.#gapMs = 1000 / perSecond;
+  }
+
+  /** Waits for the next free slot of the origin. If the signal aborts first, it throws the abort reason. */
+  async wait(origin: string, signal: AbortSignal): Promise<void> {
+    const now = Date.now();
+    const tat = Math.max(this.#tat.get(origin) ?? now, now);
+    this.#tat.delete(origin);
+    this.#tat.set(origin, tat + this.#gapMs);
+    if (this.#tat.size > MAX_CACHE_ENTRIES) this.#tat.delete(this.#tat.keys().next().value!);
+    const delay = tat - now - (this.burst - 1) * this.#gapMs;
+    if (delay <= 0) return;
+    signal.throwIfAborted();
+    await new Promise<void>((resolve, reject) => {
+      const stop = () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', stop);
+        resolve();
+      }, delay);
+      signal.addEventListener('abort', stop, { once: true });
+    });
+  }
+}
+
 interface Shared {
   contextTtlMs: number;
   indexTtlMs: number;
   contexts: TtlCache<string[]>;
   indexes: TtlCache<Uint8Array[]>;
+  limit: RateLimit;
 }
 
 /**
  * The reader of `DecentralizedWebNode` endpoints. Only https and no private address. The adapter keeps
  * the contextIds and the index copies of each name, because a DWN allows 20 requests a second per tenant.
- * Use one adapter for each PackageSource.
+ * The adapter also limits the request rate per DWN origin. Use one adapter for each PackageSource.
  */
 export function dwnAdapter(options: DwnAdapterOptions = {}): StorageAdapter {
   const shared: Shared = {
@@ -70,6 +115,7 @@ export function dwnAdapter(options: DwnAdapterOptions = {}): StorageAdapter {
     indexTtlMs: options.indexTtlMs ?? INDEX_TTL_MS,
     contexts: new TtlCache(),
     indexes: new TtlCache(),
+    limit: new RateLimit(options.requestsPerSecond ?? REQUESTS_PER_SECOND, options.burst ?? REQUEST_BURST),
   };
   const canRead = (endpoint: Endpoint): boolean => {
     if (endpoint.type !== DWN_SERVICE_TYPE || !DID_RE.test(endpoint.did) || !URL.canParse(endpoint.url)) return false;
@@ -146,8 +192,9 @@ class DwnReader implements StorageReader {
 
   // PackageSource sets the time limit with the signal, so no own timer. fetchBytes allows a redirect
   // only to the same host and protocol, so a loopback endpoint stays loopback.
-  #get(route: string, signal: AbortSignal, maxBytes: number) {
+  async #get(route: string, signal: AbortSignal, maxBytes: number) {
     const url = new URL(route, this.#tenant);
+    await this.#shared.limit.wait(url.origin, signal);
     return fetchBytes(url.href, { fetch: this.#fetch, signal, timeoutMs: Infinity, maxBytes, allowPrivateHosts: isLoopback(url.hostname) });
   }
 }
