@@ -11,6 +11,8 @@ export { sri, contentDigest } from './digest.ts';
 export type { SriAlgorithm } from './digest.ts';
 export { RELEASE_STATUSES, parseRelease, parseIndex, proofsOf, signObject } from './release.ts';
 export type { DidPkgRelease, DidPkgIndex, IndexEntry, ReleaseStatus } from './release.ts';
+export { checkVersion, latestOf, signIndex, signRelease } from './build.ts';
+export type { IndexInput, ReleaseInput } from './build.ts';
 export { verifyIndex, verifyRelease } from './verify.ts';
 export type {
   ReleaseReader, Pin, TrustStore, PolicyMode, VerifyIndexOptions, VerifyReleaseOptions,

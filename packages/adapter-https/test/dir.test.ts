@@ -27,6 +27,19 @@ afterEach(async () => {
 const read = (rel: string) => readFile(join(dir, rel)).then((b) => new Uint8Array(b), () => undefined);
 const files = async () => (await readdir(dir, { recursive: true })).sort();
 
+test('read: 0 or 1 copies of its own layout, with the size limit', async () => {
+  const writer = new DirWriter(dir);
+  const copies = async (maxBytes = 100) => {
+    const out: Uint8Array[] = [];
+    for await (const b of writer.read({ kind: 'release', name: 'hello', version: '1.0.0' }, { signal: AbortSignal.timeout(1000), maxBytes })) out.push(b);
+    return out;
+  };
+  expect(await copies()).toEqual([]);
+  await writer.publish(input());
+  expect(await copies()).toEqual([bytes('{"r":1}')]);
+  await expect(copies(6)).rejects.toThrow('hello/1.0.0.json: more than 6 bytes');
+});
+
 test('publish: the exact bytes at the layout paths, and no temporary file', async () => {
   const writer = new DirWriter(dir);
   await writer.publish(input());

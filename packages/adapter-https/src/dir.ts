@@ -2,10 +2,11 @@
 // The publisher deploys the folder (Pages, R2, rsync). This entry point uses node:fs, so not a browser.
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import type { PublishInput, StorageWriter, StoredFile } from '@didpkg/core/source';
+import type { PublishInput, ReadOptions, StorageReader, StorageWriter, StoredFile } from '@didpkg/core/source';
 import { layoutPath } from './layout.ts';
 
-export class DirWriter implements StorageWriter {
+/** It also reads its folder, so `didpkg publish` can read the head index and a release back. */
+export class DirWriter implements StorageWriter, StorageReader {
   readonly #dir: string;
 
   constructor(dir: string) {
@@ -23,16 +24,27 @@ export class DirWriter implements StorageWriter {
     await this.#put({ kind: 'index', name }, index, false);
   }
 
+  /** 0 or 1 copies. Only the size limit applies, because a local read does not stop. */
+  async *read(file: StoredFile, { maxBytes }: ReadOptions): AsyncIterable<Uint8Array> {
+    const bytes = await this.#get(join(this.#dir, ...layoutPath(file)));
+    if (bytes && bytes.length > maxBytes) throw new Error(`${layoutPath(file).join('/')}: more than ${maxBytes} bytes`);
+    if (bytes) yield new Uint8Array(bytes);
+  }
+
+  async #get(path: string): Promise<Buffer | undefined> {
+    return readFile(path).catch((e: NodeJS.ErrnoException) => {
+      if (e.code === 'ENOENT') return undefined;
+      throw e;
+    });
+  }
+
   // A published release and tarball do not change: a lockfile holds their integrity. The same bytes
   // again is a no-op, so a failed publish can run again. The rename makes each write atomic, so a
   // server on the folder never gives a part of a file.
   async #put(file: StoredFile, bytes: Uint8Array, immutable: boolean): Promise<void> {
     const path = join(this.#dir, ...layoutPath(file));
     if (immutable) {
-      const old = await readFile(path).catch((e: NodeJS.ErrnoException) => {
-        if (e.code === 'ENOENT') return undefined;
-        throw e;
-      });
+      const old = await this.#get(path);
       if (old?.equals(bytes)) return;
       if (old) throw new Error(`${path}: a different file exists, and a published version does not change`);
     }

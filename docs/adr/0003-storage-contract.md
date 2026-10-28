@@ -181,7 +181,7 @@ PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<na
 - Cost: the verifier and `PackageSource` both resolve the DID. The `DidResolver` cache (single-flight) makes the second resolution free.
 - Open: if the DWN is down, a stale mirror can serve an older valid index. The pin stops a rollback in the same key epoch. On first use, the user gets the older index. Same in spike 06.
 - Cost: a packument reads each listed manifest. The DWN limit is 20 requests per second per tenant. Thus `PackageSource` keeps each release by its signed digest (section 5 item 4), and the DWN reader keeps the contextIds and the index copies (section 6 item 12).
-- Open: two versions that differ only in build metadata (`1.0.0+a`, `1.0.0+b`) have one precedence. npm and pnpm can confuse them. The packument sorts them by code unit. `didpkg publish` (C9) can reject build metadata.
+- Decided (C9): two versions that differ only in build metadata (`1.0.0+a`, `1.0.0+b`) have one precedence, and npm and pnpm can confuse them. Thus `didpkg publish` refuses build metadata (`checkVersion` in `@didpkg/core/trust`). A verifier still accepts it from another tool, and the packument sorts those versions by code unit.
 - Open: two valid copies with one sequence and different content (equivocation) are not detected at read time. The first copy wins. The pin detects it later (`EQUIVOCATION`).
 
 ## Rejected

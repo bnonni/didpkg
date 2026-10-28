@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 // didpkg CLI. Source: didpkg@0.0.1 (src/cli.ts). It needs Bun 1.4.4 or later, the same floor as the shim.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { format, parse, GrammarError } from '@didpkg/core/name';
 import { createDht } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
 import { idPaths, readIdentity } from './id/store.ts';
+import { publish } from './publish/publish.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const VERSION: string = pkg.version;
@@ -17,6 +18,8 @@ Usage:
   didpkg id create <alias> [--dwn <url>] [--repo <url>]... [--relay <url>]...
                                   Make a did:dht publisher DID with the release key #didpkg-1
   didpkg id show <alias>          Print the public data of an identity as JSON
+  didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
+                                  Sign an npm pack tarball with #didpkg-1 and write it to each target
   didpkg --help                   Print this help
   didpkg --version                Print the version
 
@@ -25,6 +28,7 @@ Examples:
   didpkg name did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y my-lib
   didpkg parse @didpkg/hello_web_nonni.org
   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
+  didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key #0), else from the terminal.
@@ -86,6 +90,30 @@ async function id(args: string[]): Promise<string> {
   throw new UsageError(sub === undefined ? '"id" needs a subcommand: create or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
 }
 
+async function publishCommand(args: string[]): Promise<string> {
+  const { positional, values } = options(args, ['--to', '--relay']);
+  if (positional.length !== 2) throw new UsageError(`"publish" needs 2 arguments: <alias> <tarball> (got ${positional.length})`);
+  if (values['--to']!.length === 0) throw new UsageError('"publish" needs --to dwn or --to dir:<path>');
+  const [alias, file] = positional as [string, string];
+  const identity = readIdentity(idPaths(alias));
+  const r = await publish({
+    identity,
+    tarball: new Uint8Array(readFileSync(file)),
+    to: values['--to']!,
+    relays: values['--relay']!.length ? values['--relay'] : undefined,
+    passphrase: () => passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'Passphrase for the release key #didpkg-1' }),
+  });
+  const failed = [
+    ...(r.relays.length && !r.relays.some((x) => x.ok) ? ['no relay accepted the DID'] : []),
+    ...r.targets.filter((t) => !t.ok).map((t) => `${t.url} failed`),
+  ];
+  if (failed.length) {
+    process.stderr.write(`didpkg: error: ${failed.join(', and ')}. Run the same publish again: it writes the same bytes.\n`);
+    process.exitCode = 1;
+  }
+  return `${JSON.stringify(r, null, 2)}\n`;
+}
+
 async function run(argv: string[]): Promise<string> {
   const [cmd, ...args] = argv;
   if (cmd === '-h' || cmd === '--help' || cmd === 'help') return HELP;
@@ -108,6 +136,8 @@ async function run(argv: string[]): Promise<string> {
     }
     case 'id':
       return id(args);
+    case 'publish':
+      return publishCommand(args);
     default:
       throw new UsageError(`unknown command ${JSON.stringify(cmd)}`);
   }

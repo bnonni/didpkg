@@ -4,10 +4,9 @@
 import * as ed from '@noble/ed25519';
 import type { DidDocument, DidResolutionResult } from '../../src/did/types.ts';
 import {
-  contentDigest, ed25519Signer, signObject, sri, toMultikey,
+  contentDigest, ed25519Signer, signIndex, signRelease, toMultikey,
   type DidPkgIndex, type DidPkgRelease, type ReleaseReader, type ReleaseStatus, type Signer,
 } from '../../src/trust/index.ts';
-import { compareVersions } from '../../src/trust/release.ts';
 
 export const NAME = 'hello';
 export const T0 = '2026-10-23T10:00:00Z';
@@ -88,27 +87,23 @@ export function didDoc(did: string, keys: Key[]): DidDocument {
 
 type StatusChange = Record<string, { status: ReleaseStatus; message?: string }>;
 
-/** The publisher side: sign a manifest, then a new index head. */
+/** The publisher side (core signRelease and signIndex): sign a manifest, then a new index head. */
 export async function publish(reader: MemReader, o: {
   did: string; version: string; tarball: Uint8Array; signers: Signer[]; indexSigners?: Signer[]; created?: string;
   npm?: Record<string, unknown>;
 }): Promise<DidPkgIndex> {
   const prev = await reader.getIndex(o.did, NAME);
-  const prevVersion = prev ? Object.keys(prev.releases).at(-1) : undefined;
-  const release = (await signObject({
-    type: 'DidPkgRelease', specVersion: '1', publisher: o.did, name: NAME, version: o.version,
-    published: o.created ?? T0,
-    dist: { integrity: await sri('sha512', o.tarball), size: o.tarball.length },
+  const release = await signRelease({
+    publisher: o.did, name: NAME, version: o.version, tarball: o.tarball, head: prev, published: o.created ?? T0,
     npm: o.npm ?? { dependencies: {}, hasInstallScript: false },
-    previous: prev && prevVersion ? { version: prevVersion, digest: prev.releases[prevVersion]!.digest } : null,
-  }, o.signers, o.created)) as DidPkgRelease;
+  }, o.signers);
   reader.releases.set(`${o.did}/${NAME}@${o.version}`, release);
   reader.tarballs.set(`${o.did}/${NAME}@${o.version}`, o.tarball);
   const releases = { ...prev?.releases, [o.version]: { digest: contentDigest(release), status: 'active' as const } };
   return reindex(reader, { did: o.did, releases, signers: o.indexSigners ?? o.signers, created: o.created });
 }
 
-/** A new signed index head. `sequence` overrides the next sequence (for an equivocation test). `distTags` overrides `latest`. */
+/** A new signed index head. `sequence` overrides the next sequence (for an equivocation test). `distTags` overrides all tags. */
 export async function reindex(reader: MemReader, o: {
   did: string; signers: Signer[]; created?: string; sequence?: number; releases?: DidPkgIndex['releases']; status?: StatusChange;
   distTags?: Record<string, string>;
@@ -116,13 +111,9 @@ export async function reindex(reader: MemReader, o: {
   const prev = await reader.getIndex(o.did, NAME);
   const releases = structuredClone(o.releases ?? prev?.releases ?? {});
   for (const [version, change] of Object.entries(o.status ?? {})) Object.assign(releases[version]!, change);
-  const latest = Object.keys(releases).filter((v) => ['active', 'deprecated'].includes(releases[v]!.status)).sort(compareVersions).at(-1);
-  const index = (await signObject({
-    type: 'DidPkgIndex', specVersion: '1', publisher: o.did, name: NAME,
-    sequence: o.sequence ?? (prev?.sequence ?? 0) + 1, updated: o.created ?? T0,
-    previous: prev ? contentDigest(prev) : null,
-    distTags: o.distTags ?? (latest ? { latest } : {}), releases,
-  }, o.signers, o.created)) as DidPkgIndex;
+  const index = await signIndex({
+    publisher: o.did, name: NAME, head: prev, releases, distTags: o.distTags, sequence: o.sequence, updated: o.created ?? T0,
+  }, o.signers);
   reader.putIndex(index);
   return index;
 }
