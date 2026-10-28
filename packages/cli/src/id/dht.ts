@@ -72,14 +72,20 @@ export async function putPayload(relays: readonly string[], did: string, payload
 
 const errorOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** The service `#dwn` (type `DecentralizedWebNode`) and the service `#pkg` (type `DIDPackageRepository`). */
+export function servicesOf(o: { dwn?: string; repos?: string[] }): DidService[] {
+  const services: DidService[] = [];
+  if (o.dwn) services.push({ id: 'dwn', type: 'DecentralizedWebNode', serviceEndpoint: [endpoint(o.dwn, 'dwn')] });
+  if (o.repos?.length) services.push({ id: 'pkg', type: REPOSITORY_TYPE, serviceEndpoint: o.repos.map((r) => endpoint(r, 'repo')) });
+  return services;
+}
+
 export async function createDht(o: CreateOptions): Promise<CreateResult> {
   const paths = idPaths(o.alias, o.env);
   if (o.passphrase === o.updatePassphrase) throw new Error('the update key passphrase must not be the release key passphrase');
   const relays = (o.relays ?? DEFAULT_RELAYS).map((r) => endpoint(r, 'relay'));
   if (relays.length === 0) throw new Error('no relay');
-  const services: DidService[] = [];
-  if (o.dwn) services.push({ id: 'dwn', type: 'DecentralizedWebNode', serviceEndpoint: [endpoint(o.dwn, 'dwn')] });
-  if (o.repos?.length) services.push({ id: 'pkg', type: REPOSITORY_TYPE, serviceEndpoint: o.repos.map((r) => endpoint(r, 'repo')) });
+  const services = servicesOf(o);
 
   // 1. The DID and the signed relay payload, in memory. Enbox refuses a DNS packet of more than 1000 bytes (BEP44).
   const bearer = await DidDht.create({

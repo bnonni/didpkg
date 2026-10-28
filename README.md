@@ -27,7 +27,7 @@ bun test
 bun run typecheck
 ```
 
-The demo (`demo/e2e.ts`) starts a Pkarr relay, a `dwn-server` and a static mirror on 127.0.0.1. A did:dht publisher signs and publishes `demo/hello` to its DWN and to the mirror. A user with no keys then installs the package with npm, pnpm and bun through `didpkg shim start`. Then the DWN stops, and npm installs the package from the mirror. The demo needs npm, Node and pnpm 11 or later.
+The demo (`demo/e2e.ts`) starts a Pkarr relay, a `dwn-server` and a static mirror on 127.0.0.1. A did:dht publisher signs and publishes `demo/hello` to its DWN and to the mirror. A user with no keys then installs the package with npm, pnpm and bun through `didpkg shim start`. A did:web publisher (`did:web:web.didpkg.test`) hosts its `did.json` on a TLS site and publishes the same tarball to the same DWN and to that site, and npm installs it too. Then the DWN stops, and npm installs both packages from the mirrors. The demo makes a demo CA at run time, and a CONNECT proxy sends the did:web host to the TLS site (`demo/tls.ts`). The demo needs npm, Node, openssl and pnpm 11 or later.
 
 ```sh
 bun demo/e2e.ts

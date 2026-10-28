@@ -5,6 +5,7 @@ import { format, parse, GrammarError } from '@didpkg/core/name';
 import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
 import { idPaths, readIdentity } from './id/store.ts';
+import { createWeb, documentUrl } from './id/web.ts';
 import { publish } from './publish/publish.ts';
 import { startShim } from './shim/start.ts';
 import pkg from '../package.json' with { type: 'json' };
@@ -18,6 +19,8 @@ Usage:
   didpkg parse <install-name>     Print the parts of an install name as JSON
   didpkg id create <alias> [--dwn <url>] [--repo <url>]... [--relay <url>]...
                                   Make a did:dht publisher DID with the release key #didpkg-1
+  didpkg id create <alias> --web <host>[:<path>]... [--dwn <url>] [--repo <url>]...
+                                  Make a did:web publisher DID and its did.json to host
   didpkg id show <alias>          Print the public data of an identity as JSON
   didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
                                   Sign an npm pack tarball with #didpkg-1 and write it to each target
@@ -31,6 +34,7 @@ Examples:
   didpkg name did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y my-lib
   didpkg parse @didpkg/hello_web_nonni.org
   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
+  didpkg id create web --web me.github.io:pkgs --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
 
@@ -59,11 +63,23 @@ function options(args: string[], flags: string[]) {
 async function id(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub === 'create') {
-    const { positional, values } = options(rest, ['--dwn', '--repo', '--relay']);
+    const { positional, values } = options(rest, ['--dwn', '--repo', '--relay', '--web']);
     if (positional.length !== 1) throw new UsageError(`"id create" needs 1 argument: <alias> (got ${positional.length})`);
     if (values['--dwn']!.length > 1) throw new UsageError('use --dwn one time');
+    if (values['--web']!.length > 1) throw new UsageError('use --web one time');
     const alias = positional[0]!;
     idPaths(alias); // a bad alias fails before the passphrase prompt
+    const web = values['--web']![0];
+    if (web !== undefined) {
+      if (values['--relay']!.length) throw new UsageError('--relay is for did:dht only');
+      documentUrl(web);
+      const r = await createWeb({
+        alias, web, dwn: values['--dwn']![0], repos: values['--repo'],
+        passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key #didpkg-1', confirm: true }),
+      });
+      process.stderr.write(`Host ${r.files.document} at ${r.documentUrl}. Then "didpkg publish" installs the DWN protocol.\n`);
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
     const r = await createDht({
       alias,
       dwn: values['--dwn']![0],

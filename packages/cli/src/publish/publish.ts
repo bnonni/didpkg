@@ -103,7 +103,7 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
   ];
 
   // 2. A DWN resolves the DID before it accepts a write, and a did:dht record lives about 2 hours.
-  const relayResults = relays.length ? await putPayload(relays, did, base64urlnopad.decode(o.identity.relayPayload)) : [];
+  const relayResults = relays.length ? await putPayload(relays, did, base64urlnopad.decode(o.identity.relayPayload!)) : [];
   for (const t of targets) await t.dwn?.installProtocol();
 
   // 3. The signed copies of this key on the targets.

@@ -47,7 +47,7 @@ describe('id create', () => {
   test('the relay gets the signed payload, and the DWN gets the protocol', async () => {
     expect([r.relays, r.dwn]).toEqual([[{ url: relay.url, ok: true }], { url: dwn.url, ok: true }]);
     const id = readIdentity(idPaths('main', env));
-    expect(relay.store.get(r.did.slice('did:dht:'.length))).toEqual(base64urlnopad.decode(id.relayPayload));
+    expect(relay.store.get(r.did.slice('did:dht:'.length))).toEqual(base64urlnopad.decode(id.relayPayload!));
     // A record write needs the protocol on the DWN.
     const seed = await decryptKey(id.releaseKey, PASS.passphrase);
     const writer = new DwnWriter({ dwnUrl: dwn.url, did: r.did, signer: ed25519MessageSigner(seed, r.keyId) });

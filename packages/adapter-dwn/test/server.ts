@@ -31,8 +31,9 @@ function freePort(): number {
   return port;
 }
 
-/** Starts the dwn-server in open mode (no tenant allowlist) with a new LevelDB folder. The rate limits are off. */
-export async function startDwn(o: { relayUrl: string }) {
+/** Starts the dwn-server in open mode (no tenant allowlist) with a new LevelDB folder. The rate limits are off.
+ * `env` adds variables, for example a proxy and a CA for did:web. */
+export async function startDwn(o: { relayUrl: string; env?: Record<string, string> }) {
   const pkgJson = fileURLToPath(import.meta.resolve('@enbox/dwn-server/package.json'));
   const main = join(pkgJson, '..', 'dist', 'esm', 'src', 'main.js');
   const dir = mkdtempSync(join(tmpdir(), 'didpkg-dwn-'));
@@ -41,7 +42,7 @@ export async function startDwn(o: { relayUrl: string }) {
   const env = {
     PATH: process.env.PATH!, HOME: dir, DS_PORT: String(port), DS_HOST: '127.0.0.1', DWN_BASE_URL: url,
     DID_DHT_GATEWAY_URI: o.relayUrl, DID_DHT_ALLOW_PRIVATE_GATEWAY: '1', DWN_SERVER_PACKAGE_JSON: pkgJson, DWN_SERVER_LOG_LEVEL: 'warn',
-    DWN_RATE_LIMIT_REQUESTS_PER_SECOND: '0', DWN_RATE_LIMIT_TENANT_REQUESTS_PER_SECOND: '0',
+    DWN_RATE_LIMIT_REQUESTS_PER_SECOND: '0', DWN_RATE_LIMIT_TENANT_REQUESTS_PER_SECOND: '0', ...o.env,
   };
   const errLog = join(dir, 'err.log');
   const proc = Bun.spawn(['bun', main], { cwd: dir, env, stdout: 'ignore', stderr: Bun.file(errLog) });
