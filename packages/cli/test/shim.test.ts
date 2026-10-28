@@ -1,34 +1,16 @@
 // The shim handler on the core test publisher: the HTTP results of PLAN.md and ADR 0003 section 5.
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { gzipSync } from 'node:zlib';
 import { format } from '@didpkg/core/name';
 import { SourceError } from '@didpkg/core/source';
 import { contentDigest, type Pin } from '@didpkg/core/trust';
 import { FakeResolver, MemReader, NAME, newKey, publish, reindex, type Key } from '../../core/test/trust/sim.ts';
 import { DENYLIST, shimHandler, type ShimOptions } from '../src/shim/shim.ts';
+import { npmTgz } from './tgz.ts';
 
 const DID = 'did:web:example.com';
 const INSTALL = format(DID, NAME);
 const ORIGIN = 'http://127.0.0.1:2092';
 const enc = new TextEncoder();
-
-/** An `npm pack` style .tgz with one file, package/package.json. */
-function npmTgz(pkg: Record<string, unknown>): Uint8Array {
-  const body = enc.encode(JSON.stringify(pkg));
-  const header = new Uint8Array(512);
-  const put = (text: string, at: number) => header.set(enc.encode(text), at);
-  put('package/package.json', 0);
-  put('0000644\0', 100);
-  put(`${body.length.toString(8).padStart(11, '0')}\0`, 124);
-  put('        ', 148);
-  put('0', 156);
-  put('ustar\x0000', 257);
-  put(`${header.reduce((a, b) => a + b, 0).toString(8).padStart(6, '0')}\0 `, 148);
-  const tar = new Uint8Array(512 + Math.ceil(body.length / 512) * 512 + 1024);
-  tar.set(header);
-  tar.set(body, 512);
-  return gzipSync(tar);
-}
 
 let reader: MemReader;
 let resolver: FakeResolver;
