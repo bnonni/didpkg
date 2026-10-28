@@ -155,10 +155,10 @@ export async function verifyIndex(o: VerifyIndexOptions): Promise<VerifiedIndex>
 /** Steps 1-7: verify the index, the release status, the manifest and the tarball, then update the pin. */
 export async function verifyRelease(o: VerifyReleaseOptions): Promise<VerifiedRelease> {
   const verified = await verifyIndex(o);
-  const { didDocument: doc, index, indexDigest, epochKey, warnings } = verified;
+  const { index, indexDigest, epochKey, warnings } = verified;
 
   // 4. The release status from the signed index.
-  const entry = index.releases[o.version];
+  const entry = Object.hasOwn(index.releases, o.version) ? index.releases[o.version] : undefined;
   const note = entry?.message ? `: ${entry.message}` : '';
   if (!entry) throw new PolicyError('NOT_LISTED', `${o.version} is not in the signed index`);
   if (entry.status === 'revoked') throw new PolicyError('REVOKED', `${o.version} is revoked${note}`);
@@ -167,14 +167,7 @@ export async function verifyRelease(o: VerifyReleaseOptions): Promise<VerifiedRe
   if (entry.status === 'deprecated') warnings.push({ code: 'DEPRECATED', message: `${o.version} is deprecated${note}` });
 
   // 5. The manifest: the digest in the index, the fields, and the proof.
-  const raw = await o.reader.getRelease(o.did, o.name, o.version, entry.digest);
-  if (raw === null || raw === undefined) throw new PolicyError('MANIFEST_MISSING', `no manifest for ${o.version}`);
-  const release = parseRelease(raw);
-  if (contentDigest(release) !== entry.digest) throw new PolicyError('MANIFEST_DIGEST', 'the manifest is not the manifest in the signed index');
-  if (release.publisher !== o.did || release.name !== o.name || release.version !== o.version) {
-    throw new PolicyError('MANIFEST_FIELDS', 'the manifest publisher, name or version is not the requested value');
-  }
-  const manifestKey = await manifestKeyOf(release, doc);
+  const { release, manifestKey } = await checkRelease(o.reader, verified, o.version);
 
   // 6. The tarball: hash all bytes before one byte goes to npm.
   const tarball = await o.reader.getTarball(o.did, o.name, o.version, release.dist);
@@ -194,6 +187,29 @@ export async function verifyRelease(o: VerifyReleaseOptions): Promise<VerifiedRe
     releases: { ...pin?.releases, [o.version]: entry.digest },
   });
   return { ...verified, release, tarball, manifestKey };
+}
+
+/**
+ * Step 5 for one version of a verified index: the manifest with the digest in the index, the
+ * publisher, name and version of the index, and a proof by a method of the publisher. The tarball
+ * route (verifyRelease) and the packument (source/) both use it, so they accept the same manifests.
+ */
+export async function checkRelease(
+  reader: Pick<ReleaseReader, 'getRelease'>,
+  verified: Pick<VerifiedIndex, 'didDocument' | 'index'>,
+  version: string,
+): Promise<{ release: DidPkgRelease; manifestKey: VerifiedRelease['manifestKey'] }> {
+  const { didDocument: doc, index } = verified;
+  if (!Object.hasOwn(index.releases, version)) throw new PolicyError('NOT_LISTED', `${version} is not in the signed index`);
+  const { digest } = index.releases[version]!;
+  const raw = await reader.getRelease(index.publisher, index.name, version, digest);
+  if (raw === null || raw === undefined) throw new PolicyError('MANIFEST_MISSING', `no manifest for ${version}`);
+  const release = parseRelease(raw);
+  if (contentDigest(release) !== digest) throw new PolicyError('MANIFEST_DIGEST', 'the manifest is not the manifest in the signed index');
+  if (release.publisher !== index.publisher || release.name !== index.name || release.version !== version) {
+    throw new PolicyError('MANIFEST_FIELDS', 'the manifest publisher, name or version is not the requested value');
+  }
+  return { release, manifestKey: await manifestKeyOf(release, doc) };
 }
 
 // Step 2 for one index copy: the schema, the fields, and a proof by a key in assertionMethod now.

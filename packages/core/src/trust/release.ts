@@ -60,6 +60,42 @@ const SHA256_DIGEST = /^sha256-[A-Za-z0-9+/]{43}=$/;
 export const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
+// SEMVER gives numeric identifiers with no leading zero, so a longer one is larger.
+const compareNumbers = (x: string, y: string) => x.length - y.length || (x < y ? -1 : x > y ? 1 : 0);
+const NUMERIC = /^\d+$/;
+
+function compareIdentifiers(x: string, y: string): number {
+  const [nx, ny] = [NUMERIC.test(x), NUMERIC.test(y)];
+  if (nx && ny) return compareNumbers(x, y);
+  if (nx !== ny) return nx ? -1 : 1;
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+function versionParts(version: string) {
+  const m = SEMVER.exec(version);
+  if (!m) throw new TypeError(`not a SemVer 2.0.0 version: ${version}`);
+  return { core: [m[1]!, m[2]!, m[3]!], pre: m[4]?.split('.') ?? [] };
+}
+
+/**
+ * SemVer 2.0.0 precedence (section 11). The result is negative if a < b, 0 if equal, positive if a > b.
+ * Build metadata does not change the precedence. A version that is not valid is a TypeError.
+ */
+export function compareVersions(a: string, b: string): number {
+  const [x, y] = [versionParts(a), versionParts(b)];
+  for (let i = 0; i < 3; i++) {
+    const c = compareNumbers(x.core[i]!, y.core[i]!);
+    if (c) return c;
+  }
+  // A version with no prerelease is larger than a version with a prerelease.
+  if (x.pre.length === 0 || y.pre.length === 0) return y.pre.length - x.pre.length;
+  for (let i = 0; i < Math.min(x.pre.length, y.pre.length); i++) {
+    const c = compareIdentifiers(x.pre[i]!, y.pre[i]!);
+    if (c) return c;
+  }
+  return x.pre.length - y.pre.length;
+}
+
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isText = (v: unknown): v is string => typeof v === 'string' && v.length > 0;

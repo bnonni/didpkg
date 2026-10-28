@@ -3,7 +3,8 @@
 - Status: ACCEPTED (2026-10-27)
 - Date: 2026-10-27
 - Deciders: bnonni (DWN first, 2026-10-27), agent (the merge of the prototypes)
-- Code: `packages/core/src/source/`, the `ReleaseReader` change in `packages/core/src/trust/verify.ts`. Tests: `packages/core/test/source/`.
+- Code: `packages/core/src/source/`, the `ReleaseReader` change and `checkRelease` in `packages/core/src/trust/verify.ts`. Tests: `packages/core/test/source/`.
+- Amended: 2026-10-27, section 8 (the npm packument, chunk C4b).
 
 ## Context
 
@@ -140,12 +141,25 @@ The spike 06 shape is final (`~/spikes/didpkg-p0/06-dwn/protocol.json`, 30 of 30
 
 PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<name>/<version>.tgz`. The repository root `didpkg.json` stays optional. Phase 1 does not read or write it. A later version can add it to `StoredFile`, because v1 adds members only.
 
+### 8. The npm packument
+
+`buildPackument` (`source/packument.ts`) makes the packument from the result of `verifyIndex`. The shim (C10) sends it.
+
+1. It lists the `active` and `deprecated` versions in SemVer 2.0.0 order. It omits `yanked` and `revoked` versions and does not read their manifests.
+2. Each listed version must pass `checkRelease`: step 5 of the tarball route (digest, fields, proof method). Thus the packument never lists a version that the tarball route rejects.
+3. If one listed manifest is absent or bad, the packument fails with the `PolicyError` of the lowest failed version. A host must not hide one signed version, because that is a selective rollback.
+4. Each version is the signed `npm` fields, plus `name` (the canonical install name), `version` and `dist` (`integrity` from the signed release, `tarball` from a function of the caller). The index owns the status: a `deprecated` member in `npm` does not count. A deprecated version with no message gets `deprecated: "deprecated"`, because npm ignores an empty string.
+5. `time` holds the `published` value of each listed version. It is a publisher claim. `npm install --before` reads it.
+6. A dist-tag of an omitted version is dropped. If no `latest` tag is left, `latest` is the highest listed version with no prerelease, else the highest listed version. If a stable version is listed, npm selects the same version when `latest` is absent. pnpm needs the tag (not verified in this repository).
+
 ## Consequences
 
 - Good: one trust code path. The spike 06 checks (stale mirror, swapped bytes, names that are not unique) are now unit tests on core.
 - Good: an adapter is small. It maps 3 file kinds to its layout and yields bytes.
 - Cost: the verifier and `PackageSource` both resolve the DID. The `DidResolver` cache (single-flight) makes the second resolution free.
 - Open: if the DWN is down, a stale mirror can serve an older valid index. The pin stops a rollback in the same key epoch. On first use, the user gets the older index. Same in spike 06.
+- Cost: a packument reads each listed manifest. The DWN limit is 20 requests per second per tenant, so the DWN reader (C7) caches manifests by digest.
+- Open: two versions that differ only in build metadata (`1.0.0+a`, `1.0.0+b`) have one precedence. npm and pnpm can confuse them. The packument sorts them by code unit. `didpkg publish` (C9) can reject build metadata.
 - Open: two valid copies with one sequence and different content (equivocation) are not detected at read time. The first copy wins. The pin detects it later (`EQUIVOCATION`).
 
 ## Rejected
@@ -155,3 +169,4 @@ PLAN.md "Layout v1" is final: `<name>/index.json`, `<name>/<version>.json`, `<na
 3. Readers that return parsed JSON: the bytes can differ per adapter, and each adapter needs its own parse rules.
 4. A `writer(target, credentials)` factory in `StorageAdapter`: the credentials have no common type.
 5. One reader method per file kind (`getIndex`, `getRelease`, `getTarball`): 3 methods per adapter for 1 map from a file to a path.
+6. A packument that skips a version with an absent or bad manifest (spike `lib/shim.ts`): a host can hide the newest version, and the `latest` fallback then selects an older version.

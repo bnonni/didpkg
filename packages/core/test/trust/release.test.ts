@@ -1,5 +1,6 @@
 import { beforeAll, expect, test } from 'bun:test';
 import { contentDigest, parseIndex, parseRelease, proofsOf, signObject, type DidPkgIndex, type DidPkgRelease } from '../../src/trust/index.ts';
+import { compareVersions } from '../../src/trust/release.ts';
 import { failure, outcome } from './helpers.ts';
 import { MemReader, NAME, newKey, publish, tgz, type Key } from './sim.ts';
 
@@ -63,4 +64,20 @@ test('signObject: two signers give a proof set, and the digest does not change',
   expect(proofsOf(two).map((p) => p.verificationMethod)).toEqual([k2.vm, k1.vm]);
   expect(contentDigest(two)).toBe(contentDigest(one));
   expect(await failure(() => signObject(index, []))).toBe('PROOF_GENERATION_ERROR malformed-proof');
+});
+
+test('compareVersions: SemVer 2.0.0 precedence (section 11)', () => {
+  const ordered = [
+    '1.0.0-alpha', '1.0.0-alpha.1', '1.0.0-alpha.beta', '1.0.0-beta', '1.0.0-beta.2', '1.0.0-beta.11', '1.0.0-rc.1',
+    '1.0.0', '1.0.1', '1.2.0', '1.10.0', '2.0.0', '10.0.0', '18446744073709551615.0.0', '18446744073709551616.0.0',
+  ];
+  for (let i = 0; i < ordered.length; i++) {
+    for (let j = 0; j < ordered.length; j++) {
+      expect([ordered[i], ordered[j], Math.sign(compareVersions(ordered[i]!, ordered[j]!))]).toEqual([ordered[i], ordered[j], Math.sign(i - j)]);
+    }
+  }
+  expect(compareVersions('1.0.0-1', '1.0.0-a')).toBeLessThan(0); // a numeric identifier is lower
+  expect(compareVersions('1.0.0+b', '1.0.0+a')).toBe(0); // build metadata does not count
+  expect(compareVersions('1.0.0-rc.1+b', '1.0.0-rc.1')).toBe(0);
+  expect(() => compareVersions('1.0', '1.0.0')).toThrow(TypeError);
 });
