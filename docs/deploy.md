@@ -83,10 +83,14 @@ Each line must start with `ok`. curl checks the certificate, so a pass also prov
 
    ```sh
    didpkg id create main --dwn https://dwn.didpkg.dev --repo https://<user>.github.io/<repo>/
-   didpkg id create web --web <user>.github.io:<repo> --dwn https://dwn.didpkg.dev --repo https://<user>.github.io/<repo>/
+   didpkg id create web --web <user>.github.io:<repo> --dwn https://dwn.didpkg.dev --repo https://<user>.github.io/<repo>/web/
    ```
 
    A did:dht identity goes to the default relays, `relay.pkarr.org` too. The DWN resolves did:dht through `relay.pkarr.org`. A did:web identity needs its `did.json` on the site before step 3.
+
+   Each publisher must have its own mirror URL, because the mirror path has no DID in it. Here, `web/` is the mirror of the second publisher. If two publishers use one URL, the second publish of the same version fails with `a different file exists`.
+
+   The DID is not a tenant yet, so the protocol install of a did:dht identity fails with `401 Not a registered tenant`. The publish in step 3 installs the protocol.
 2. On the VPS, add the DID that `didpkg id show <alias>` shows. The script must print `201`:
 
    ```sh
@@ -97,7 +101,16 @@ Each line must start with `ok`. curl checks the certificate, so a pass also prov
 
    ```sh
    didpkg publish main <tarball> --to dwn --to dir:<site folder>
+   didpkg publish web <tarball> --to dwn --to dir:<site folder>/web
    ```
+
+4. Push the site. Then, on your machine, install each name with npm, pnpm and bun through the shim. The script must print `PASS`:
+
+   ```sh
+   bun demo/live.ts <install-name>...
+   ```
+
+   To check the mirror fallback, run `docker compose stop dwn` on the VPS, then `bun demo/live.ts --dwn-down <install-name>...`, then `docker compose start dwn`.
 
 ## Operate
 

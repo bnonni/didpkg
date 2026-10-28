@@ -39,6 +39,12 @@ The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dw
 bun deploy/test/stack.ts
 ```
 
+The live demo has 2 publishers. Both publish `hello@1.0.0` to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)): `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` and `did:web:bnonni.github.io:didpkg-demo`. This command starts a shim with the public Pkarr relays, then installs both packages with npm, pnpm and bun:
+
+```sh
+bun demo/live.ts @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo
+```
+
 ## Security
 
 See [SECURITY.md](SECURITY.md).
