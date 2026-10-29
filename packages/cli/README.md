@@ -14,7 +14,7 @@ didpkg needs Node 22 or later.
 
 ## Install a package by DID
 
-1. Start the shim: `didpkg shim start`
+1. Start the shim: `didpkg shim start`. It runs until you push Ctrl+C, so use a second terminal for the next steps.
 2. Add this line to the `.npmrc` file of your project: `@didpkg:registry=http://127.0.0.1:2092/`
 3. Install the package with its install name: `npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo`
 
@@ -23,5 +23,7 @@ The shim refuses a package if the signature, the DID document or the release his
 ## More
 
 - All commands: `didpkg --help`
+- Quickstart and HTTP errors: https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md
+- How didpkg works (trust model and limits): https://github.com/bnonni/didpkg/blob/main/docs/how-it-works.md
 - Source and documentation: https://github.com/bnonni/didpkg
 - `dist/cli.js` includes third-party packages. Their licenses are in `dist/THIRD_PARTY_LICENSES.txt`.

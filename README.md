@@ -8,6 +8,36 @@ Phase 1 (the first end-to-end demo) started on 2026-10-27, after the Gate 1 GO (
 
 The old drpm code is in the `legacy/*` tags, for example `legacy/v5.2.1`.
 
+## Install
+
+```sh
+npm install --global didpkg
+```
+
+didpkg needs Node 22 or later. Note: `didpkg@0.1.0` is not on npm yet. Until then, build it from a clone ([quickstart, step 1](docs/quickstart.md#1-install-the-cli)).
+
+To install a package by DID, start the shim. It runs until you push Ctrl+C.
+
+```sh
+didpkg shim start
+```
+
+In a second terminal, in your project folder, add 1 line to `.npmrc` and install:
+
+```sh
+echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
+npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo
+```
+
+The [quickstart](docs/quickstart.md) gives each step and the HTTP errors.
+
+## Documentation
+
+The [docs index](docs/README.md) lists all documents. Start with these:
+
+- [Quickstart](docs/quickstart.md): install the CLI, start the shim and install a package by DID.
+- [How didpkg works](docs/how-it-works.md): the checks at install, the trust model and the limits.
+
 ## Layout
 
 | Path | npm name | Role |
