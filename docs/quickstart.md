@@ -131,4 +131,5 @@ npm error 404 Not Found - GET http://127.0.0.1:2092/@didpkg%2fnope_web_bnonni.gi
 ## Next
 
 - [How didpkg works](how-it-works.md): the parts, the checks at install, the trust model and the limits.
-- All commands: `didpkg --help`.
+- [Publish a package](publish.md): make a publisher DID and publish your own package.
+- [CLI reference](cli.md): each command and its options.

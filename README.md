@@ -37,6 +37,8 @@ The [docs index](docs/README.md) lists all documents. Start with these:
 
 - [Quickstart](docs/quickstart.md): install the CLI, start the shim and install a package by DID.
 - [How didpkg works](docs/how-it-works.md): the checks at install, the trust model and the limits.
+- [Publish a package](docs/publish.md): make a publisher DID and publish a package.
+- [CLI reference](docs/cli.md): each command and its options.
 
 ## Layout
 

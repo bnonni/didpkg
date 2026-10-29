@@ -22,7 +22,8 @@ The shim refuses a package if the signature, the DID document or the release his
 
 ## More
 
-- All commands: `didpkg --help`
+- All commands: https://github.com/bnonni/didpkg/blob/main/docs/cli.md
+- Publish a package: https://github.com/bnonni/didpkg/blob/main/docs/publish.md
 - Quickstart and HTTP errors: https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md
 - How didpkg works (trust model and limits): https://github.com/bnonni/didpkg/blob/main/docs/how-it-works.md
 - Source and documentation: https://github.com/bnonni/didpkg
