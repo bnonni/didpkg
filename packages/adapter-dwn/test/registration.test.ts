@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { getTerms, register, solve, type Challenge } from '../src/registration.ts';
+import { averageHashes, getTerms, register, solve, type Challenge } from '../src/registration.ts';
 import { startPublisher } from './server.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'didpkg-terms-'));
@@ -66,9 +66,10 @@ test('solve reports progress and stops at an abort', async () => {
   const progress: number[] = [];
   const impossible = { challengeNonce: 'A'.repeat(64), maximumAllowedHashValue: '0'.repeat(64) };
   const ac = new AbortController();
-  const onProgress = (n: number) => { progress.push(n); ac.abort(); };
+  const onProgress = (n: number, average: number) => { progress.push(n, average); ac.abort(); };
   expect(await solve(impossible, 'x', { signal: ac.signal, onProgress }).then(() => 'solved', (e: Error) => e.name)).toBe('AbortError');
-  expect(progress).toEqual([65536]);
+  expect(progress).toEqual([65536, 2 ** 256]);
+  expect([averageHashes(EASY), averageHashes('F'.repeat(64))]).toEqual([65536, 1]);
   expect(await solve({ ...impossible, challengeNonce: 'not hex' }, 'x').catch((e: Error) => e.message)).toBe('proof-of-work challenge: not 64 hex digits');
 });
 

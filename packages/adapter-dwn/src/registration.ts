@@ -23,8 +23,8 @@ export interface RegisterOptions {
   /** The terms that the user agreed to. Omit them only for a server without terms. */
   terms?: Terms;
   signal?: AbortSignal;
-  /** Gets the number of hashes so far, after each 65,536 hashes. */
-  onProgress?: (hashes: number) => void;
+  /** Gets the number of hashes so far, after each 65,536 hashes, and the average number for the challenge. */
+  onProgress?: (hashes: number, average: number) => void;
 }
 
 const endpoint = (dwnUrl: string, path: string) => `${dwnUrl.replace(/\/+$/, '')}/registration${path}`;
@@ -67,6 +67,7 @@ export async function solve({ challengeNonce, maximumAllowedHashValue }: Challen
   { signal, onProgress }: Omit<RegisterOptions, 'terms'> = {}): Promise<string> {
   if (!HEX64.test(challengeNonce) || !HEX64.test(maximumAllowedHashValue)) throw new Error('proof-of-work challenge: not 64 hex digits');
   const max = hexToBytes(maximumAllowedHashValue);
+  const average = averageHashes(maximumAllowedHashValue);
   const head = sha256.create().update(te.encode(challengeNonce));
   const data = te.encode(requestData);
   // 48 random hex digits, then a counter of 16 hex digits. The counter changes in place.
@@ -76,10 +77,15 @@ export async function solve({ challengeNonce, maximumAllowedHashValue }: Challen
     increment(nonce);
     if (n % 65536 === 0) {
       signal?.throwIfAborted();
-      onProgress?.(n);
+      onProgress?.(n, average);
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
+}
+
+/** 2^256 / (maximumAllowedHashValue + 1): the average number of hashes to find a response nonce. */
+export function averageHashes(maximumAllowedHashValue: string): number {
+  return Number((1n << 256n) / (BigInt(`0x${maximumAllowedHashValue}`) + 1n));
 }
 
 /** a <= b, as big-endian numbers of the same length. */

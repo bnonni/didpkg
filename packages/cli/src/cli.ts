@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { format, parse, GrammarError } from '@didpkg/core/name';
 import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
+import { registerIdentity } from './id/register.ts';
 import { idPaths, readIdentity } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
 import { publish } from './publish/publish.ts';
@@ -22,6 +23,8 @@ Usage:
                                   Make a did:dht publisher DID with the release key #didpkg-1
   didpkg id create <alias> --web <host>[:<path>]... [--dwn <url>] [--repo <url>]...
                                   Make a did:web publisher DID and its did.json to host
+  didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
+                                  Accept the terms of the DWN, then register the DID there (proof of work)
   didpkg id show <alias>          Print the public data of an identity as JSON
   didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
                                   Sign an npm pack tarball with #didpkg-1 and write it to each target
@@ -36,6 +39,7 @@ Examples:
   didpkg parse @didpkg/hello_web_nonni.org
   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
   didpkg id create web --web me.github.io:pkgs --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
+  didpkg id register main
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
 
@@ -46,6 +50,9 @@ The grammar is draft 1 and can change before 1.0. See https://didpkg.dev.
 `;
 
 class UsageError extends Error {}
+
+/** The error text of the dwn-server for a DID that is not a tenant. */
+const NOT_REGISTERED = 'Not a registered tenant';
 
 /** Positional arguments and repeatable `--flag <value>` options. */
 function options(args: string[], flags: string[]) {
@@ -90,11 +97,23 @@ async function id(args: string[]): Promise<string> {
       updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the update key #0', confirm: true }),
     });
     process.stderr.write(`Move ${r.files.updateKey} offline. Only "didpkg id update" needs it.\n`);
-    const failed = [...(r.relays.some((x) => x.ok) ? [] : ['no relay accepted the DID']), ...(r.dwn && !r.dwn.ok ? ['the DWN protocol install failed'] : [])];
+    const unregistered = r.dwn?.error?.includes(NOT_REGISTERED) === true;
+    if (unregistered) process.stderr.write(`The DWN ${r.dwn!.url} needs a registration. Run "didpkg id register ${alias}", then "didpkg publish" installs the DWN protocol.\n`);
+    const failed = [...(r.relays.some((x) => x.ok) ? [] : ['no relay accepted the DID']), ...(r.dwn && !r.dwn.ok && !unregistered ? ['the DWN protocol install failed'] : [])];
     if (failed.length) {
       process.stderr.write(`didpkg: error: the identity is saved, but ${failed.join(', and ')}. "didpkg publish" sends the DID again and installs the DWN protocol.\n`);
       process.exitCode = 1;
     }
+    return `${JSON.stringify(r, null, 2)}\n`;
+  }
+  if (sub === 'register') {
+    const { positional, values } = options(rest, ['--dwn', '--accept-terms']);
+    if (positional.length !== 1) throw new UsageError(`"id register" needs 1 argument: <alias> (got ${positional.length})`);
+    if (values['--dwn']!.length > 1 || values['--accept-terms']!.length > 1) throw new UsageError('use --dwn and --accept-terms one time');
+    const acceptTerms = values['--accept-terms']![0];
+    if (acceptTerms !== undefined && !/^[0-9a-f]{64}$/i.test(acceptTerms)) throw new UsageError('--accept-terms: use the SHA-256 hex of the terms (64 hex digits)');
+    const identity = readIdentity(idPaths(positional[0]!));
+    const r = await registerIdentity({ identity, dwn: values['--dwn']![0], acceptTerms: acceptTerms?.toLowerCase() });
     return `${JSON.stringify(r, null, 2)}\n`;
   }
   if (sub === 'show') {
@@ -108,7 +127,7 @@ async function id(args: string[]): Promise<string> {
     };
     return `${JSON.stringify(out, null, 2)}\n`;
   }
-  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
+  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create, register or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
 }
 
 async function publishCommand(args: string[]): Promise<string> {
@@ -195,7 +214,9 @@ try {
   } else if (e instanceof GrammarError) {
     process.stderr.write(`didpkg: error: ${e.message}\n`);
   } else {
-    process.stderr.write(`didpkg: error: ${e instanceof Error ? e.message : String(e)}\n`);
+    const message = e instanceof Error ? e.message : String(e);
+    const hint = message.includes(NOT_REGISTERED) ? '\nThe DWN needs a registration of the DID: run "didpkg id register <alias>".' : '';
+    process.stderr.write(`didpkg: error: ${message}${hint}\n`);
   }
   process.exitCode = 1;
 }
