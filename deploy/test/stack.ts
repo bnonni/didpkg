@@ -1,6 +1,6 @@
 // The deploy stack test (chunk C13). It starts deploy/compose.yaml with two local changes: a demo CA in place of
 // Let's Encrypt, and a did:dht relay container in place of relay.pkarr.org. Then it proves, through Traefik:
-// the route allowlist (check.sh), the tenant allowlist (tenant.sh), a write and a read with the didpkg DWN adapter,
+// the route allowlist (check.sh), the registration (terms and proof of work), a write and a read with the didpkg DWN adapter,
 // the body limit, backup.sh and restore.sh, the quota for each tenant, no ACME account, and the limit for each client IP.
 // Needs Docker with Compose 2.24 or later, openssl and curl. Run: bun deploy/test/stack.ts
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { makeCerts } from '../../demo/tls.ts';
 import { dhtFixture } from '../../packages/core/test/did/helpers.ts';
 import { DwnWriter, ed25519MessageSigner } from '../../packages/adapter-dwn/src/writer.ts';
+import { getTerms, register } from '../../packages/adapter-dwn/src/registration.ts';
 import { dwnAdapter } from '../../packages/adapter-dwn/src/index.ts';
 import type { StorageReader, StoredFile } from '../../packages/core/src/source/index.ts';
 
@@ -104,6 +105,8 @@ tls:
     environment:
       DID_DHT_GATEWAY_URI: http://relay:8080
       DID_DHT_ALLOW_PRIVATE_GATEWAY: "1"
+      # About 2^16 hashes for each registration, not 2^24: the test stays fast.
+      DWN_REGISTRATION_PROOF_OF_WORK_INITIAL_MAX_HASH: 0000${'F'.repeat(60)}
   relay:
     image: ${BUN_IMAGE}
     entrypoint: ["bun", "-e", ${JSON.stringify(RELAY)}]
@@ -121,7 +124,7 @@ tls:
     await run(['docker', 'compose', 'up', '-d', '--build', '--wait', '--wait-timeout', '180']);
     console.log(`ok   compose up (${Math.round(performance.now() - t0)} ms)`);
     await run(['./check.sh', base]);
-    check(true, 'check.sh: /health and /info pass, the admin, metrics, registration and connect routes give 404');
+    check(true, 'check.sh: /health, /info and the registration routes pass; the admin, metrics and connect routes give 404');
 
     const fx = await dhtFixture();
     writeFileSync(join(dir, 'relay', fx.id), await fx.payload());
@@ -132,8 +135,12 @@ tls:
     const writer = new DwnWriter({ dwnUrl: base, did: fx.did, signer: ed25519MessageSigner(seed, keyId) });
 
     const denied = await writer.installProtocol().then(() => 'accepted', (e: Error) => e.message);
-    check(denied.includes('DWN 401'), `a DID that is not on the allowlist cannot write (${denied.slice(0, 60)})`);
-    await run(['./tenant.sh', fx.did]);
+    check(denied.includes('DWN 401'), `a DID that is not registered cannot write (${denied.slice(0, 60)})`);
+    const terms = (await getTerms(base))!;
+    check(terms.text === readFileSync(join(DEPLOY, 'terms-of-service.txt'), 'utf8'), 'the terms through Traefik are deploy/terms-of-service.txt');
+    const wrong = await register(base, fx.did, { terms: { ...terms, hash: '0'.repeat(64) } }).then(() => 'accepted', (e: Error) => e.message);
+    check(wrong.includes('HTTP 400'), `a registration with another terms hash fails (${wrong.slice(0, 60)})`);
+    await register(base, fx.did, { terms });
     await writer.installProtocol();
     // More than 30 KB, so the write and the read use the binary body of the DWN.
     const tarball = random(2 * 1024 * 1024);
@@ -143,7 +150,7 @@ tls:
       index: new TextEncoder().encode('{"stack":"index"}'),
     };
     await writer.publish({ name: 'hello', version: '1.0.0', ...files });
-    check(true, 'after tenant.sh, the DID writes the protocol and a 2 MiB release through Traefik');
+    check(true, 'after the registration, the DID writes the protocol and a 2 MiB release through Traefik');
 
     // A new reader each time: a reader keeps the contextIds and the index for some time.
     const reader = () => dwnAdapter({ allowLoopback: true }).reader({ did: fx.did, serviceId: `${fx.did}#dwn`, type: 'DecentralizedWebNode', url: base }, { fetch });
@@ -168,7 +175,7 @@ tls:
     await healthy();
     check(same(await readAll()) && (await release102()).length === 0, 'after restore.sh, the reader gets the bytes of the backup, and 1.0.2 is gone');
     await writer.publish({ name: 'hello', version: '1.0.1', ...files });
-    check(true, 'after restore.sh, the allowlist is back: the DID writes 1.0.1');
+    check(true, 'after restore.sh, the registration is back: the DID writes 1.0.1');
 
     // The admin API is not on the internet, so the test calls it from the dwn container, as tenant.sh does.
     type QuotaStatus = { quota: { maxMessages: number; maxStorageBytes: number; source: string }; usage: { storageBytes: number } };

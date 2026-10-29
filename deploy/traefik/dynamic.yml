@@ -1,14 +1,16 @@
 # The routes of the demo DWN. Only the routes that didpkg uses pass. Each other request gets 404, for example
-# /admin, /metrics, /registration, /connect and the WebSocket on "/".
+# /admin, /metrics, /connect and the WebSocket on "/".
 # The reader uses GET /<did>/query and GET /<did>/read/...; the writer uses GET /info and POST /.
+# The registration uses GET /registration/terms-of-service, GET /registration/proof-of-work and POST /registration.
 http:
   routers:
     dwn:
       entryPoints: [websecure]
       rule: >-
         Host(`{{ env "DWN_DOMAIN" }}`) && (
-        (Method(`GET`) && (Path(`/health`) || Path(`/info`) || PathRegexp(`^/did:[a-z0-9]+:[^/]+/(query|read)(/|$)`)))
-        || (Method(`POST`) && Path(`/`)))
+        (Method(`GET`) && (Path(`/health`) || Path(`/info`) || PathRegexp(`^/did:[a-z0-9]+:[^/]+/(query|read)(/|$)`)
+        || Path(`/registration/terms-of-service`) || Path(`/registration/proof-of-work`)))
+        || (Method(`POST`) && (Path(`/`) || Path(`/registration`))))
       middlewares: [per-ip-limit, body-limit]
       service: dwn
       tls:

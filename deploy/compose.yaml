@@ -24,10 +24,14 @@ services:
       DID_DHT_GATEWAY_URI: https://relay.pkarr.org
       # The DWN records (messages, data, tasks) in SQLite. The admin store and the quotas need a SQL store.
       DWN_STORAGE: sqlite://data/dwn.db
-      # The tenant allowlist (ADR 0001, "From spike 06", item 3). Only a DID that tenant.sh adds can write.
-      # There is no proof-of-work and no provider auth, so a DID cannot add itself.
+      # The tenant store (ADR 0001, "From spike 06", item 3). Only a registered DID can write.
       DWN_REGISTRATION_STORE_URL: sqlite://data/registration.db
       DWN_TTL_CACHE_URL: sqlite://data/registration.db
+      # A DID registers itself: it agrees to the terms (their SHA-256) and sends a proof of work (about 2^24 hashes).
+      # The registration does not prove control of the DID. The DWN still checks each write against the DID document.
+      # A change of the terms file stops each tenant until it registers again with the new hash.
+      DWN_REGISTRATION_PROOF_OF_WORK_ENABLED: "true"
+      DWN_TERMS_OF_SERVICE_FILE_PATH: /app/terms-of-service.txt
       DWN_ADMIN_TOKEN: ${DWN_ADMIN_TOKEN:?set DWN_ADMIN_TOKEN in deploy/.env}
       # The default quota for each tenant: 50 MiB of record data and 10,000 DWN messages.
       # The storage quota counts only record data, so the message quota limits many small records.
@@ -42,6 +46,7 @@ services:
     volumes:
       # A new volume for SQLite. The old volume dwn-data (LevelDB) stays for a rollback (docs/deploy.md).
       - dwn-sqlite:/app/data
+      - ./terms-of-service.txt:/app/terms-of-service.txt:ro
     healthcheck:
       test: ["CMD", "bun", "-e", "process.exit((await fetch('http://127.0.0.1:3000/health')).ok ? 0 : 1)"]
       interval: 30s

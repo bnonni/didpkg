@@ -17,6 +17,7 @@
         "@enbox/dwn-clients": "0.4.37",
         "@enbox/dwn-sdk-js": "0.4.29",
         "@noble/ed25519": "3.2.0",
+        "@noble/hashes": "2.4.0",
       },
       "devDependencies": {
         "@enbox/dwn-server": "0.1.45",

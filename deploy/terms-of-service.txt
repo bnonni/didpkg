@@ -1,0 +1,10 @@
+Terms of service: the didpkg demo DWN (dwn.didpkg.dev)
+
+1. This DWN is a free demo service for didpkg packages. There is no warranty and no guarantee of uptime.
+2. Store only didpkg packages: the releases, tarballs and indexes that the didpkg CLI writes.
+3. Do not store malware or illegal content. Do not store content that you do not have the right to share.
+4. Do not store personal data of other persons. All records on this DWN are public.
+5. Each DID gets a quota of 50 MiB and 10,000 messages. Do not register more DIDs to get more space.
+6. The operator can suspend or delete a DID and its records at any time, without notice.
+7. The operator can change these terms. After a change, register your DID again before you write.
+8. Report abuse or ask a question: https://github.com/bnonni/didpkg/issues

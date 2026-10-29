@@ -66,8 +66,9 @@ export async function startDwn(o: { relayUrl: string; env?: Record<string, strin
   return { url, pid: proc.pid, stop };
 }
 
-/** A new did:dht publisher per run, with the release key #didpkg-1, its relay and a dwn-server with the protocol. */
-export async function startPublisher() {
+/** A new did:dht publisher per run, with the release key #didpkg-1, its relay and a dwn-server with the protocol.
+ * With `env`, the server gets more variables and the publisher does not install the protocol. */
+export async function startPublisher(env?: Record<string, string>) {
   const fx = await dhtFixture();
   const keyId = `${fx.did}#didpkg-1`;
   const vm = fx.document.verificationMethod!.find((v) => v.id === keyId)!;
@@ -75,9 +76,9 @@ export async function startPublisher() {
   const seed = new Uint8Array(Buffer.from(privateKeys!.find((k) => k.x === vm.publicKeyJwk!.x)!.d!, 'base64url'));
   const signer = ed25519MessageSigner(seed, keyId);
   const relay = startRelay(new Map([[fx.id, await fx.payload()]]));
-  const dwn = await startDwn({ relayUrl: relay.url });
+  const dwn = await startDwn({ relayUrl: relay.url, env });
   const writer = new DwnWriter({ dwnUrl: dwn.url, did: fx.did, signer });
-  await writer.installProtocol();
+  if (!env) await writer.installProtocol();
   const stop = async () => {
     await dwn.stop();
     relay.stop();
