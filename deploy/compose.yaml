@@ -22,11 +22,17 @@ services:
       DS_WEBSOCKET_SERVER: "off"
       # The default did:dht gateway of @enbox/dids failed for a live DID; relay.pkarr.org served it (ADR 0001).
       DID_DHT_GATEWAY_URI: https://relay.pkarr.org
+      # The DWN records (messages, data, tasks) in SQLite. The admin store and the quotas need a SQL store.
+      DWN_STORAGE: sqlite://data/dwn.db
       # The tenant allowlist (ADR 0001, "From spike 06", item 3). Only a DID that tenant.sh adds can write.
       # There is no proof-of-work and no provider auth, so a DID cannot add itself.
       DWN_REGISTRATION_STORE_URL: sqlite://data/registration.db
       DWN_TTL_CACHE_URL: sqlite://data/registration.db
       DWN_ADMIN_TOKEN: ${DWN_ADMIN_TOKEN:?set DWN_ADMIN_TOKEN in deploy/.env}
+      # The default quota for each tenant: 50 MiB of record data and 10,000 DWN messages.
+      # The storage quota counts only record data, so the message quota limits many small records.
+      DWN_QUOTA_MAX_STORAGE_BYTES: "52428800"
+      DWN_QUOTA_MAX_MESSAGES: "10000"
       # The server sees only the address of Traefik, so its limit for each IP is one limit for all clients.
       # Traefik limits each client IP (traefik/dynamic.yml). All tenants are demo DIDs: no limit for each tenant.
       DWN_RATE_LIMIT_REQUESTS_PER_SECOND: "0"
@@ -34,7 +40,8 @@ services:
       # The server keeps each request body in memory. Traefik refuses a larger body first.
       MAX_RECORD_DATA_SIZE: 16mb
     volumes:
-      - dwn-data:/app/data
+      # A new volume for SQLite. The old volume dwn-data (LevelDB) stays for a rollback (docs/deploy.md).
+      - dwn-sqlite:/app/data
     healthcheck:
       test: ["CMD", "bun", "-e", "process.exit((await fetch('http://127.0.0.1:3000/health')).ok ? 0 : 1)"]
       interval: 30s
@@ -71,5 +78,5 @@ services:
     logging: *logging
 
 volumes:
-  dwn-data: {}
+  dwn-sqlite: {}
   acme: {}

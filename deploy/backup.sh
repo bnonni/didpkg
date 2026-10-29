@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Backs up the DWN data (LevelDB and the SQLite allowlist). systemd/didpkg-dwn-backup.timer starts it each day.
-# LevelDB is not safe to copy while the server runs, so the script stops the dwn-server for some seconds.
+# Backs up the DWN data (the SQLite files dwn.db and registration.db). systemd/didpkg-dwn-backup.timer starts it each day.
+# The script stops the dwn-server for some seconds, so that the copy of the database files is consistent.
 # In that time, installs use the mirror (the DID document lists it after the DWN).
 # Env: BACKUP_DIR (default /var/backups/didpkg-dwn), BACKUP_KEEP_DAYS (default 14).
 set -euo pipefail

@@ -1,7 +1,7 @@
 // The deploy stack test (chunk C13). It starts deploy/compose.yaml with two local changes: a demo CA in place of
 // Let's Encrypt, and a did:dht relay container in place of relay.pkarr.org. Then it proves, through Traefik:
 // the route allowlist (check.sh), the tenant allowlist (tenant.sh), a write and a read with the didpkg DWN adapter,
-// the body limit, backup.sh and restore.sh, no ACME account, and the limit for each client IP.
+// the body limit, backup.sh and restore.sh, the quota for each tenant, no ACME account, and the limit for each client IP.
 // Needs Docker with Compose 2.24 or later, openssl and curl. Run: bun deploy/test/stack.ts
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,6 +39,12 @@ function freePort(): number {
   const port = s.port!;
   s.stop(true);
   return port;
+}
+
+function random(size: number): Uint8Array {
+  const bytes = new Uint8Array(size);
+  for (let i = 0; i < size; i += 65536) crypto.getRandomValues(bytes.subarray(i, i + 65536));
+  return bytes;
 }
 
 function check(cond: boolean, what: string): void {
@@ -130,8 +136,7 @@ tls:
     await run(['./tenant.sh', fx.did]);
     await writer.installProtocol();
     // More than 30 KB, so the write and the read use the binary body of the DWN.
-    const tarball = new Uint8Array(2 * 1024 * 1024);
-    for (let i = 0; i < tarball.length; i += 65536) crypto.getRandomValues(tarball.subarray(i, i + 65536));
+    const tarball = random(2 * 1024 * 1024);
     const files = {
       release: new TextEncoder().encode('{"stack":"release 1.0.0"}'),
       tarball,
@@ -164,6 +169,23 @@ tls:
     check(same(await readAll()) && (await release102()).length === 0, 'after restore.sh, the reader gets the bytes of the backup, and 1.0.2 is gone');
     await writer.publish({ name: 'hello', version: '1.0.1', ...files });
     check(true, 'after restore.sh, the allowlist is back: the DID writes 1.0.1');
+
+    // The admin API is not on the internet, so the test calls it from the dwn container, as tenant.sh does.
+    type QuotaStatus = { quota: { maxMessages: number; maxStorageBytes: number; source: string }; usage: { storageBytes: number } };
+    const quota = async (): Promise<QuotaStatus> => JSON.parse(await run(['docker', 'compose', 'exec', '-T', '-e', `TENANT_DID=${fx.did}`, 'dwn', 'bun', '-e',
+      'const r = await fetch(`http://127.0.0.1:3000/admin/api/tenants/${process.env.TENANT_DID}/quota`, { headers: { authorization: `Bearer ${process.env.DWN_ADMIN_TOKEN}` } }); console.log(await r.text()); process.exit(r.ok ? 0 : 1);']));
+    const { quota: max } = await quota();
+    check(max.maxStorageBytes === 50 * 1024 * 1024 && max.maxMessages === 10_000 && max.source === 'global', 'the default quota of compose.yaml: 50 MiB and 10,000 messages for each tenant');
+    // Tarballs of 15 MiB fill the quota. The first write over the quota must fail.
+    const chunk = random(15 * 1024 * 1024);
+    let written = 0;
+    let refused = '';
+    while (!refused && written < 5) {
+      refused = await writer.publish({ name: 'big', version: `1.0.${written}`, ...files, tarball: chunk }).then(() => (written++, ''), (e: Error) => e.message);
+    }
+    const used = (await quota()).usage.storageBytes;
+    check(refused.includes('TenantStorageQuotaExceeded') && used <= max.maxStorageBytes && used + chunk.length > max.maxStorageBytes,
+      `after ${written} tarballs of 15 MiB (${used} bytes in use), a write over the quota fails (${refused.slice(0, 90)})`);
 
     const acme = await run(['docker', 'compose', 'exec', '-T', 'traefik', 'sh', '-c', 'cat /acme/acme.json 2>/dev/null || true']);
     check(!acme.includes('Registration'), 'no Let\'s Encrypt account was made');
