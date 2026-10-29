@@ -1,11 +1,13 @@
 // `didpkg id register` on the pinned dwn-server with a tenant store, a terms file and proof of work, then `didpkg publish`.
 // The test difficulty needs about 2^16 hashes; the server default needs about 2^24.
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from 'bun:test';
+import { Database } from 'bun:sqlite';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dwnAdapter } from '@didpkg/adapter-dwn';
 import { startDwn } from '../../adapter-dwn/test/server.ts';
 import { putRelay } from './relay.ts';
 import { tgzOf } from './tgz.ts';
@@ -116,6 +118,28 @@ describe('id register', () => {
     const p = await run(['publish', 'pub', tarball, '--to', 'dwn', '--relay', relay.url]);
     expect(p.err).toBe('');
     expect(JSON.parse(p.out).targets).toEqual([{ url: dwn.url, ok: true }]);
+  });
+
+  test('after a terms change, the DWN refuses the reads and the writes of the DID until it registers again', async () => {
+    const did = JSON.parse(await Bun.file(join(home, 'ids', 'pub.json')).text()).did;
+    const index = async () => {
+      const reader = dwnAdapter({ allowLoopback: true }).reader({ did, serviceId: `${did}#dwn`, type: 'DecentralizedWebNode', url: dwn.url }, { fetch });
+      const out: Uint8Array[] = [];
+      for await (const bytes of reader.read({ kind: 'index', name: 'hello' }, { signal: AbortSignal.timeout(10_000), maxBytes: 1 << 20 })) out.push(bytes);
+      return Buffer.concat(out).length;
+    };
+    expect(await index()).toBeGreaterThan(0);
+    // The server reads the terms file only at the start. An old hash in the tenant row has the same effect as new terms.
+    const db = new Database(join(dwn.dir, 'data', 'registration.db'));
+    db.query('UPDATE registeredTenants SET termsOfServiceHash = ? WHERE did = ?').run('0'.repeat(64), did);
+    db.close();
+    expect(await index().then(String, (e: Error) => e.message)).toContain('bad query reply');
+    const p = await run(['publish', 'pub', tarball, '--to', 'dwn', '--relay', relay.url]);
+    expect(p.code).toBe(1);
+    expect(p.err).toContain('DWN 401 Agreed terms-of-service is outdated.');
+    expect(p.err).toContain('The terms of service of the DWN changed: run "didpkg id register <alias>" again.');
+    expect((await run(['id', 'register', 'pub', '--accept-terms', hash])).code).toBe(0);
+    expect(await index()).toBeGreaterThan(0);
   });
 
   test('a did:web identity with no DWN service needs --dwn', async () => {

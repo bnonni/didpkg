@@ -6,15 +6,15 @@ This runbook puts the demo DWN `dwn.didpkg.dev` on one VPS (PLAN.md Phase 1 item
 
 | Part | Version | Task |
 |---|---|---|
-| `dwn` | `@enbox/dwn-server` 0.1.45 on Bun 1.4.4 (`deploy/dwn/`, built on the VPS) | The DWN, with a tenant allowlist and a quota for each tenant. Its port is not published. |
+| `dwn` | `@enbox/dwn-server` 0.1.45 on Bun 1.4.4 (`deploy/dwn/`, built on the VPS) | The DWN, with registration (terms of service and proof of work) and a quota for each tenant. Its port is not published. |
 | `traefik` | Traefik v3.7.16 | TLS from Let's Encrypt (TLS-ALPN challenge), the route allowlist, the limits. |
 | `didpkg-dwn-backup.timer` | systemd on the host | One backup each day at 03:30 UTC (plus a random delay of up to 15 min). |
 
 Rules of the stack:
 
 1. Only TCP port 443 is open to the internet. Port 80 is not used.
-2. Only the routes of didpkg pass: `GET /health`, `GET /info`, `POST /`, `GET /<did>/query...` and `GET /<did>/read/...`. Each other request gets 404, for example `/admin`, `/metrics` and `/registration`.
-3. Only a DID that you add with `deploy/tenant.sh` can write. A DID cannot add itself: there is no proof-of-work and no provider auth.
+2. Only the routes of didpkg pass: `GET /health`, `GET /info`, `POST /`, `GET /<did>/query...` and `GET /<did>/read/...`. The registration routes pass too: `GET /registration/terms-of-service`, `GET /registration/proof-of-work` and `POST /registration`. Each other request gets 404, for example `/admin`, `/metrics` and `/connect`.
+3. Only a registered DID can write, and the DWN gives only the records of a registered DID. A DID registers itself with `didpkg id register`. It accepts the terms of service (`deploy/terms-of-service.txt`) and does a proof of work (about 30 s). There is no provider auth. The registration does not prove control of the DID, but the DWN checks each write against the DID document.
 4. Traefik allows 20 requests a second for each client IP, with a burst of 50. The dwn-server sees only the Traefik address, so its own limits are off.
 5. A request body can be 17 MiB at most. A DWN record can be 16 MiB at most.
 6. The data is in the Docker volume `didpkg-dwn_dwn-sqlite`, in 2 SQLite files: `dwn.db` (the DWN records) and `registration.db` (the tenants and the quotas). The certificate is in `didpkg-dwn_acme`.
@@ -78,7 +78,9 @@ deploy/check.sh https://dwn.didpkg.dev
 
 Each line must start with `ok`. curl checks the certificate, so a pass also proves TLS. The stack test (`bun deploy/test/stack.ts`) proves the rest of the stack locally, but not Let's Encrypt.
 
-## 4. Add a publisher (about 5 min for each publisher)
+## 4. Check with a publisher (about 10 min)
+
+A publisher needs no action from you: each publisher registers its own DID (see [Publish a package](publish.md)). To check the DWN, do these steps as a publisher.
 
 1. On your machine, make the identity with this DWN in its `#dwn` service:
 
@@ -91,11 +93,12 @@ Each line must start with `ok`. curl checks the certificate, so a pass also prov
 
    Each publisher must have its own mirror URL, because the mirror path has no DID in it. Here, `web/` is the mirror of the second publisher. If two publishers use one URL, the second publish of the same version fails with `a different file exists`.
 
-   The DID is not a tenant yet, so the protocol install of a did:dht identity fails with `401 Not a registered tenant`. The publish in step 3 installs the protocol.
-2. On the VPS, add the DID that `didpkg id show <alias>` shows. The script must print `201`:
+   The did:dht DID is not registered yet, so `id create main` shows the next command, `didpkg id register <alias>`. The publish in step 3 installs the protocol.
+2. Register each DID. Read the terms, then type `y`. The proof of work takes about 30 s on average:
 
    ```sh
-   /opt/didpkg/deploy/tenant.sh <did>
+   didpkg id register main
+   didpkg id register web
    ```
 
 3. On your machine, publish:
@@ -125,7 +128,7 @@ Each line must start with `ok`. curl checks the certificate, so a pass also prov
 | Restore a backup | `./restore.sh /var/backups/didpkg-dwn/dwn-<time>.tar.gz` |
 | See the backup timer | `systemctl list-timers didpkg-dwn-backup.timer` |
 
-To restore on a new VPS, do sections 1 and 2 first, copy the backup file to the VPS, then run `restore.sh`.
+To restore on a new VPS, do sections 1 and 2 first, copy the backup file to the VPS, then run `restore.sh`. The backup holds the registrations too.
 
 Keep a copy of the backups off the VPS. For example, run this command on your machine each week:
 
@@ -133,11 +136,45 @@ Keep a copy of the backups off the VPS. For example, run this command on your ma
 rsync -a root@<vps>:/var/backups/didpkg-dwn/ ~/backups/didpkg-dwn/
 ```
 
+## Manage the tenants
+
+Use `deploy/tenant.sh` on the VPS, in `/opt/didpkg/deploy`. It sends each request to the admin API from the dwn container.
+
+| Task | Command |
+|---|---|
+| List the tenants, with the message count and the bytes of each tenant | `./tenant.sh list` |
+| Show the registration, the terms hash and the status of a DID | `./tenant.sh show <did>` |
+| Stop the writes of a DID and the reads of its records | `./tenant.sh suspend <did>` |
+| Allow a suspended DID again | `./tenant.sh unsuspend <did>` |
+| Remove the registration of a DID. Its records stay, and it can register again | `./tenant.sh delete <did>` |
+| Remove the registration and all records of a DID | `./tenant.sh purge <did>` |
+| Remove all records of a DID, and keep the DID suspended | `./tenant.sh block <did>` |
+| Show the quota and the usage of a DID | `./tenant.sh quota <did>` |
+| Set the quota of a DID (0 is no limit) | `./tenant.sh quota <did> <max bytes> <max messages>` |
+| Give a DID the quota of `compose.yaml` again | `./tenant.sh quota <did> default` |
+
+For abuse, use `block`. A new registration does not clear a suspension, but `delete` and `purge` remove the suspension.
+
+## Change the terms of service
+
+A change of the terms stops each tenant. Until a publisher registers again, the DWN refuses its writes and the reads of its records: `401 Agreed terms-of-service is outdated`. In that time, installs use the mirrors.
+
+1. Edit `deploy/terms-of-service.txt`, commit the change, and sign the commit.
+2. On the VPS, check out the commit. Then make a new dwn container, because the server reads the terms only when it starts:
+
+   ```sh
+   git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --force-recreate --wait dwn
+   ```
+
+3. Tell the publishers to run `didpkg id register <alias>` again, for example in a GitHub issue. Register the demo DIDs again too.
+
+## Change the pinned dwn-server
+
 To change the pinned `dwn-server`, edit `deploy/dwn/package.json`, then run `bun install --lockfile-only --ignore-scripts` in `deploy/dwn/`. Use the same versions as the root `bun.lock`, so the DWN runs the code that the tests use. Then run `bun deploy/test/stack.ts` before you commit.
 
 ## Move from LevelDB to SQLite (one time, about 20 min)
 
-The first stack kept the DWN records in LevelDB, in the volume `didpkg-dwn_dwn-data`. LevelDB has no admin store, so it has no quotas. The stack now uses SQLite in the new volume `didpkg-dwn_dwn-sqlite`. There is no data conversion: you add the tenants again and publish each package again. The old volume stays, so you can go back.
+The first stack kept the DWN records in LevelDB, in the volume `didpkg-dwn_dwn-data`. LevelDB has no admin store, so it has no quotas. The stack now uses SQLite in the new volume `didpkg-dwn_dwn-sqlite`. There is no data conversion: each publisher registers again and publishes each package again. The old volume stays, so you can go back.
 
 On the VPS, in `/opt/didpkg/deploy`, before you check out the new commit:
 
@@ -165,35 +202,32 @@ On the VPS, in `/opt/didpkg/deploy`, before you check out the new commit:
    git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --wait
    ```
 
-5. Add each DID of step 3 again. The script must print `201`:
-
-   ```sh
-   ./tenant.sh <did>
-   ```
+5. Tell the publisher of each DID of step 3 to register again with `didpkg id register <alias>`, then to publish again.
 
 On your machine, in the didpkg repository:
 
 1. Run `deploy/check.sh https://dwn.didpkg.dev`. Each line must start with `ok`.
-2. Publish each version of each package again, to the DWN and to its mirror clone. The tarball is in the mirror clone:
+2. Register each demo DID again: `didpkg id register <alias>`.
+3. Publish each version of each package again, to the DWN and to its mirror clone. The tarball is in the mirror clone:
 
    ```sh
    didpkg publish <alias> <site folder>/<name>/<version>.tgz --to dwn --to dir:<site folder>
    ```
 
    The publish finds the signed release and index on the mirror and writes the same bytes to the DWN. The mirror files do not change, so `git status` in the clone must show no change.
-3. Install each name through the shim. The script must print `PASS`:
+4. Install each name through the shim. The script must print `PASS`:
 
    ```sh
    bun demo/live.ts <install-name>...
    ```
 
-4. After 7 days with no problem, delete the old volume on the VPS: `docker volume rm didpkg-dwn_dwn-data`.
+5. After 7 days with no problem, delete the old volume on the VPS: `docker volume rm didpkg-dwn_dwn-data`.
 
-To go back before step 4, check out the old commit on the VPS and run `docker compose up -d --build --wait`. The stack then uses the old volume.
+To go back before step 5, check out the old commit on the VPS and run `docker compose up -d --build --wait`. The stack then uses the old volume.
 
 ## Known limits
 
 1. The backup stops the dwn-server for some seconds each day, so that the copy of the database files is consistent. In that time, Traefik gives 502 and installs use the mirror.
 2. The dwn-server can use only one did:dht gateway. If `relay.pkarr.org` is down, the DWN can refuse the writes of a did:dht publisher.
-3. `tenant.sh` can only add a DID. The removal of a tenant is not tested.
+3. Each DID that does the proof of work can register, because the DWN has no provider auth. The quota of each DID and `tenant.sh block` are the only limits on abuse. The server makes the proof of work harder if more than 10 registrations occur in one minute.
 4. The stack test replaces Let's Encrypt with a demo CA. Only `check.sh` on the real VPS proves the ACME settings.

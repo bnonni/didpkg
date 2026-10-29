@@ -32,7 +32,7 @@ function freePort(): number {
 }
 
 /** Starts the dwn-server in open mode (no tenant allowlist) with a new LevelDB folder. The rate limits are off.
- * `env` adds variables, for example a proxy and a CA for did:web. */
+ * `env` adds variables, for example a proxy and a CA for did:web. `dir` is the working folder of the server. */
 export async function startDwn(o: { relayUrl: string; env?: Record<string, string> }) {
   const pkgJson = fileURLToPath(import.meta.resolve('@enbox/dwn-server/package.json'));
   const main = join(pkgJson, '..', 'dist', 'esm', 'src', 'main.js');
@@ -63,7 +63,7 @@ export async function startDwn(o: { relayUrl: string; env?: Record<string, strin
     }
     await Bun.sleep(100);
   }
-  return { url, pid: proc.pid, stop };
+  return { url, pid: proc.pid, dir, stop };
 }
 
 /** A new did:dht publisher per run, with the release key #didpkg-1, its relay and a dwn-server with the protocol.

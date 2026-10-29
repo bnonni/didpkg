@@ -124,7 +124,7 @@ stdout gets the JSON result: `alias`, `did`, `dwn` and `termsOfServiceHash` (`nu
 
 To get the hash for CI, run the command one time with no terminal: `didpkg id register main < /dev/null`. stderr shows the terms and the hash. You can also hash the terms yourself: `curl -s https://dwn.didpkg.dev/registration/terms-of-service | sha256sum` (on macOS, `shasum -a 256`).
 
-If you register again with the same terms, nothing changes. If the operator changes the terms, the DWN refuses your writes until you register again. The registration does not prove that you control the DID. The DWN checks each write against the DID document.
+If you register again with the same terms, nothing changes. If the operator changes the terms, the DWN refuses your writes and the reads of your packages until you register again: `401 Agreed terms-of-service is outdated`. In that time, the shim reads your packages from the mirror. The registration does not prove that you control the DID. The DWN checks each write against the DID document.
 
 After the registration, `didpkg publish` installs the didpkg protocol and writes.
 

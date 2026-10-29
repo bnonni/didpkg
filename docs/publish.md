@@ -10,7 +10,7 @@ You must have:
 - A package folder with a `package.json` file. The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. A scope (`@me/lib`) and `_` are not permitted.
 - Storage for the package, one or both of these:
   - A static HTTPS site that you control, for example a GitHub Pages repository. This is the mirror.
-  - A DWN that accepts writes from your DID. The demo DWN `https://dwn.didpkg.dev` accepts only the DIDs that its operator adds. To run your own DWN, read [Deploy a DWN](deploy.md).
+  - A DWN that accepts writes from your DID. The demo DWN `https://dwn.didpkg.dev` accepts each DID that registers there (step 5). To run your own DWN, read [Deploy a DWN](deploy.md).
 
 A DWN is optional. With only a mirror, the shim reads each package from the mirror.
 
@@ -37,7 +37,7 @@ For a script or CI, set the passphrases in the environment:
 | `DIDPKG_PASSPHRASE` | The release key `#didpkg-1` | `id create`, `publish` |
 | `DIDPKG_UPDATE_PASSPHRASE` | The update key `#0` (did:dht only) | `id create` |
 
-The 2 passphrases must be different. Keep them in a password manager. If you lose a passphrase, nobody can decrypt its key.
+The 2 passphrases must be different. Keep them in a password manager. If you lose a passphrase, nobody can decrypt its key. `didpkg id register` needs no passphrase.
 
 ## 3. Make the identity
 
@@ -55,7 +55,9 @@ didpkg id create main --dwn https://dwn.example.com --repo https://me.github.io/
 
 The command writes the 2 key files first. Then it sends the DID record to the relays and installs the didpkg protocol on the DWN. It prints the DID and the file paths as JSON.
 
-If no relay accepts the DID, or the DWN refuses the protocol, the command exits with 1. The identity is saved. The first `didpkg publish` sends the DID again and installs the protocol. A DWN with a tenant allowlist refuses a DID that is not a tenant: `401 Not a registered tenant`.
+If no relay accepts the DID, or the DWN refuses the protocol, the command exits with 1. The identity is saved. The first `didpkg publish` sends the DID again and installs the protocol.
+
+A DWN with registration refuses a DID that is not registered: `401 Not a registered tenant`. In this case, the command exits with 0 and shows the next command, `didpkg id register <alias>` (step 5).
 
 The DID record must have 1000 bytes or less. Each `--repo` and `--dwn` URL makes the record larger, so use a small number of short URLs.
 
@@ -97,15 +99,23 @@ The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$
 
 didpkg never replaces a key file. If the alias exists, `id create` stops with `<file> exists: didpkg never replaces a key`. didpkg 0.1.0 has no command to change a key. If you lose the release key, you cannot publish a new version with that DID.
 
-## 5. Add the DID to the DWN
+## 5. Register the DID on the DWN
 
-Do this step only if you publish to a DWN with a tenant allowlist. Get the DID:
+Do this step only if you publish to a DWN with registration, for example `https://dwn.didpkg.dev`:
 
 ```sh
-didpkg id show main
+didpkg id register main
 ```
 
-Give the `did` value to the operator of the DWN. If you operate the DWN, read [Deploy a DWN](deploy.md), section 4.
+1. The command shows the terms of service of the DWN and their SHA-256 hash. Read the terms.
+2. In a terminal, type `y` to accept the terms. In a script or CI, use `--accept-terms <hash>`.
+3. The command does a proof of work. On the demo DWN, it takes about 30 s on average.
+
+If the identity has no `#dwn` service, add `--dwn <url>`. For all options, read [CLI reference](cli.md#didpkg-id-register).
+
+If the operator changes the terms, the DWN refuses your writes and the reads of your packages: `401 Agreed terms-of-service is outdated`. Run `didpkg id register main` again. Until then, the shim reads your packages from the mirror.
+
+A DWN with a tenant allowlist and no registration accepts only the DIDs that its operator adds. Give the `did` value of `didpkg id show main` to the operator.
 
 For did:web, host `did.json` before the publish, because the DWN resolves the DID before it accepts a write.
 

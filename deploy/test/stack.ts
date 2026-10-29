@@ -1,7 +1,7 @@
 // The deploy stack test (chunk C13). It starts deploy/compose.yaml with two local changes: a demo CA in place of
 // Let's Encrypt, and a did:dht relay container in place of relay.pkarr.org. Then it proves, through Traefik:
 // the route allowlist (check.sh), the registration (terms and proof of work), a write and a read with the didpkg DWN adapter,
-// the body limit, backup.sh and restore.sh, the quota for each tenant, no ACME account, and the limit for each client IP.
+// the body limit, backup.sh and restore.sh, the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.
 // Needs Docker with Compose 2.24 or later, openssl and curl. Run: bun deploy/test/stack.ts
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -177,10 +177,10 @@ tls:
     await writer.publish({ name: 'hello', version: '1.0.1', ...files });
     check(true, 'after restore.sh, the registration is back: the DID writes 1.0.1');
 
-    // The admin API is not on the internet, so the test calls it from the dwn container, as tenant.sh does.
-    type QuotaStatus = { quota: { maxMessages: number; maxStorageBytes: number; source: string }; usage: { storageBytes: number } };
-    const quota = async (): Promise<QuotaStatus> => JSON.parse(await run(['docker', 'compose', 'exec', '-T', '-e', `TENANT_DID=${fx.did}`, 'dwn', 'bun', '-e',
-      'const r = await fetch(`http://127.0.0.1:3000/admin/api/tenants/${process.env.TENANT_DID}/quota`, { headers: { authorization: `Bearer ${process.env.DWN_ADMIN_TOKEN}` } }); console.log(await r.text()); process.exit(r.ok ? 0 : 1);']));
+    // The admin API is not on the internet, so tenant.sh calls it from the dwn container.
+    type QuotaStatus = { quota: { maxMessages: number; maxStorageBytes: number; source: string }; usage: { messageCount: number; storageBytes: number } };
+    const tenant = (...args: string[]) => run(['./tenant.sh', ...args]);
+    const quota = async (...set: string[]): Promise<QuotaStatus> => JSON.parse((await tenant('quota', fx.did, ...set)).trim().split('\n').pop()!);
     const { quota: max } = await quota();
     check(max.maxStorageBytes === 50 * 1024 * 1024 && max.maxMessages === 10_000 && max.source === 'global', 'the default quota of compose.yaml: 50 MiB and 10,000 messages for each tenant');
     // Tarballs of 15 MiB fill the quota. The first write over the quota must fail.
@@ -193,6 +193,29 @@ tls:
     const used = (await quota()).usage.storageBytes;
     check(refused.includes('TenantStorageQuotaExceeded') && used <= max.maxStorageBytes && used + chunk.length > max.maxStorageBytes,
       `after ${written} tarballs of 15 MiB (${used} bytes in use), a write over the quota fails (${refused.slice(0, 90)})`);
+
+    const own = (await quota(String(200 * 1024 * 1024), '0')).quota;
+    check(own.source === 'tenant' && own.maxStorageBytes === 200 * 1024 * 1024 && own.maxMessages === 0, 'tenant.sh quota sets the quota of one DID');
+    check((await quota('default')).quota.source === 'global', 'tenant.sh quota default gives the DID the quota of compose.yaml again');
+    check((await tenant('list')).includes(`${fx.did} `), 'tenant.sh list shows the DID');
+    const write = () => writer.publish({ name: 'hello', version: '1.0.3', ...files }).then(() => 'accepted', (e: Error) => e.message);
+    await tenant('suspend', fx.did);
+    const suspended = await write();
+    const unread = await readAll().then(() => 'read', (e: Error) => e.message);
+    check(suspended.includes('Tenant is suspended') && unread.includes('bad query reply'), `after tenant.sh suspend, the DID cannot write or read (${suspended.slice(0, 60)})`);
+    await tenant('unsuspend', fx.did);
+    check(same(await readAll()), 'after tenant.sh unsuspend, the reader gets the same bytes');
+    check((await tenant('show', fx.did)).includes(terms.hash), 'tenant.sh show shows the terms hash of the DID');
+    await tenant('delete', fx.did);
+    const gone = await readAll().then(() => 'read', (e: Error) => e.message);
+    await register(base, fx.did, { terms });
+    check(gone.includes('bad query reply') && same(await readAll()), 'after tenant.sh delete, the reads fail; after a new registration, the reader gets the same bytes');
+    await tenant('block', fx.did);
+    await register(base, fx.did, { terms });
+    const blocked = await write();
+    const left = (await quota()).usage;
+    check(blocked.includes('Tenant is suspended') && left.messageCount === 0 && left.storageBytes === 0,
+      `after tenant.sh block, the DID has no records, and it stays suspended after a new registration (${blocked.slice(0, 60)})`);
 
     const acme = await run(['docker', 'compose', 'exec', '-T', 'traefik', 'sh', '-c', 'cat /acme/acme.json 2>/dev/null || true']);
     check(!acme.includes('Registration'), 'no Let\'s Encrypt account was made');

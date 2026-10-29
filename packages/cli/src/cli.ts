@@ -53,6 +53,8 @@ class UsageError extends Error {}
 
 /** The error text of the dwn-server for a DID that is not a tenant. */
 const NOT_REGISTERED = 'Not a registered tenant';
+/** The error text of the dwn-server for a tenant that registered with old terms of service. */
+const OUTDATED_TERMS = 'Agreed terms-of-service is outdated';
 
 /** Positional arguments and repeatable `--flag <value>` options. */
 function options(args: string[], flags: string[]) {
@@ -215,7 +217,8 @@ try {
     process.stderr.write(`didpkg: error: ${e.message}\n`);
   } else {
     const message = e instanceof Error ? e.message : String(e);
-    const hint = message.includes(NOT_REGISTERED) ? '\nThe DWN needs a registration of the DID: run "didpkg id register <alias>".' : '';
+    const hint = message.includes(NOT_REGISTERED) ? '\nThe DWN needs a registration of the DID: run "didpkg id register <alias>".'
+      : message.includes(OUTDATED_TERMS) ? '\nThe terms of service of the DWN changed: run "didpkg id register <alias>" again.' : '';
     process.stderr.write(`didpkg: error: ${message}${hint}\n`);
   }
   process.exitCode = 1;
