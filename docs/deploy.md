@@ -123,10 +123,12 @@ A publisher needs no action from you: each publisher registers its own DID (see 
 | See the logs | `docker compose logs --tail 100 dwn` (or `traefik`) |
 | See the state | `docker compose ps` |
 | Restart | `docker compose restart` |
-| Update to a new commit | `git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --wait` |
+| Update to a new commit | `git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --force-recreate --wait` |
 | Change the admin token | Edit `.env`, then `docker compose up -d --wait` |
 | Restore a backup | `./restore.sh /var/backups/didpkg-dwn/dwn-<time>.tar.gz` |
 | See the backup timer | `systemctl list-timers didpkg-dwn-backup.timer` |
+
+An update must make new containers (`--force-recreate`). The stack mounts single files, for example `traefik/dynamic.yml`. A checkout replaces each changed file, but a container that runs continues to read the old file. Example: after the move to SQLite, Traefik gave 404 for `/registration` until a new Traefik container started.
 
 To restore on a new VPS, do sections 1 and 2 first, copy the backup file to the VPS, then run `restore.sh`. The backup holds the registrations too.
 
@@ -196,10 +198,10 @@ On the VPS, in `/opt/didpkg/deploy`, before you check out the new commit:
    docker compose exec -T dwn bun -e 'import { Database } from "bun:sqlite"; for (const t of new Database("data/registration.db", { readonly: true }).query("SELECT did FROM registeredTenants").all()) console.log(t.did)'
    ```
 
-4. Check out the new commit and start the stack. The DWN starts with no data:
+4. Check out the new commit and start the stack with new containers. The DWN starts with no data:
 
    ```sh
-   git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --wait
+   git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --force-recreate --wait
    ```
 
 5. Tell the publisher of each DID of step 3 to register again with `didpkg id register <alias>`, then to publish again.
@@ -223,7 +225,7 @@ On your machine, in the didpkg repository:
 
 5. After 7 days with no problem, delete the old volume on the VPS: `docker volume rm didpkg-dwn_dwn-data`.
 
-To go back before step 5, check out the old commit on the VPS and run `docker compose up -d --build --wait`. The stack then uses the old volume.
+To go back before step 5, check out the old commit on the VPS and run `docker compose up -d --build --force-recreate --wait`. The stack then uses the old volume.
 
 ## Known limits
 
