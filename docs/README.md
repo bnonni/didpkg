@@ -3,6 +3,7 @@
 | Document | Reader | Content |
 |---|---|---|
 | [Quickstart](quickstart.md) | User | Install the CLI, start the shim and install a package by DID. The HTTP errors of the shim. |
+| [Install didpkg](install.md) | User | npm, the install script and a manual download. The checks, the environment variables, upgrade, uninstall and what you trust. |
 | [How didpkg works](how-it-works.md) | User, publisher | The parts, the checks at install, the trust model, the pins and the limits. |
 | [Publish a package](publish.md) | Publisher | Make a did:dht or did:web identity, sign a package, write it to a DWN and a mirror. |
 | [CLI reference](cli.md) | User, publisher | Each command, with its options, its output and its exit code. |

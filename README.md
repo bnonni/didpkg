@@ -10,11 +10,19 @@ The old drpm code is in the `legacy/*` tags, for example `legacy/v5.2.1`.
 
 ## Install
 
+On Linux or macOS, the install script gets a standalone binary:
+
+```sh
+curl -fsSL https://didpkg.dev/install | sh
+```
+
+On each OS with Node 22 or later (also Windows), use npm:
+
 ```sh
 npm install --global didpkg
 ```
 
-didpkg needs Node 22 or later. Note: `didpkg@0.1.0` is not on npm yet. Until then, build it from a clone ([quickstart, step 1](docs/quickstart.md#1-install-the-cli)).
+[Install didpkg](docs/install.md) shows how to read the script before you run it, check a manual download, upgrade and uninstall. Note: `didpkg@0.1.0`, the release `v0.1.0` and `didpkg.dev` are not live yet. Until then, build the CLI from a clone ([quickstart, step 1](docs/quickstart.md#1-install-the-cli)).
 
 To install a package by DID, start the shim. It runs until you push Ctrl+C.
 
@@ -36,6 +44,7 @@ The [quickstart](docs/quickstart.md) gives each step and the HTTP errors.
 The [docs index](docs/README.md) lists all documents. Start with these:
 
 - [Quickstart](docs/quickstart.md): install the CLI, start the shim and install a package by DID.
+- [Install didpkg](docs/install.md): npm, the install script, a manual download, upgrade and uninstall.
 - [How didpkg works](docs/how-it-works.md): the checks at install, the trust model and the limits.
 - [Publish a package](docs/publish.md): make a publisher DID and publish a package.
 - [CLI reference](docs/cli.md): each command and its options.

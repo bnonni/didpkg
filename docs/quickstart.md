@@ -11,12 +11,27 @@ You must have:
 
 ## 1. Install the CLI
 
+On Linux or macOS, use the install script:
+
+```sh
+curl -fsSL https://didpkg.dev/install | sh
+```
+
+If the script shows a PATH line, add it to your shell profile and open a new terminal. On each OS with Node 22 or later, you can use npm:
+
 ```sh
 npm install --global didpkg
+```
+
+Then check the version:
+
+```sh
 didpkg --version
 ```
 
-The version must be `0.1.0` or later. Note: `didpkg@0.1.0` is not on npm yet. Until then, build the package from a clone. The build needs Bun 1.4.4 or later. The package that you install needs only Node.
+The version must be `0.1.0` or later. [Install didpkg](install.md) gives the other ways to install, the checks, upgrade and uninstall.
+
+Note: `didpkg@0.1.0`, the release `v0.1.0` and `didpkg.dev` are not live yet. Until then, build the package from a clone. The build needs Bun 1.4.4 or later. The package that you install needs only Node.
 
 ```sh
 git clone https://github.com/bnonni/didpkg.git

@@ -38,9 +38,12 @@
 
     <section id="install">
       <h2>Install</h2>
-      <p>didpkg needs Node 22 or later.</p>
+      <p>On Linux or macOS, the install script gets a standalone binary:</p>
+      <pre><code>curl -fsSL https://didpkg.dev/install | sh</code></pre>
+      <p>On each OS with Node 22 or later (also Windows), use npm:</p>
       <pre><code>npm install --global didpkg</code></pre>
-      <p class="note">Note: <code>didpkg@0.1.0</code> is not on npm yet. Until then, build it from a clone (<a href="https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md#1-install-the-cli">quickstart, step 1</a>).</p>
+      <p><a href="https://github.com/bnonni/didpkg/blob/main/docs/install.md">Install didpkg</a> shows how to read the script before you run it, check a manual download, upgrade and uninstall.</p>
+      <p class="note">Note: <code>didpkg@0.1.0</code>, the release <code>v0.1.0</code> and this install script are not live yet. Until then, build the CLI from a clone (<a href="https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md#1-install-the-cli">quickstart, step 1</a>).</p>
       <h3>Install a package by DID</h3>
       <p>Start the shim. It runs until you push Ctrl+C.</p>
       <pre><code>didpkg shim start</code></pre>

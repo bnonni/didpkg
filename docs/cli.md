@@ -18,6 +18,8 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 | `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`. If it is not set, didpkg asks in the terminal. |
 | `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key `#0` (did:dht only). If it is not set, didpkg asks in the terminal. |
 
+The install script has its own variables: see [Install didpkg](install.md#environment-variables).
+
 A new passphrase must have 12 or more characters. Without a terminal and without the variable, the command stops with `no passphrase: set <variable>, or run in a terminal`.
 
 ## didpkg name
