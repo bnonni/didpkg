@@ -1,4 +1,4 @@
-// The identity files in `<config>/ids/` (PLAN.md Rules item 4). Each file has mode 0600, and the folder has mode 0700.
+// The identity files in `<config>/ids/`. Each file has mode 0600, and the folder has mode 0700.
 //   <alias>.json             the public data and the encrypted release key #didpkg-1. `didpkg publish` reads only this file.
 //   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht). Move it offline. Only `didpkg id update` reads it.
 //   <alias>.did.json         the DID document for the publisher to host (did:web only, mode 0644). did:web has no update key.

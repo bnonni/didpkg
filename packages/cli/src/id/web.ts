@@ -1,4 +1,4 @@
-// `didpkg id create --web` for did:web (PLAN.md Phase 1 items 4 and 5).
+// `didpkg id create --web` for did:web.
 // The host is the only authority for the document, so a did:web identity has no update key: the publisher
 // hosts the did.json file, and a change of that file changes the DID document.
 // This command does no network write. A DWN resolves the DID before it accepts the protocol, and the

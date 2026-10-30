@@ -1,4 +1,4 @@
-// The deploy stack test (chunk C13). It starts deploy/compose.yaml with two local changes: a demo CA in place of
+// The deploy stack test. It starts deploy/compose.yaml with two local changes: a demo CA in place of
 // Let's Encrypt, and a did:dht relay container in place of relay.pkarr.org. Then it proves, through Traefik:
 // the route allowlist (check.sh), the registration (terms and proof of work), a write and a read with the didpkg DWN adapter,
 // the body limit, backup.sh and restore.sh, the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.

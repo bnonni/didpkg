@@ -20,7 +20,7 @@ test('core src imports no node: module and uses no Bun global', async () => {
   expect(bad).toEqual([]);
 });
 
-// PLAN.md "Rules" item 1: only did/drivers/*.ts import a DID method library, one file per library.
+// Only did/drivers/*.ts import a DID method library, one file per library.
 // trust/*.ts imports only @noble/ed25519, @noble/curves, @noble/hashes, @scure/base and canonicalize.
 test('import borders: each library has only the expected importers', async () => {
   const importers: Record<string, string[]> = {};
@@ -50,7 +50,7 @@ test('dependencies have exact versions', () => {
   }
 });
 
-// Phase 1 exit criterion 4: a test imports every entry point and proves no network call and no process exit.
+// This test imports every entry point and proves no network call and no process exit.
 test('every entry point imports with no network call and no process exit', () => {
   const entries = Object.entries(pkg.exports).filter(([k]) => k !== './package.json').map(([, v]) => root + v);
   const script = `

@@ -13,16 +13,16 @@ const docOf = (id: string) => ({
   id,
   verificationMethod: [{ id: `${id}#didpkg-1`, type: 'Multikey', controller: id, publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK' }],
   assertionMethod: [`${id}#didpkg-1`],
-  service: [{ id: `${id}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: ['https://bnonni.github.io/didpkg-spike-pages/'] }],
+  service: [{ id: `${id}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: ['https://bnonni.github.io/didpkg-pages/'] }],
 });
 
 test('resolves the domain form and the path form', async () => {
   const root = 'did:web:example.com';
-  const path = 'did:web:bnonni.github.io:didpkg-spike-pages';
+  const path = 'did:web:bnonni.github.io:didpkg-pages';
   const port = 'did:web:example.com%3A8443:u:alice';
   const { fetch, calls } = fakeFetch({
     'https://example.com/.well-known/did.json': jsonResponse(docOf(root)),
-    'https://bnonni.github.io/didpkg-spike-pages/did.json': jsonResponse(docOf(path)),
+    'https://bnonni.github.io/didpkg-pages/did.json': jsonResponse(docOf(path)),
     'https://example.com:8443/u/alice/did.json': jsonResponse(docOf(port)),
   });
   const d = webDriver({ fetch });
@@ -32,7 +32,7 @@ test('resolves the domain form and the path form', async () => {
     expect(r.didDocument).toEqual(docOf(did));
     expect(r.didResolutionMetadata.verification).toBe('tofu');
   }
-  expect(calls).toEqual(['https://example.com/.well-known/did.json', 'https://bnonni.github.io/didpkg-spike-pages/did.json', 'https://example.com:8443/u/alice/did.json']);
+  expect(calls).toEqual(['https://example.com/.well-known/did.json', 'https://bnonni.github.io/didpkg-pages/did.json', 'https://example.com:8443/u/alice/did.json']);
 });
 
 test('a document of another DID gives INVALID_DID_DOCUMENT', async () => {

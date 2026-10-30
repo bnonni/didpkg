@@ -1,4 +1,4 @@
-// The encrypted key (PLAN.md Rules item 4): AES-256-GCM with a PBKDF2-SHA256 key at 600,000 iterations.
+// The encrypted key: AES-256-GCM with a PBKDF2-SHA256 key at 600,000 iterations.
 // Source: drpm.tools/src/lib/profile.ts:128-140 and :208-251, with 600,000 iterations, not 100,000.
 // The header fields are the AES-GCM additional data. Thus a changed DID, key id, key or KDF field fails to decrypt.
 import * as ed from '@noble/ed25519';

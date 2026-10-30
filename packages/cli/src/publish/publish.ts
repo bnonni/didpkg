@@ -1,4 +1,4 @@
-// `didpkg publish` (PLAN.md Phase 1 item 4 and Rules item 4). It loads only the release key #didpkg-1, never #0.
+// `didpkg publish`. It loads only the release key #didpkg-1, never #0.
 // 1. Checks: the tarball, the name, the version, the targets. Then the passphrase.
 // 2. Before the first write: the keyless re-PUT of the stored DID packet, and the DWN protocol install.
 // 3. It reads the head index and the release of the version from each target, and keeps only the copies

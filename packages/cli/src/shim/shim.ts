@@ -1,6 +1,6 @@
-// The npm shim handler: (req: Request) => Promise<Response> (PLAN.md Rules item 5, "Verification at install").
+// The npm shim handler: (req: Request) => Promise<Response> (docs/how-it-works.md "Checks at install").
 // No framework path patterns: route() parses the raw path. The shim verifies, then serves. It keeps no keys.
-// HTTP results: PLAN.md "HTTP results" and ADR 0003 section 5.
+// HTTP results: ADR 0003 section 5.
 import { errorCode, type DidResolver } from '@didpkg/core/did';
 import { route } from '@didpkg/core/name';
 import { buildPackument, SourceError, type TarballUrlInput } from '@didpkg/core/source';
@@ -21,7 +21,7 @@ export interface ShimOptions {
   resolver: Pick<DidResolver, 'resolve'>;
   /** One PackageSource for the shim lifetime. */
   source: ReleaseReader;
-  /** The TOFU pins. Phase 1 keeps them in memory only. */
+  /** The TOFU pins. The shim keeps them in memory only. */
   trust: TrustStore;
   mode?: PolicyMode;
   /** More DIDs to refuse, in addition to DENYLIST. */

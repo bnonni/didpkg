@@ -1,5 +1,4 @@
 // Shim request router for the didpkg npm shim. Framework-free and pure.
-// Source: research/phase3/name-grammar/route.ts (2026-10-23).
 // Rules that stop the drpm.tools bug from coming back:
 //  1. No framework path patterns for names. The server gives (method, raw path); this function does the rest.
 //  2. One decode step only: the scope slash "%2f" or "%2F". Any other "%" is a 400. No decodeURIComponent.

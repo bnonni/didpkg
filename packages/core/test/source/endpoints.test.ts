@@ -1,4 +1,4 @@
-// Endpoint selection (PLAN.md "Storage" rules 1-6, ADR 0003): exact types, the DWN first, document order.
+// Endpoint selection (ADR 0003 section 4): exact types, the DWN first, document order.
 import { expect, test } from 'bun:test';
 import type { DidDocument } from '../../src/did/types.ts';
 import { MAX_ENDPOINTS, storageEndpoints } from '../../src/source/index.ts';

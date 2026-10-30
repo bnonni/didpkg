@@ -1,4 +1,4 @@
-// The npm packument of a verified package: PLAN.md packument route, step 3.
+// The npm packument of a verified package (ADR 0003 section 8).
 // Each listed version must pass the manifest checks of the tarball route (checkRelease), so the
 // packument never lists a version that the tarball route rejects. If one listed manifest is absent
 // or bad, the packument fails: a storage host must not hide a signed version (a selective rollback).
@@ -37,7 +37,7 @@ export interface PackumentOptions {
   verified: Pick<VerifiedIndex, 'didDocument' | 'index'>;
   /** Usually the PackageSource that verifyIndex used. */
   reader: Pick<ReleaseReader, 'getRelease'>;
-  /** The `dist.tarball` URL of one verified release. The shim (C10) decides the query. */
+  /** The `dist.tarball` URL of one verified release. The shim decides the query. */
   tarballUrl: (input: TarballUrlInput) => string;
 }
 

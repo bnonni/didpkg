@@ -1,4 +1,4 @@
-// Codec tests from didpkg@0.0.1 (test/grammar.test.ts), first from research/phase3/name-grammar/grammar.test.ts.
+// Codec tests from didpkg@0.0.1 (test/grammar.test.ts).
 // Changes: validate-npm-package-name is a devDependency, one test per vector, and a golden test.
 import { expect, test } from 'bun:test';
 import validate from 'validate-npm-package-name';
@@ -10,7 +10,7 @@ import * as trust from '../../src/trust/index.ts';
 import * as source from '../../src/source/index.ts';
 
 const vectors: { method: string; did: string }[] = await Bun.file(new URL('./vectors.json', import.meta.url)).json();
-// golden.json: format(did, name) from the research codec (research/phase3/name-grammar/grammar.ts).
+// golden.json: format(did, name) from an earlier codec. The current codec must give the same names.
 const golden: { did: string; name: string; installName: string }[] = await Bun.file(new URL('./golden.json', import.meta.url)).json();
 
 const code = (f: () => unknown) => { try { f(); return 'OK'; } catch (e) { return (e as GrammarError).code ?? String(e); } };

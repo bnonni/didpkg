@@ -1,8 +1,8 @@
 // The reference verifier, trust policy v1. Trust comes only from DID resolution and signatures.
 // The storage host (DWN, HTTPS mirror, disk) is not trusted.
 // Tiers: L1 (a current assertionMethod key signed it, or the current index vouches for it) and
-// L2 (a pinned key co-signs the first index of a new key). L3 (method history and the
-// DidPkgCheckpoint service) is Phase 3, so a key change here needs a co-signature.
+// L2 (a pinned key co-signs the first index of a new key). This verifier has no L3 tier (method
+// history and the DidPkgCheckpoint service), so a key change needs a co-signature.
 import type { DidResolver } from '../did/resolver.ts';
 import type { DidDocument } from '../did/types.ts';
 import { contentDigest, sri } from './digest.ts';
@@ -36,7 +36,7 @@ export interface Pin {
   releases: Record<string, string>;
 }
 
-/** The pins, with the key `<did>/<name>`. Phase 2 stores them in `~/.config/didpkg/trust.json`. */
+/** The pins, with the key `<did>/<name>`. didpkg 0.1.0 keeps them in memory only. */
 export type TrustStore = Map<string, Pin>;
 export type PolicyMode = 'enforce' | 'warn';
 
@@ -83,7 +83,7 @@ export interface VerifiedRelease extends VerifiedIndex {
 
 const pinId = (did: string, name: string) => `${did}/${name}`;
 
-// The did:dht identity key #0 is the DID update key (PLAN.md Rules item 4). The did:dht spec puts #0 in
+// The did:dht identity key #0 is the DID update key. The did:dht spec puts #0 in
 // assertionMethod (spec.md section "Identity Key Pair"), but only a release key signs releases. A proof by #0
 // shows a hot update key, and a thief with #0 can sign with no DID document change. Thus a #0 proof fails.
 const updateKeyOf = (did: string) => (did.startsWith('did:dht:') ? `${did}#0` : undefined);

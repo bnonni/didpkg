@@ -1,6 +1,5 @@
-// The publisher flow. A port of the spike script research/phase3/did-trust-model/07-publish.ts: it
-// makes 4 snapshots of an untrusted store (v1, yank, revoke, swap), and each snapshot gives the
-// verifier result that the npm end-to-end test expects. The npm part is in the shim tests (C10, C11).
+// The publisher flow. It makes 4 snapshots of an untrusted store (v1, yank, revoke, swap), and each snapshot gives the
+// verifier result that the npm end-to-end test expects. The npm part is in the shim tests of packages/cli.
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { base64urlnopad } from '@scure/base';
 import * as ed from '@noble/ed25519';
@@ -11,7 +10,7 @@ import { ed25519Signer, toMultikey, verifyRelease, type TrustStore } from '../..
 import { outcome } from './helpers.ts';
 import { FakeResolver, MemReader, NAME, newKey, publish, reindex, tgz } from './sim.ts';
 
-describe('the 4 snapshots of the spike npm end-to-end test (did:web)', () => {
+describe('the 4 snapshots of the npm end-to-end test (did:web)', () => {
   const did = 'did:web:pkg.example';
   const resolver = new FakeResolver();
   const v1 = new MemReader();

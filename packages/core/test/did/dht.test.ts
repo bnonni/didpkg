@@ -11,7 +11,7 @@ const A = 'https://relay-a.example';
 const B = 'https://relay-b.example/pkarr/';
 const ctx = { signal: new AbortController().signal };
 const code = (r: DidResolutionResult) => r.didResolutionMetadata.error?.type.slice(DID_ERROR_NS.length);
-const fx = await dhtFixture(['https://bnonni.github.io/didpkg-spike-pages/', 'https://dwn.example/']);
+const fx = await dhtFixture(['https://bnonni.github.io/didpkg-pages/', 'https://dwn.example/']);
 
 test('resolves a signed packet: document, versionId, updated, source', async () => {
   const { fetch, calls } = fakeFetch({ [`${A}/${fx.id}`]: bytesResponse(await fx.payload(1793113192)) });
@@ -24,7 +24,7 @@ test('resolves a signed packet: document, versionId, updated, source', async () 
   expect(doc.id).toBe(fx.did);
   // Enbox also puts #0 in assertionMethod by default.
   expect(doc.assertionMethod).toEqual([`${fx.did}#0`, `${fx.did}#didpkg-1`]);
-  expect(doc.service).toEqual([{ id: `${fx.did}#pkg`, type: SERVICE_TYPE, serviceEndpoint: ['https://bnonni.github.io/didpkg-spike-pages/', 'https://dwn.example/'] }]);
+  expect(doc.service).toEqual([{ id: `${fx.did}#pkg`, type: SERVICE_TYPE, serviceEndpoint: ['https://bnonni.github.io/didpkg-pages/', 'https://dwn.example/'] }]);
   // The same document as the Enbox resolver gives for the same packet.
   expect(doc).toEqual(JSON.parse(JSON.stringify(fx.document)));
 });
@@ -107,7 +107,7 @@ test('through DidResolver: the id check passes and the cache works', async () =>
   expect(code(await r.resolve(fx.did, { versionId: '7' }))).toBe('FEATURE_NOT_SUPPORTED');
 });
 
-test('the default relays are the two from spike 01', () => {
+test('the driver needs at least one relay, and its method name is dht', () => {
   expect(() => dhtDriver({ relays: [] })).toThrow('at least one relay');
   expect(dhtDriver().method).toBe('dht');
   expect(DidDht.methodName).toBe('dht');

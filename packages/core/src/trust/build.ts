@@ -1,5 +1,5 @@
 // The publisher side: sign a release manifest and the next index head. The test builders of
-// test/trust/sim.ts (spike research/phase3/did-trust-model/src/sim.ts) moved here for `didpkg publish`.
+// test/trust/sim.ts moved here for `didpkg publish`.
 import { contentDigest, sri } from './digest.ts';
 import type { Signer } from './proof.ts';
 import { compareVersions, SEMVER, signObject, type DidPkgIndex, type DidPkgRelease, type IndexEntry } from './release.ts';

@@ -1,4 +1,4 @@
-// Endpoint selection (PLAN.md "Storage", ADR 0003). Readers select services by type, not by id.
+// Endpoint selection (ADR 0003 section 4). Readers select services by type, not by id.
 import type { DidDocument } from '../did/types.ts';
 import type { Endpoint, EndpointType } from './types.ts';
 

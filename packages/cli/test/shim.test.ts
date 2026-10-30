@@ -1,4 +1,4 @@
-// The shim handler on the core test publisher: the HTTP results of PLAN.md and ADR 0003 section 5.
+// The shim handler on the core test publisher: the HTTP results of ADR 0003 section 5.
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { format } from '@didpkg/core/name';
 import { SourceError } from '@didpkg/core/source';

@@ -1,5 +1,5 @@
-// runDriverConformance: the checks that every DID method driver must pass (PLAN.md "Definition of
-// done" item 4). It uses no test framework, so packages/did-* can call it in their own tests.
+// runDriverConformance: the checks that every DID method driver must pass.
+// It uses no test framework, so packages/did-* can call it in their own tests.
 // Each failure is one string. An empty list means pass.
 import { DID_ERROR_NS, type DidErrorCode } from './errors.ts';
 import { DidResolver } from './resolver.ts';

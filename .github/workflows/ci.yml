@@ -40,7 +40,7 @@ jobs:
       - name: Scan the full git history
         run: ./gitleaks git --no-banner --redact --exit-code 1 .
 
-  # Exit criterion 1 of Phase 1: the demo passes 3 times in a row, each run in less than 5 minutes.
+  # The demo must pass 3 times in a row, each run in less than 5 minutes.
   demo:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

@@ -1,4 +1,4 @@
-// Phase 1 exit criterion 4: the conformance suite passes for 4 drivers.
+// The conformance suite passes for 4 drivers.
 import { expect, test } from 'bun:test';
 import { DidJwk, DidKey } from '@enbox/dids';
 import { runDriverConformance } from '../../src/did/conformance.ts';
@@ -40,13 +40,13 @@ test('did:dht passes', async () => {
 });
 
 test('did:web passes', async () => {
-  const did = 'did:web:bnonni.github.io:didpkg-spike-pages';
+  const did = 'did:web:bnonni.github.io:didpkg-pages';
   const { fetch } = fakeFetch({
-    'https://bnonni.github.io/didpkg-spike-pages/did.json': jsonResponse({
+    'https://bnonni.github.io/didpkg-pages/did.json': jsonResponse({
       id: did,
       verificationMethod: [{ id: '#didpkg-1', type: 'Multikey', controller: did, publicKeyMultibase: 'z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK' }],
       assertionMethod: ['#didpkg-1'],
-      service: [{ id: '#pkg', type: 'DIDPackageRepository', serviceEndpoint: 'https://bnonni.github.io/didpkg-spike-pages/' }],
+      service: [{ id: '#pkg', type: 'DIDPackageRepository', serviceEndpoint: 'https://bnonni.github.io/didpkg-pages/' }],
     }),
   });
   const fails = await runDriverConformance(webDriver({ fetch }), {

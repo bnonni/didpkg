@@ -1,4 +1,4 @@
-// DidResolver: one entry point for all DID methods (PLAN.md "DID resolution").
+// DidResolver: one entry point for all DID methods.
 // It does the checks that apply to every method, so that no driver must do them:
 // the DID syntax, the options, the didDocument.id check (DID Core 1.0 section 7.1),
 // the time limit per DID, a memory cache with single-flight, and stale-if-error.

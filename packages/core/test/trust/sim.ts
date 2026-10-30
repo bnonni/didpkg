@@ -1,4 +1,4 @@
-// Test doubles for the release verifier (a port of the spike research/phase3/did-trust-model/src/sim.ts).
+// Test doubles for the release verifier.
 // MemReader is an untrusted storage host that a test can make hostile. FakeResolver gives only the
 // current DID document, as did:web and did:dht do.
 import * as ed from '@noble/ed25519';

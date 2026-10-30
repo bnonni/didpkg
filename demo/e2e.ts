@@ -1,4 +1,4 @@
-// The Phase 1 demo (PLAN.md Phase 1 item 5, exit criteria 1 and 2). Publisher A makes a did:dht identity,
+// The end-to-end demo. Publisher A makes a did:dht identity,
 // then signs `demo/hello` and publishes it to its DWN and to a static mirror. User B has no keys. B installs
 // the package by name through `didpkg shim start` with npm, pnpm and bun, each with a cold cache, and Node
 // loads it. Publisher W makes a did:web identity, hosts its did.json on a TLS site, and publishes the same

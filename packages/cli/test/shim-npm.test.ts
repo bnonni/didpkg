@@ -1,6 +1,6 @@
 // `didpkg shim start` with the npm CLI: publish to the pinned dwn-server, then `npm install` and `npm ci`
-// through the shim, on a cold cache and with one .npmrc line (PLAN.md Phase 1 item 4). Then the cases of
-// exit criterion 3: a swapped tarball, a wrapped tarball (fake-registry.mjs), a revoked and a yanked version.
+// through the shim, on a cold cache and with one .npmrc line. Then these cases:
+// a swapped tarball, a wrapped tarball (fake-registry.mjs), a revoked and a yanked version.
 // pnpm and `bun add` too.
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -201,7 +201,7 @@ describe('shim start', () => {
   });
 });
 
-describe('exit criterion 3', () => {
+describe('swapped, wrapped, yanked and revoked releases', () => {
   test('the shim never wraps a tarball: each version gives the published bytes (fake-registry.mjs)', async () => {
     const doc = (await (await fetch(`${shimUrl}/${installName}`)).json()) as { versions: Record<string, { dist: { tarball: string; integrity: string } }> };
     expect(Object.keys(doc.versions).sort()).toEqual(Object.keys(tgz));

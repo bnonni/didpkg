@@ -83,7 +83,7 @@ jobs:
           test "$("$b" --version)" = "$VERSION"
           "$b" name did:web:nonni.org hello
 
-  # The demo (exit criterion 1 of Phase 1) with the Linux x64 binary in place of src/cli.ts.
+  # The demo with the Linux x64 binary in place of src/cli.ts.
   demo:
     needs: build
     runs-on: ubuntu-24.04

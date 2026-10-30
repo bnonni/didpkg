@@ -1,4 +1,4 @@
-// Network limits for the drivers (PLAN.md "DID resolution" item 5): 5 s per source, 256 KB per
+// Network limits for the drivers: 5 s per source, 256 KB per
 // response, https only, no private address, no redirect to another host.
 // The private-address check sees only the URL. It does not resolve DNS names, because the core
 // must also run in a browser. A server that resolves DIDs for others needs an egress filter too.

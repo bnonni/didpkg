@@ -1,4 +1,4 @@
-// The package.json of an `npm pack` tarball, and the signed `npm` fields of the release (PLAN.md signed objects).
+// The package.json of an `npm pack` tarball, and the signed `npm` fields of the release (docs/spec/release-records.md section 1).
 // npm removes the first path part (`package/`), so this reader uses the files of the top folder.
 import { gunzipSync } from 'node:zlib';
 

@@ -1,4 +1,4 @@
-// The npm packument of a verified index (PLAN.md packument route, step 3).
+// The npm packument of a verified index (ADR 0003 section 8).
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { format } from '../../src/name/index.ts';
 import { buildPackument, type TarballUrlInput } from '../../src/source/index.ts';

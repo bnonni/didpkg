@@ -1,4 +1,4 @@
-// did:dht driver. @enbox/dids 0.1.14 is only the codec (PLAN.md decision 4), and this is the only
+// did:dht driver. @enbox/dids 0.1.14 is only the codec, and this is the only
 // file that imports it. The driver GETs the signed packet from each relay in parallel, with the
 // network limits of fetch.ts. The valid packet with the highest seq wins.
 // Relay payload (Pkarr relay spec): sig (64 bytes) || seq (8 bytes, big-endian) || v (DNS packet, max 1000 bytes).

@@ -1,4 +1,4 @@
-// `didpkg publish` on a local Pkarr relay and the pinned dwn-server, with no #0 key on disk (exit criterion 3).
+// `didpkg publish` on a local Pkarr relay and the pinned dwn-server, with no #0 key on disk.
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from 'bun:test';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -76,7 +76,7 @@ beforeAll(async () => {
   ({ did } = await createDht({ alias: 'pub', dwn: dwn.url, relays: [relay.url], env, iterations: 1000, passphrase: PASS, updatePassphrase: 'update passphrase 2' }));
   const updateKey = idPaths('pub', env).updateKey;
   updateSeed = await decryptKey(JSON.parse(readFileSync(updateKey, 'utf8')), 'update passphrase 2'); // only for a hostile #0 copy
-  rmSync(updateKey); // exit criterion 3: no #0 key on disk
+  rmSync(updateKey); // no #0 key on disk
 });
 afterAll(async () => {
   await dwn?.stop();

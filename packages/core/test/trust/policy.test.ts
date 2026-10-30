@@ -1,7 +1,5 @@
 // Trust policy v1 under key rotation, compromise, yank, revoke, rollback and a hostile storage host.
-// A port of the spike script research/phase3/did-trust-model/06-rotation-revocation.ts. The spike
-// scenarios C1 and I used a resolver with method history (L3, Phase 3). Here a co-signed rotation
-// (L2) replaces C1, and the other scenarios use a resolver with the current document only.
+// The resolver gives only the current DID document, so each key rotation here has a co-signature (L2).
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { verifyRelease, type PolicyMode, type TrustStore } from '../../src/trust/index.ts';
 import { outcome } from './helpers.ts';
@@ -22,16 +20,16 @@ describe('A and B: a key rotation with no method history (did:web, did:dht)', ()
     [k1, k2] = [await newKey(did, 'didpkg-1'), await newKey(did, 'didpkg-2')];
     resolver.set(did, [k1]);
     await publish(reader, { did, version: '1.0.0', tarball: tgz('a1'), signers: [k1.signer] });
-    await verifyRelease({ did, name: NAME, version: '1.0.0', resolver, reader, trust: pinned }); // A0: TOFU pins key 1
+    await verifyRelease({ did, name: NAME, version: '1.0.0', resolver, reader, trust: pinned }); // TOFU pins key 1
     resolver.set(did, [k2]); // the DID update: key 1 out, key 2 in
     beforeRotation = reader.clone();
   });
 
-  test('A0: the first install pins key 1', () => {
+  test('the first install pins key 1', () => {
     expect(pinned.get(`${did}/${NAME}`)?.keys).toEqual([k1.multikey]);
   });
 
-  test('A1: the old key co-signs the index of the new key, so the pinned user installs', async () => {
+  test('the old key co-signs the index of the new key, so the pinned user installs', async () => {
     const host = beforeRotation.clone();
     await reindex(host, { did, signers: [k2.signer, k1.signer] }); // a proof set: the new key and the old key
     const r = await verify({ did, version: '1.0.0', resolver, reader: host, trust: structuredClone(pinned) });
@@ -45,10 +43,10 @@ describe('A and B: a key rotation with no method history (did:web, did:dht)', ()
     expect(await outcome(() => verify({ ...base, trust: structuredClone(pinned) }))).toBe('KEY_CHANGED');
     const warned = await verify({ ...base, trust: structuredClone(pinned), mode: 'warn' });
     expect([warned.continuity, warned.warnings.map((w) => w.code)]).toEqual(['accepted-in-warn-mode', ['KEY_CHANGED']]);
-    expect((await verify({ ...base, trust: new Map() })).continuity).toBe('first-use'); // A4: a new user has no pin
+    expect((await verify({ ...base, trust: new Map() })).continuity).toBe('first-use'); // a new user has no pin
   });
 
-  test('B: a did:web domain takeover serves a new DID document, key and index', async () => {
+  test('a did:web domain takeover serves a new DID document, key and index', async () => {
     const thief = await newKey(did, 'didpkg-1');
     const takeover = new FakeResolver();
     takeover.set(did, [thief]);
@@ -56,7 +54,7 @@ describe('A and B: a key rotation with no method history (did:web, did:dht)', ()
     await publish(evil, { did, version: '1.0.0', tarball: tgz('evil'), signers: [thief.signer] });
     const base = { did, version: '1.0.0', resolver: takeover, reader: evil };
     expect(await outcome(() => verify({ ...base, trust: structuredClone(pinned) }))).toBe('KEY_CHANGED');
-    // B2: only warn mode passes, with two warnings. npm then fails on the lockfile integrity.
+    // Only warn mode passes, with two warnings. npm then fails on the lockfile integrity.
     const warned = await verify({ ...base, trust: structuredClone(pinned), mode: 'warn' });
     expect(warned.warnings.map((w) => w.code)).toEqual(['KEY_CHANGED', 'HISTORY_CHANGED']);
   });
@@ -75,24 +73,24 @@ describe('C-I: compromise, yank, revoke, rollback and a hostile host', () => {
     resolver.set(did, [k1]);
     await publish(reader, { did, version: '1.0.0', tarball: tgz('c1'), signers: [k1.signer] });
     await publish(reader, { did, version: '1.1.0', tarball: tgz('c2'), signers: [k1.signer] });
-    await verifyRelease({ did, name: NAME, version: '1.1.0', resolver, reader, trust: pinned }); // C0
+    await verifyRelease({ did, name: NAME, version: '1.1.0', resolver, reader, trust: pinned });
     oldHead = reader.clone();
     resolver.set(did, [k2]);
     await reindex(reader, { did, signers: [k2.signer, k1.signer] });
   });
 
-  test('C1: after a co-signed rotation, the pinned user installs an old release', async () => {
+  test('after a co-signed rotation, the pinned user installs an old release', async () => {
     const r = await verify({ did, version: '1.0.0', resolver, reader, trust: structuredClone(pinned) });
     expect([r.continuity, r.manifestKey]).toEqual(['co-signed', 'index']);
   });
 
-  test('D1: a thief signs a new index with the rotated-out key 1', async () => {
+  test('a thief signs a new index with the rotated-out key 1', async () => {
     const thief = oldHead.clone();
     await publish(thief, { did, version: '1.2.0', tarball: tgz('malware'), signers: [k1.signer], created: '2026-03-15T00:00:00Z' });
     expect(await outcome(() => verify({ did, version: '1.2.0', resolver, reader: thief, trust: new Map() }))).toBe('INDEX_SIGNATURE');
   });
 
-  test('D2: a thief manifest next to the real index is not listed', async () => {
+  test('a thief manifest next to the real index is not listed', async () => {
     const thief = oldHead.clone();
     await publish(thief, { did, version: '1.2.0', tarball: tgz('malware'), signers: [k1.signer] });
     const mixed = reader.clone();
@@ -121,12 +119,12 @@ describe('C-I: compromise, yank, revoke, rollback and a hostile host', () => {
       expect([r.manifestKey, r.continuity]).toEqual(['current-key', 'first-use']);
     });
 
-    test('E2: an exact pin of a yanked version gives a warning', async () => {
+    test('an exact pin of a yanked version gives a warning', async () => {
       const r = await verify({ did, version: '1.1.0', resolver, reader, trust: new Map(), exactPin: true });
       expect(r.warnings.map((w) => w.code)).toEqual(['YANKED']);
     });
 
-    test('F1: the host serves an older index of the same key (it hides the revocation)', async () => {
+    test('the host serves an older index of the same key (it hides the revocation)', async () => {
       const trust: TrustStore = new Map();
       await verify({ did, version: '1.3.0', resolver, reader, trust });
       const frozen = reader.clone();
@@ -134,7 +132,7 @@ describe('C-I: compromise, yank, revoke, rollback and a hostile host', () => {
       expect(await run('1.0.0', { reader: frozen, trust })).toBe('ROLLBACK');
     });
 
-    test('F2: the host serves a second index with the pinned sequence', async () => {
+    test('the host serves a second index with the pinned sequence', async () => {
       const trust: TrustStore = new Map();
       await verify({ did, version: '1.3.0', resolver, reader, trust });
       const fork = reader.clone();
@@ -143,7 +141,7 @@ describe('C-I: compromise, yank, revoke, rollback and a hostile host', () => {
       expect(await run('1.0.0', { reader: fork, trust })).toBe('EQUIVOCATION');
     });
 
-    test('G1: the host swaps the tarball bytes', async () => {
+    test('the host swaps the tarball bytes', async () => {
       const swap = reader.clone();
       swap.tarballs.set(`${did}/${NAME}@1.3.0`, tgz('c3-trojan'));
       expect(await run('1.3.0', { reader: swap })).toBe('INTEGRITY');
@@ -152,7 +150,7 @@ describe('C-I: compromise, yank, revoke, rollback and a hostile host', () => {
       expect(await run('1.3.0', { reader: same })).toBe('INTEGRITY');
     });
 
-    test('H1: the host swaps the manifest (it adds a dependency)', async () => {
+    test('the host swaps the manifest (it adds a dependency)', async () => {
       const swap = reader.clone();
       const m = structuredClone(reader.releases.get(`${did}/${NAME}@1.3.0`)!);
       m.npm = { dependencies: { 'evil-dep': '*' } };
@@ -169,7 +167,7 @@ describe('C-I: compromise, yank, revoke, rollback and a hostile host', () => {
       expect(await run('1.3.0', { reader: new MemReader() })).toBe('INDEX_MISSING');
     });
 
-    test('I1: a deactivated DID fails', async () => {
+    test('a deactivated DID fails', async () => {
       const gone = new FakeResolver();
       gone.set(did, [k2], true);
       expect(await outcome(() => verify({ did, version: '1.3.0', resolver: gone, reader, trust: new Map() }))).toBe('DID_DEACTIVATED');

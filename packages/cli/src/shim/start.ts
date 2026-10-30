@@ -13,7 +13,7 @@ import { httpsAdapter } from '@didpkg/adapter-https';
 import { shimHandler } from './shim.ts';
 
 export const DEFAULT_PORT = 2092;
-/** Install uses a cached DID document for 7 days if the method fails (PLAN.md "DID resolution" item 3). */
+/** Install uses a cached DID document for 7 days if the method fails. */
 export const STALE_IF_ERROR_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface StartShimOptions {

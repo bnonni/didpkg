@@ -1,4 +1,4 @@
-// `didpkg id create` for did:dht (PLAN.md Phase 1 item 4 and Rules item 4).
+// `didpkg id create` for did:dht.
 // The identity key #0 is the DID update key: it signs the relay payload one time here, and then it goes cold.
 // The did:dht spec puts #0 in assertionMethod, but the verifier refuses a release proof by #0.
 // The release key #didpkg-1 is an Ed25519 JsonWebKey, because DWN JWS verification reads only publicKeyJwk.

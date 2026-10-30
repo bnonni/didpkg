@@ -1,4 +1,4 @@
-// Exit criterion 2 of Phase 1 (PLAN.md) against the live demo DWN and the live mirrors. User B has no keys.
+// The install check against the live demo DWN and the live mirrors. User B has no keys.
 // B starts `didpkg shim start` with the default public Pkarr relays. Then npm, pnpm and bun install each name
 // with a cold cache, and Node loads it. Run it with the DWN up, then stop the DWN (docs/deploy.md) and run it
 // again with --dwn-down: the installs then come from the mirrors.

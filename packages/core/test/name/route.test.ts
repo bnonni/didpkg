@@ -1,4 +1,4 @@
-// Router tests from research/phase3/name-grammar/route.test.ts (2026-10-23).
+// Router tests for the didpkg npm shim.
 import { expect, test } from 'bun:test';
 import { route } from '../../src/name/route.ts';
 import { format } from '../../src/name/grammar.ts';
@@ -47,11 +47,11 @@ test('the drpm.tools misparse cannot happen: legacy and hostile paths are reject
   expect(got.map((r): string => r.kind)).toEqual(cases.map((c) => c[2]));
 });
 
-// Regression test for the drpm.tools route bug (research/phase3/name-grammar/route-bug.mjs, results/route-bug.json).
+// Regression test for the drpm.tools route bug.
 // drpm.tools registered '/:scope/:name~:id' and '/:scope/:name~:method~:id' after decodeURIComponent(req.url).
 // Express 4.21.2 and 5.3.0 gave 200 and built did:dht:nonni.org for the "~web~" paths below.
 // route() must reject each path and must never return a DID for it.
-test('route-bug.mjs paths: the Express misparse cannot come back', () => {
+test('the Express misparse cannot come back', () => {
   const bodies = [
     'hello~8w7ckznnw671az7nmkrd19ddctpj4spgt8sjqxkmnamdartxh1bo',
     'react~web~nonni.org',
