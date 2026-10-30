@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["packages/*/src", "packages/*/test", "demo", "deploy/test", "site"]
+  "include": ["packages/*/src", "packages/cli/*.ts", "packages/*/test", "demo", "deploy/test", "site"]
 }
