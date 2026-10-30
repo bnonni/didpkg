@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>didpkg: install packages by the DID of the publisher</title>
+  <meta name="description" content="didpkg is a package manager with the DID of the publisher as the root of trust. You install with plain npm, pnpm or bun.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <a class="name" href="./">didpkg</a>
+    <nav aria-label="Main">
+      <a href="#install">Install</a>
+      <a href="#publish">Publish</a>
+      <a href="#docs">Docs</a>
+      <a href="https://github.com/bnonni/didpkg">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section>
+      <h1>Install packages by the DID of the publisher</h1>
+      <p class="lead">didpkg is a package manager with the DID (Decentralized Identifier) of the publisher as the root of trust. The publisher signs each release with a key from its DID document. You install with plain npm, pnpm or bun.</p>
+      <p class="status"><strong>Status:</strong> didpkg is a demo, not a release. Phase 1, the first end-to-end demo, is done. The decision to continue is open in <a href="https://github.com/bnonni/didpkg/blob/main/docs/adr/0002-continue.md">ADR 0002</a>.</p>
+    </section>
+
+    <section id="how">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><strong>Sign.</strong> The publisher signs a release record with a key from its DID document. The record holds the SHA-512 digest of the tarball.</li>
+        <li><strong>Store.</strong> The DWN (Decentralized Web Node) of the publisher is the registry. Static HTTPS mirrors hold the same signed bytes. If the DWN stops, npm installs from a mirror.</li>
+        <li><strong>Verify.</strong> A local shim resolves the DID, then checks the proof and the digest. Then it gives the package to npm. If a check fails, npm gets an HTTP error.</li>
+      </ol>
+      <p><a href="https://github.com/bnonni/didpkg/blob/main/docs/how-it-works.md">How didpkg works</a> gives the trust model and the limits.</p>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <p>didpkg needs Node 22 or later.</p>
+      <pre><code>npm install --global didpkg</code></pre>
+      <p class="note">Note: <code>didpkg@0.1.0</code> is not on npm yet. Until then, build it from a clone (<a href="https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md#1-install-the-cli">quickstart, step 1</a>).</p>
+      <h3>Install a package by DID</h3>
+      <p>Start the shim. It runs until you push Ctrl+C.</p>
+      <pre><code>didpkg shim start</code></pre>
+      <p>In a second terminal, in your project folder, add 1 line to <code>.npmrc</code> and install:</p>
+      <pre><code>echo '@didpkg:registry=http://127.0.0.1:2092/' &gt;&gt; .npmrc
+npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo</code></pre>
+      <p>The install name holds the package name, the DID method and the DID. <code>@didpkg/hello_web_bnonni.github.io_didpkg-demo</code> is the package <code>hello</code> of <code>did:web:bnonni.github.io:didpkg-demo</code>. The <a href="https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md">quickstart</a> gives each step and the HTTP errors.</p>
+    </section>
+
+    <section id="publish">
+      <h2>Publish</h2>
+      <p>Make a publisher DID (did:dht or did:web). Then sign a package and write it to a DWN and to a static mirror with <code>didpkg publish</code>. <a href="https://github.com/bnonni/didpkg/blob/main/docs/publish.md">Publish a package</a> gives each step and the key safety rules.</p>
+    </section>
+
+    <section id="docs">
+      <h2>Documentation</h2>
+      <ul class="docs">
+        <li><a href="https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md">Quickstart</a>: install the CLI, start the shim and install a package by DID.</li>
+        <li><a href="https://github.com/bnonni/didpkg/blob/main/docs/how-it-works.md">How didpkg works</a>: the checks at install, the trust model and the limits.</li>
+        <li><a href="https://github.com/bnonni/didpkg/blob/main/docs/publish.md">Publish a package</a>: make a publisher DID, sign a package and write it to a DWN and a mirror.</li>
+        <li><a href="https://github.com/bnonni/didpkg/blob/main/docs/cli.md">CLI reference</a>: each command, with its options, its output and its exit code.</li>
+        <li><a href="https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md">Install names</a>: the install-name grammar, the shim routes and the test vectors.</li>
+        <li><a href="https://github.com/bnonni/didpkg/blob/main/docs/spec/release-records.md">Release records</a>: the release record, the index, the digests, the proofs and the storage layouts.</li>
+        <li><a href="https://github.com/bnonni/didpkg/blob/main/docs/README.md">All documents</a>: the docs index, with the runbook and the ADRs.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>didpkg is open source under the <a href="https://github.com/bnonni/didpkg/blob/main/LICENSE">Apache-2.0 license</a>.</p>
+    <p>
+      <a href="https://github.com/bnonni/didpkg">Source</a> ·
+      <a href="https://www.npmjs.com/package/didpkg">npm</a> ·
+      <a href="https://github.com/bnonni/didpkg/blob/main/SECURITY.md">Security</a> ·
+      <a href="protocols/repository/v1">DWN protocol v1</a>
+    </p>
+  </footer>
+</body>
+</html>
