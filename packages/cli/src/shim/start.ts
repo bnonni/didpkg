@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net';
 import { DidResolver, jwkDriver, keyDriver } from '@didpkg/core/did';
 import { dhtDriver } from '@didpkg/core/did/dht';
 import { webDriver } from '@didpkg/core/did/web';
+import { webvhDriver } from '@didpkg/core/did/webvh';
 import { PackageSource } from '@didpkg/core/source';
 import type { PolicyMode } from '@didpkg/core/trust';
 import { dwnAdapter } from '@didpkg/adapter-dwn';
@@ -30,7 +31,7 @@ export async function startShim(o: StartShimOptions = {}): Promise<{ url: string
   const loopback = o.allowLoopback ?? false;
   const resolver = new DidResolver({
     drivers: [
-      keyDriver(), jwkDriver(), webDriver({ allowPrivateHosts: loopback }),
+      keyDriver(), jwkDriver(), webDriver({ allowPrivateHosts: loopback }), webvhDriver({ allowPrivateHosts: loopback }),
       dhtDriver({ relays: o.relays?.length ? o.relays : undefined, allowPrivateRelays: loopback }),
     ],
     staleIfErrorMs: STALE_IF_ERROR_MS,

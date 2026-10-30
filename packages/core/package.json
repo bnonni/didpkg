@@ -12,6 +12,7 @@
     "./did": "./src/did/index.ts",
     "./did/dht": "./src/did/drivers/dht.ts",
     "./did/web": "./src/did/drivers/web.ts",
+    "./did/webvh": "./src/did/drivers/webvh.ts",
     "./did/conformance": "./src/did/conformance.ts",
     "./trust": "./src/trust/index.ts",
     "./source": "./src/source/index.ts",
@@ -27,6 +28,7 @@
     "@noble/hashes": "2.4.0",
     "@scure/base": "2.4.0",
     "canonicalize": "5.1.0",
+    "didwebvh-ts": "3.0.0",
     "web-did-resolver": "3.2.0"
   }
 }

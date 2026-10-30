@@ -1,4 +1,4 @@
-// The conformance suite passes for 4 drivers.
+// The conformance suite passes for 5 drivers.
 import { expect, test } from 'bun:test';
 import { DidJwk, DidKey } from '@enbox/dids';
 import { runDriverConformance } from '../../src/did/conformance.ts';
@@ -6,8 +6,9 @@ import { dhtDriver } from '../../src/did/drivers/dht.ts';
 import { jwkDriver } from '../../src/did/drivers/jwk.ts';
 import { keyDriver } from '../../src/did/drivers/key.ts';
 import { webDriver } from '../../src/did/drivers/web.ts';
+import { webvhDriver } from '../../src/did/drivers/webvh.ts';
 import type { DidMethodDriver } from '../../src/did/types.ts';
-import { bytesResponse, dhtFixture, fakeFetch, jsonResponse } from './helpers.ts';
+import { bytesResponse, dhtFixture, fakeFetch, jsonResponse, textResponse, webvhFixture } from './helpers.ts';
 
 test('did:key passes', async () => {
   const fails = await runDriverConformance(keyDriver(), {
@@ -53,6 +54,25 @@ test('did:web passes', async () => {
     valid: [did],
     invalid: ['did:web:example.com%3A0', 'did:web:a::b'],
     notFound: ['did:web:none.example'],
+  });
+  expect(fails).toEqual([]);
+});
+
+test('did:webvh passes', async () => {
+  const a = await webvhFixture();
+  const b = await webvhFixture('pkg.example.com:8443', ['dids', 'bob']);
+  const gone = await webvhFixture('gone.example.com');
+  const { fetch } = fakeFetch({
+    [a.url]: textResponse(a.jsonl(await a.update(a.log, 'https://two.example.com/'))),
+    [b.url]: textResponse(b.jsonl(b.log)),
+    [gone.url]: textResponse(gone.jsonl(await gone.deactivate(gone.log))),
+  });
+  const scid = a.did.split(':')[2];
+  const fails = await runDriverConformance(webvhDriver({ fetch }), {
+    valid: [a.did, b.did],
+    invalid: ['did:webvh:abc', `did:webvh:${scid}`],
+    notFound: [a.did.replace('pkg.example.com', 'none.example.com')],
+    deactivated: [gone.did],
   });
   expect(fails).toEqual([]);
 });

@@ -10,7 +10,7 @@ const formatRows = rows(/^\| `(did:[^`]+)` \| `([^`]+)` \| `(@didpkg\/[^`]+)` \|
 const parseRows = rows(/^\| `([^`]+)` \| `(OK|E_[A-Z_]+)` \|/);
 
 test('the spec has the 2 vector tables', () => {
-  expect(formatRows.length).toBe(11);
+  expect(formatRows.length).toBe(12);
   expect(parseRows.length).toBe(16);
 });
 

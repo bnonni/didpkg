@@ -147,6 +147,7 @@ The test [`packages/core/test/name/spec.test.ts`](../../packages/core/test/name/
 | `did:web:example.com%3A3000:user:alice` | `hello` | `@didpkg/hello_web.aam_example.com.3a3000_user_alice` |
 | `did:web:example.com:Users:Alice_Smith` | `hello` | `@didpkg/hello_web.aaiim_example.com_users_alice-smith` |
 | `did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK` | `hello` | `@didpkg/hello_key.ixcqfxbqq_z6mkhaxgbzdvotdkl5257faiztigic2qtklgpbnnegta2dok` |
+| `did:webvh:QmdmPkUdYzbr9txmx8gM2rsHPgr5L6m3gHjJGAf4vUFoGE:domain.example` | `hello` | `@didpkg/hello_webvh.rkaezfzw_qmdmpkudyzbr9txmx8gm2rshpgr5l6m3ghjjgaf4vufoge_domain.example` |
 | `did:plc:ewvi7nxzyoun6zhxrhs64oiz` | `hello` | `@didpkg/hello_plc_ewvi7nxzyoun6zhxrhs64oiz` |
 | `did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq` | `hello` | `@didpkg/hello_pkh.b2yepsm_tz_tz2bftypeyrzxd5aibchbxn3wczhx7bqbmbq` |
 | `did:btcr2:k1q5pxw76fzmq5fttej05clqr2wlg97zrj7897783pngqwa4kvunm538sev7lgu` | `hello` | `@didpkg/hello_btcr2_k1q5pxw76fzmq5fttej05clqr2wlg97zrj7897783pngqwa4kvunm538sev7lgu` |

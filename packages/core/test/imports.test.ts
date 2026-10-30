@@ -41,6 +41,7 @@ test('import borders: each library has only the expected importers', async () =>
     '@scure/base': ['did/drivers/jwk.ts', 'did/drivers/key.ts', 'trust/digest.ts', 'trust/keys.ts', 'trust/proof.ts'],
     '@enbox/dids': ['did/drivers/dht.ts'],
     'web-did-resolver': ['did/drivers/web.ts'],
+    'didwebvh-ts': ['did/drivers/webvh.ts'],
   });
 });
 
