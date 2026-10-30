@@ -100,10 +100,12 @@ didpkg is a Phase 1 proof of concept. It had no security audit. These limits app
 2. Only the `@didpkg` packages go through the shim. The dependencies of a `@didpkg` package come from your usual registry, and didpkg does not check them.
 3. The shim does not find 2 valid index copies with the same `sequence` and different content at read time. The pin finds them later (`EQUIVOCATION`).
 4. A cold DWN read of a packument with more than about 110 versions fails with 502. The cause is the request rate limit of the DWN reader.
-5. A hash-form install name needs a DID binding, which comes in Phase 2. The install-name grammar is draft 1 and can change before 1.0.
+5. A hash-form install name needs a DID binding, which comes in Phase 2. The [install-name grammar](spec/install-names.md) is draft 1 and can change before 1.0.
 
 ## More
 
+- [Install names](spec/install-names.md): the grammar, the codec and the test vectors.
+- [Release records](spec/release-records.md): the signed objects, the digests, the proofs and the storage layout.
 - [ADR 0003](adr/0003-storage-contract.md): the storage contract, the DWN protocol v1, the static layout v1 and the packument rules.
 - [Deploy a DWN](deploy.md): the runbook of the demo DWN.
 - [SECURITY.md](../SECURITY.md): how to report a vulnerability, and the denylist.

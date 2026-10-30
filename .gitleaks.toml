@@ -3,9 +3,10 @@
 useDefault = true
 
 # A did:key DID holds a multibase public key (base58btc, prefix "z"). It is not a secret.
-# The test vectors hold many of them, and the rule generic-api-key matches "key:z..." plus the closing quote.
+# The test vectors hold many of them, and the rule generic-api-key matches "key:z..." plus the closing quote
+# (or the closing backtick of a Markdown code span, as in docs/spec/install-names.md).
 [[allowlists]]
 description = "did:key DIDs (public keys)"
 targetRules = ["generic-api-key"]
 regexTarget = "match"
-regexes = ['''^key:z[1-9A-HJ-NP-Za-km-z]{40,}["']$''']
+regexes = ['''^key:z[1-9A-HJ-NP-Za-km-z]{40,}["'`]$''']

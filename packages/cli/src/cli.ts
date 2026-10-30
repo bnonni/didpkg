@@ -46,7 +46,8 @@ Examples:
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key #0), else from the terminal.
 
-The grammar is draft 1 and can change before 1.0. See https://didpkg.dev.
+The grammar is draft 1 and can change before 1.0. See
+https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md
 `;
 
 class UsageError extends Error {}

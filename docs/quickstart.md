@@ -97,7 +97,7 @@ This command gives the install name for a DID and a package name:
 didpkg name did:web:bnonni.github.io:didpkg-demo hello
 ```
 
-The install-name grammar is draft 1 and can change before 1.0.
+The [install-name grammar](spec/install-names.md) is draft 1 and can change before 1.0.
 
 ## Lockfiles and CI
 

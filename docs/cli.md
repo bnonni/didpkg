@@ -54,7 +54,7 @@ didpkg parse @didpkg/hello_web_bnonni.github.io_didpkg-demo
 {"form":"direct","name":"hello","did":"did:web:bnonni.github.io:didpkg-demo"}
 ```
 
-A hash-form name gives `{"form":"hash","name":...,"hash":...}`. A bad name gives a grammar error code, for example `E_SHAPE: no "_" separator` or `E_CANONICAL: name is not in canonical form`. The grammar is draft 1 and can change before 1.0.
+A hash-form name gives `{"form":"hash","name":...,"hash":...}`. A bad name gives a grammar error code, for example `E_SHAPE: no "_" separator` or `E_CANONICAL: name is not in canonical form`. The codes are in [Install names](spec/install-names.md) section 6. The grammar is draft 1 and can change before 1.0.
 
 ## didpkg id create (did:dht)
 
