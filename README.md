@@ -30,8 +30,15 @@ In a second terminal, in your project folder, add 1 line to `.npmrc` and install
 
 ```sh
 echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
-npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo
+npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
+
+The install name holds the package name, the DID method and the DID. The demo has the package `hello` from 2 publishers:
+
+| DID method | Install name |
+|---|---|
+| did:dht | `@didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` |
+| did:web | `@didpkg/hello_web_bnonni.github.io_didpkg-demo` |
 
 The [quickstart](docs/quickstart.md) gives each step and the HTTP errors.
 

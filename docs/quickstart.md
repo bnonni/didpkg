@@ -77,21 +77,21 @@ npm sends only the `@didpkg` packages to the shim. All other packages come from 
 ## 4. Install a package by DID
 
 ```sh
-npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo
-node -e "console.log(require('@didpkg/hello_web_bnonni.github.io_didpkg-demo'))"
+npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
+node -e "console.log(require('@didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy'))"
 ```
 
-The second command prints `hello from didpkg`. The publisher of this package is `did:web:bnonni.github.io:didpkg-demo`. The same package from a did:dht publisher is:
+The second command prints `hello from didpkg`. The publisher of this package is `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy`. The same package from a did:web publisher is:
 
 ```sh
-npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
+npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo
 ```
 
 pnpm and bun read the same `.npmrc` line. The demo tests pnpm 11 and Bun 1.4.4.
 
 ```sh
-pnpm add @didpkg/hello_web_bnonni.github.io_didpkg-demo
-bun add @didpkg/hello_web_bnonni.github.io_didpkg-demo
+pnpm add @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
+bun add @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
 ## 5. Read an install name

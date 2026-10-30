@@ -49,8 +49,13 @@
       <pre><code>didpkg shim start</code></pre>
       <p>In a second terminal, in your project folder, add 1 line to <code>.npmrc</code> and install:</p>
       <pre><code>echo '@didpkg:registry=http://127.0.0.1:2092/' &gt;&gt; .npmrc
-npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo</code></pre>
-      <p>The install name holds the package name, the DID method and the DID. <code>@didpkg/hello_web_bnonni.github.io_didpkg-demo</code> is the package <code>hello</code> of <code>did:web:bnonni.github.io:didpkg-demo</code>. The <a href="https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md">quickstart</a> gives each step and the HTTP errors.</p>
+npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy</code></pre>
+      <p>The install name holds the package name, the DID method and the DID. The demo has the package <code>hello</code> from 2 publishers:</p>
+      <ul>
+        <li>did:dht: <code>@didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy</code> is the package of <code>did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy</code>.</li>
+        <li>did:web: <code>@didpkg/hello_web_bnonni.github.io_didpkg-demo</code> is the package of <code>did:web:bnonni.github.io:didpkg-demo</code>.</li>
+      </ul>
+      <p>The <a href="https://github.com/bnonni/didpkg/blob/main/docs/quickstart.md">quickstart</a> gives each step and the HTTP errors.</p>
     </section>
 
     <section id="publish">
