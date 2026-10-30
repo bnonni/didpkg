@@ -1,8 +1,8 @@
 name: release
 
 # The standalone didpkg binaries (packages/cli/compile.ts). Each push and each pull request is a dry run: it builds
-# the 4 archives and SHA256SUMS, and tests each binary on a native runner. A v* tag also makes the GitHub Release,
-# with an attestation of build provenance for each file.
+# the 4 archives and SHA256SUMS, tests each binary on a native runner, and tests the install script with the archives.
+# A v* tag also makes the GitHub Release, with an attestation of build provenance for each file.
 on:
   push:
     branches: [main]
@@ -110,10 +110,69 @@ jobs:
           tar -xzf didpkg-linux-x64.tar.gz
       - run: DIDPKG_BIN="$RUNNER_TEMP/bin/didpkg-linux-x64/didpkg" bun demo/e2e.ts
 
+  # The install script (site/public/install) with these archives on a local HTTP server: sh, and curl | bash.
+  # A changed archive must stop the install.
+  install:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: binaries
+          path: ${{ runner.temp }}/www/rel
+      - name: Serve the script, the archives (rel) and changed archives (bad) on 127.0.0.1:8000
+        working-directory: ${{ runner.temp }}/www
+        run: |
+          cp "$GITHUB_WORKSPACE/site/public/install" .
+          mkdir bad
+          cp rel/* bad/
+          for f in bad/*.tar.gz; do printf x >> "$f"; done
+          nohup python3 -m http.server 8000 --bind 127.0.0.1 > "$RUNNER_TEMP/http.log" 2>&1 &
+          for _ in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fs -o /dev/null http://127.0.0.1:8000/install; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: sh installs the binary
+        env:
+          DIDPKG_DOWNLOAD_URL: http://127.0.0.1:8000/rel
+          DIDPKG_INSTALL: ${{ runner.temp }}/a
+        run: |
+          sh site/public/install
+          test "$("$DIDPKG_INSTALL/bin/didpkg" --version)" = "$VERSION"
+          "$DIDPKG_INSTALL/bin/didpkg" name did:web:nonni.org hello
+      - name: curl | bash installs the binary in ~/.didpkg
+        env:
+          DIDPKG_DOWNLOAD_URL: http://127.0.0.1:8000/rel
+        run: |
+          curl -fsSL http://127.0.0.1:8000/install | DIDPKG_VERSION="$VERSION" bash
+          test "$("$HOME/.didpkg/bin/didpkg" --version)" = "$VERSION"
+      - name: A changed archive stops the install
+        env:
+          DIDPKG_DOWNLOAD_URL: http://127.0.0.1:8000/bad
+          DIDPKG_INSTALL: ${{ runner.temp }}/b
+        run: |
+          if sh site/public/install 2> "$RUNNER_TEMP/error.txt"; then
+            echo '::error::The install did not stop'
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/error.txt"
+          grep -q 'error: the SHA-256 of didpkg-' "$RUNNER_TEMP/error.txt"
+          test ! -e "$DIDPKG_INSTALL"
+
   # Only for a v* tag, after all tests pass. Only this job can write to the repository.
   release:
     if: github.ref_type == 'tag'
-    needs: [build, smoke, demo]
+    needs: [build, smoke, demo, install]
     runs-on: ubuntu-24.04
     permissions:
       contents: write # the release

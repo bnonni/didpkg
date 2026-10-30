@@ -1,0 +1,158 @@
+#!/bin/sh
+# The didpkg install script for Linux and macOS: https://didpkg.dev/install
+#
+#   curl -fsSL https://didpkg.dev/install | sh
+#
+# It gets the didpkg binary for this OS and CPU from the GitHub Releases of bnonni/didpkg.
+# It checks the SHA-256 of the archive against SHA256SUMS, and puts the binary in ~/.didpkg/bin.
+# It does not use sudo and it does not change a shell profile.
+#
+# Environment variables:
+#   DIDPKG_VERSION       A release version, for example 0.1.0. The default is the latest release.
+#   DIDPKG_INSTALL       The install folder. The default is ~/.didpkg. The binary goes in its bin folder.
+#   DIDPKG_DOWNLOAD_URL  The URL of a folder with the archives and SHA256SUMS, for example a mirror or a local test server.
+#
+# Uninstall: rm -rf ~/.didpkg (didpkg keeps its identities in ~/.config/didpkg, not here).
+# Source and docs: https://github.com/bnonni/didpkg/blob/main/docs/install.md
+
+set -eu
+
+REPO_URL='https://github.com/bnonni/didpkg'
+
+die() {
+  echo "didpkg install: error: $*" >&2
+  exit 1
+}
+
+# download <url> <file>: a non-HTTPS URL is possible only if DIDPKG_DOWNLOAD_URL sets it.
+download() {
+  case $1 in
+    https://*) proto='=https' ;;
+    *) proto='=http,https' ;;
+  esac
+  curl --proto "$proto" --proto-redir "$proto" -fsSL --retry 2 -o "$2" "$1" || die "cannot download $1"
+}
+
+# sha256 <file>: the SHA-256 of the file, in lowercase hex.
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{ print $1 }'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{ print $1 }'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 -r "$1" | awk '{ print $1 }'
+  else
+    die 'no SHA-256 tool (sha256sum, shasum or openssl) is on the PATH'
+  fi
+}
+
+main() {
+  command -v curl >/dev/null 2>&1 || die 'curl is not on the PATH'
+  command -v tar >/dev/null 2>&1 || die 'tar is not on the PATH'
+  [ -n "${HOME:-}" ] || die 'HOME is not set'
+
+  case $(uname -s) in
+    Linux) os=linux ;;
+    Darwin) os=darwin ;;
+    *) die "no didpkg binary for $(uname -s). Use npm: npm install --global didpkg" ;;
+  esac
+  case $(uname -m) in
+    x86_64 | amd64) arch=x64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *) die "no didpkg binary for the CPU $(uname -m). Use npm: npm install --global didpkg" ;;
+  esac
+  # A shell in Rosetta 2 shows x86_64 on an Apple silicon Mac. The arm64 binary is faster there.
+  if [ "$os" = darwin ] && [ "$arch" = x64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || true)" = 1 ]; then
+    arch=arm64
+  fi
+  # The Linux binaries need glibc. Alpine and other musl systems must use npm.
+  if [ "$os" = linux ]; then
+    for loader in /lib/ld-musl-*; do
+      if [ -e "$loader" ]; then
+        die 'no didpkg binary for musl Linux (for example Alpine). Use npm: npm install --global didpkg'
+      fi
+    done
+  fi
+  asset="didpkg-$os-$arch.tar.gz"
+
+  version=${DIDPKG_VERSION:-}
+  version=${version#v}
+  case $version in
+    *[!0-9A-Za-z.+-]*) die "DIDPKG_VERSION is not a version: $version" ;;
+  esac
+  if [ -n "${DIDPKG_DOWNLOAD_URL:-}" ]; then
+    base=${DIDPKG_DOWNLOAD_URL%/}
+  elif [ -n "$version" ]; then
+    base="$REPO_URL/releases/download/v$version"
+  else
+    base="$REPO_URL/releases/latest/download"
+  fi
+
+  install_dir=${DIDPKG_INSTALL:-$HOME/.didpkg}
+  bin_dir="$install_dir/bin"
+  exe="$bin_dir/didpkg"
+
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  echo "Source: $base/$asset"
+  download "$base/SHA256SUMS" "$tmp/SHA256SUMS"
+  download "$base/$asset" "$tmp/$asset"
+
+  # Stop if the SHA-256 of the archive is not the value in SHA256SUMS.
+  expected=$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1 }' "$tmp/SHA256SUMS")
+  case $expected in
+    '') die "SHA256SUMS has no line for $asset" ;;
+    *[!0-9a-f]*) die "SHA256SUMS has a bad line for $asset" ;;
+  esac
+  [ ${#expected} -eq 64 ] || die "SHA256SUMS has a bad line for $asset"
+  actual=$(sha256 "$tmp/$asset")
+  if [ "$actual" != "$expected" ]; then
+    die "the SHA-256 of $asset is $actual, but SHA256SUMS has $expected. The install stopped. Nothing changed."
+  fi
+  echo "SHA-256 OK: $actual"
+
+  tar -xzf "$tmp/$asset" -C "$tmp"
+  src="$tmp/didpkg-$os-$arch"
+  [ -f "$src/didpkg" ] || die "$asset has no didpkg-$os-$arch/didpkg"
+  chmod 755 "$src/didpkg"
+  got=$("$src/didpkg" --version) || die "the didpkg binary does not run on this system"
+  if [ -n "$version" ] && [ "$got" != "$version" ]; then
+    die "the binary is version $got, not $version. The install stopped. Nothing changed."
+  fi
+
+  # mv replaces the file in 1 step, also when an old didpkg runs.
+  mkdir -p "$bin_dir"
+  cp "$src/didpkg" "$exe.tmp"
+  mv -f "$exe.tmp" "$exe"
+  for f in LICENSE THIRD_PARTY_LICENSES.txt; do
+    if [ -f "$src/$f" ]; then cp "$src/$f" "$install_dir/$f"; fi
+  done
+  echo "Installed didpkg $got in $exe"
+
+  case ":${PATH:-}:" in
+    *":$bin_dir:"*)
+      found=$(command -v didpkg 2>/dev/null || true)
+      if [ "$found" != "$exe" ]; then
+        echo "Warning: the didpkg on your PATH is $found, not $exe. Remove the other didpkg, or put $bin_dir first on your PATH."
+      fi
+      echo 'Run: didpkg --help'
+      ;;
+    *)
+      echo
+      echo "$bin_dir is not on your PATH. Add this line to your shell profile (for example ~/.bashrc or ~/.zshrc):"
+      echo
+      case ${SHELL:-} in
+        */fish) echo "  fish_add_path \"$bin_dir\"" ;;
+        *) echo "  export PATH=\"$bin_dir:\$PATH\"" ;;
+      esac
+      echo
+      echo "Then open a new shell and run: didpkg --help"
+      ;;
+  esac
+}
+
+# The last line calls main: thus a partial download does nothing.
+main "$@"
