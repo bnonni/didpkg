@@ -2,7 +2,7 @@
 // B starts `didpkg shim start` with the default public Pkarr relays. Then npm, pnpm and bun install each name
 // with a cold cache, and Node loads it. Run it with the DWN up, then stop the DWN (docs/deploy.md) and run it
 // again with --dwn-down: the installs then come from the mirrors.
-// Usage, from the repo root: bun demo/live.ts [--dwn-down] <install-name>...
+// Usage, from the repo root: npm run live -- [--dwn-down] <install-name>...
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -51,7 +51,7 @@ async function install(home: string, shimUrl: string, cmd: string[]) {
 }
 
 try {
-  if (names.length === 0) throw new Error('usage: bun demo/live.ts [--dwn-down] <install-name>...');
+  if (names.length === 0) throw new Error('usage: npm run live -- [--dwn-down] <install-name>...');
   await step(`${DWN}/health ${dwnDown ? 'fails' : 'is ok'}`, async () => {
     const up = await fetch(`${DWN}/health`, { signal: AbortSignal.timeout(10_000) }).then((r) => r.ok, () => false);
     if (up === dwnDown) throw new Error(dwnDown ? 'the DWN is up: stop it first' : 'the DWN is down');

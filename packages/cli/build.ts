@@ -1,5 +1,5 @@
 // Builds dist/, the files of the npm package: cli.js (1 file for Node, with all dependencies in it), LICENSE,
-// and THIRD_PARTY_LICENSES.txt (the license of each bundled package). Run in packages/cli: bun run build.
+// and THIRD_PARTY_LICENSES.txt (the license of each bundled package). Run in packages/cli: npm run build.
 // src/cli.ts keeps the bun shebang for a run from the repo.
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -22,10 +22,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          bun-version: 1.4.4
-      - run: bun install --frozen-lockfile --ignore-scripts
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      # The bun package gets the Bun binary in its install script.
+      - run: npm rebuild bun
       - id: version
         run: echo "version=$(jq -r .version packages/cli/package.json)" >> "$GITHUB_OUTPUT"
       - name: The tag must be v<package version>
@@ -38,7 +40,7 @@ jobs:
             exit 1
           fi
       # Bun cross-compiles: this runner builds the 4 targets.
-      - run: bun packages/cli/compile.ts
+      - run: npm run compile
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binaries
@@ -90,15 +92,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: 1.4.4
       # pnpm 11 needs Node 22.13 or later.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - run: npm install --global pnpm@11.4.0
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: npm ci --ignore-scripts
+      # The bun package gets the Bun binary in its install script.
+      - run: npm rebuild bun
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: binaries
@@ -108,7 +109,7 @@ jobs:
         run: |
           grep '  didpkg-linux-x64.tar.gz$' SHA256SUMS | sha256sum -c -
           tar -xzf didpkg-linux-x64.tar.gz
-      - run: DIDPKG_BIN="$RUNNER_TEMP/bin/didpkg-linux-x64/didpkg" bun demo/e2e.ts
+      - run: DIDPKG_BIN="$RUNNER_TEMP/bin/didpkg-linux-x64/didpkg" npm run demo
 
   # The install script (site/public/install) with these archives on a local HTTP server: sh, and curl | bash.
   # A changed archive must stop the install.

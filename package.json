@@ -7,14 +7,30 @@
     "packages/*"
   ],
   "engines": {
-    "bun": ">=1.4.4"
+    "node": ">=22"
   },
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "demo": "bun demo/e2e.ts",
+    "live": "bun demo/live.ts",
+    "site:build": "bun site/build.ts",
+    "site:check": "bun site/check.ts",
+    "compile": "bun packages/cli/compile.ts",
+    "stack": "bun deploy/test/stack.ts"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
+    "bun": "1.4.4",
     "typescript": "7.0.2"
+  },
+  "allowScripts": {
+    "bun@1.4.4": true,
+    "classic-level": false
+  },
+  "overrides": {
+    "@ipld/dag-json": {
+      "cborg": "6.1.5"
+    }
   }
 }

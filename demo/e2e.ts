@@ -6,7 +6,7 @@
 // a new shim installs both packages from the mirrors.
 // All servers are on 127.0.0.1: a Pkarr relay, the pinned dwn-server 0.1.45, a static server, and the TLS
 // site of W behind a CONNECT proxy (see tls.ts).
-// Run from the repo root after `bun install`: bun demo/e2e.ts. It needs npm, pnpm 11, Node and openssl on the PATH.
+// Run from the repo root after `npm install`: npm run demo. It needs npm, pnpm 11, Node and openssl on the PATH.
 // DIDPKG_BIN=<path> runs that didpkg command in place of src/cli.ts on Bun, for example the npm package bin on Node.
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

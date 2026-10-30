@@ -31,12 +31,12 @@ didpkg --version
 
 The version must be `0.1.0` or later. [Install didpkg](install.md) gives the other ways to install, the checks, upgrade and uninstall.
 
-Note: `didpkg@0.1.0`, the release `v0.1.0` and `didpkg.dev` are not live yet. Until then, build the package from a clone. The build needs Bun 1.4.4 or later. The package that you install needs only Node.
+Note: `didpkg@0.1.0`, the release `v0.1.0` and `didpkg.dev` are not live yet. Until then, build the package from a clone. The build needs Node 22 or later and npm. The package that you install needs only Node.
 
 ```sh
 git clone https://github.com/bnonni/didpkg.git
 cd didpkg
-bun install --ignore-scripts
+npm install
 cd packages/cli
 npm pack
 npm install --global ./didpkg-0.1.0.tgz

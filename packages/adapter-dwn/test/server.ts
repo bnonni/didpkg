@@ -45,7 +45,7 @@ export async function startDwn(o: { relayUrl: string; env?: Record<string, strin
     DWN_RATE_LIMIT_REQUESTS_PER_SECOND: '0', DWN_RATE_LIMIT_TENANT_REQUESTS_PER_SECOND: '0', ...o.env,
   };
   const errLog = join(dir, 'err.log');
-  const proc = Bun.spawn(['bun', main], { cwd: dir, env, stdout: 'ignore', stderr: Bun.file(errLog) });
+  const proc = Bun.spawn([process.execPath, main], { cwd: dir, env, stdout: 'ignore', stderr: Bun.file(errLog) });
   children.add(proc);
   const stop = async () => {
     proc.kill('SIGTERM');

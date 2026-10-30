@@ -63,43 +63,45 @@ The [docs index](docs/README.md) lists all documents. Start with these:
 
 ## Develop
 
-You must have Bun 1.4.4 or later.
+You must have Node 22 or later and npm. `npm install` also gets Bun 1.4.4 (the `bun` npm package, a development dependency). The tests, the build and the demo run on that Bun. You do not install Bun.
 
 ```sh
-bun install --ignore-scripts
-bun test
-bun run typecheck
+npm install
+npm test
+npm run typecheck
 ```
+
+The `allowScripts` field in the root `package.json` lets the `bun` package run its install script, which gets the Bun binary. If you install with `--ignore-scripts`, run `npm rebuild bun` after the install.
 
 The landing page for `didpkg.dev` is in `site/`: 1 HTML page, the CSS and the DWN protocol v1 definition. The build writes `site/dist`. The link check reads the site, the Markdown files and the GitHub URLs in the source. Each relative link and each anchor must have a target.
 
 ```sh
-bun site/build.ts
-bun site/check.ts
+npm run site:build
+npm run site:check
 ```
 
 The standalone binaries for Linux and macOS (x64 and arm64) have the Bun runtime in them, thus a user needs no Bun and no Node. `packages/cli/compile.ts` builds all 4 on 1 machine. It writes `packages/cli/dist-bin`: 1 `.tar.gz` per target and `SHA256SUMS`. The workflow `release` tests each binary on a runner with its OS and CPU. A `v*` tag also makes the GitHub Release, with a build provenance attestation for each file.
 
 ```sh
-bun packages/cli/compile.ts
+npm run compile
 ```
 
 The demo (`demo/e2e.ts`) starts a Pkarr relay, a `dwn-server` and a static mirror on 127.0.0.1. A did:dht publisher signs and publishes `demo/hello` to its DWN and to the mirror. A user with no keys then installs the package with npm, pnpm and bun through `didpkg shim start`. A did:web publisher (`did:web:web.didpkg.test`) hosts its `did.json` on a TLS site and publishes the same tarball to the same DWN and to that site, and npm installs it too. Then the DWN stops, and npm installs both packages from the mirrors. The demo makes a demo CA at run time, and a CONNECT proxy sends the did:web host to the TLS site (`demo/tls.ts`). The demo needs npm, Node, openssl and pnpm 11 or later.
 
 ```sh
-bun demo/e2e.ts
+npm run demo
 ```
 
 The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dwn-server` with a tenant allowlist, Traefik for TLS and the route allowlist, and a daily backup. The runbook is [docs/deploy.md](docs/deploy.md). The stack test starts the same files with a demo CA and a local relay. It needs Docker with Compose 2.24 or later, openssl and curl.
 
 ```sh
-bun deploy/test/stack.ts
+npm run stack
 ```
 
 The live demo has 2 publishers. Both publish `hello@1.0.0` to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)): `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` and `did:web:bnonni.github.io:didpkg-demo`. This command starts a shim with the public Pkarr relays, then installs both packages with npm, pnpm and bun:
 
 ```sh
-bun demo/live.ts @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo
+npm run live -- @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo
 ```
 
 ## Old drpm code

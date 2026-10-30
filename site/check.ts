@@ -1,6 +1,6 @@
 // The link check of the docs and the site. Each relative link, and each GitHub URL of a file in this repo, must have a target.
 // The anchor of a link to a Markdown or HTML file must be a heading or an id in that file.
-// Usage: bun site/build.ts, then bun site/check.ts. The exit code is 1 if a link has no target.
+// Usage: npm run site:build, then npm run site:check. The exit code is 1 if a link has no target.
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 
@@ -95,7 +95,7 @@ if (import.meta.main) {
   const root = resolve(import.meta.dir, '..');
   const site = join(root, 'site', 'dist');
   if (!existsSync(join(site, 'index.html'))) {
-    console.error('site/dist/index.html is missing. Run bun site/build.ts first.');
+    console.error('site/dist/index.html is missing. Run npm run site:build first.');
     process.exit(1);
   }
   const git = Bun.spawnSync(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '*.md', '*.ts'], { cwd: root });

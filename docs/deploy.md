@@ -76,7 +76,7 @@ Run the route check. The first certificate can take up to 1 min after the start.
 deploy/check.sh https://dwn.didpkg.dev
 ```
 
-Each line must start with `ok`. curl checks the certificate, so a pass also proves TLS. The stack test (`bun deploy/test/stack.ts`) proves the rest of the stack locally, but not Let's Encrypt.
+Each line must start with `ok`. curl checks the certificate, so a pass also proves TLS. The stack test (`npm run stack`) proves the rest of the stack locally, but not Let's Encrypt.
 
 ## 4. Check with a publisher (about 10 min)
 
@@ -111,10 +111,10 @@ A publisher needs no action from you: each publisher registers its own DID (see 
 4. Push the site. Then, on your machine, install each name with npm, pnpm and bun through the shim. The script must print `PASS`:
 
    ```sh
-   bun demo/live.ts <install-name>...
+   npm run live -- <install-name>...
    ```
 
-   To check the mirror fallback, run `docker compose stop dwn` on the VPS, then `bun demo/live.ts --dwn-down <install-name>...`, then `docker compose start dwn`.
+   To check the mirror fallback, run `docker compose stop dwn` on the VPS, then `npm run live -- --dwn-down <install-name>...`, then `docker compose start dwn`.
 
 ## Operate
 
@@ -172,7 +172,7 @@ A change of the terms stops each tenant. Until a publisher registers again, the 
 
 ## Change the pinned dwn-server
 
-To change the pinned `dwn-server`, edit `deploy/dwn/package.json`, then run `bun install --lockfile-only --ignore-scripts` in `deploy/dwn/`. Use the same versions as the root `bun.lock`, so the DWN runs the code that the tests use. Then run `bun deploy/test/stack.ts` before you commit.
+To change the pinned `dwn-server`, edit `deploy/dwn/package.json`, then run `../../node_modules/.bin/bun install --lockfile-only --ignore-scripts` in `deploy/dwn/`. Use the same versions as the root `package-lock.json`, so the DWN runs the code that the tests use. The root `overrides` field pins the `cborg` of `@ipld/dag-json` to the version in `deploy/dwn/bun.lock`. Then run `npm run stack` before you commit.
 
 ## Move from LevelDB to SQLite (one time, about 20 min)
 
@@ -220,7 +220,7 @@ On your machine, in the didpkg repository:
 4. Install each name through the shim. The script must print `PASS`:
 
    ```sh
-   bun demo/live.ts <install-name>...
+   npm run live -- <install-name>...
    ```
 
 5. After 7 days with no problem, delete the old volume on the VPS: `docker volume rm didpkg-dwn_dwn-data`.

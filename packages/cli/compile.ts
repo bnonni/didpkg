@@ -1,7 +1,7 @@
 // Builds the standalone didpkg binaries with `bun build --compile`. Each binary has the Bun runtime in it, thus the
 // user needs no Bun and no Node. Bun cross-compiles, thus 1 machine builds all targets. Writes dist-bin/: 1 archive
 // didpkg-<os>-<arch>.tar.gz per target and SHA256SUMS. Each archive has 1 folder didpkg-<os>-<arch>/ with didpkg,
-// LICENSE and THIRD_PARTY_LICENSES.txt. Run: bun packages/cli/compile.ts [<os>-<arch> ...]. The CI workflow
+// LICENSE and THIRD_PARTY_LICENSES.txt. Run: npm run compile -- [<os>-<arch> ...]. The CI workflow
 // `release` runs it, tests each binary on a native runner and, for a v* tag, makes the GitHub Release.
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

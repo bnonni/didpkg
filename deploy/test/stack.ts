@@ -2,7 +2,7 @@
 // Let's Encrypt, and a did:dht relay container in place of relay.pkarr.org. Then it proves, through Traefik:
 // the route allowlist (check.sh), the registration (terms and proof of work), a write and a read with the didpkg DWN adapter,
 // the body limit, backup.sh and restore.sh, the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.
-// Needs Docker with Compose 2.24 or later, openssl and curl. Run: bun deploy/test/stack.ts
+// Needs Docker with Compose 2.24 or later, openssl and curl. Run: npm run stack
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,7 +26,7 @@ if (!process.env.DIDPKG_STACK_DIR) {
   const dir = mkdtempSync(join(tmpdir(), 'didpkg-stack-'));
   try {
     const { ca } = await makeCerts(dir, 'localhost');
-    const p = Bun.spawn(['bun', import.meta.path], { env: { ...process.env, DIDPKG_STACK_DIR: dir, NODE_EXTRA_CA_CERTS: ca }, stdio: ['ignore', 'inherit', 'inherit'] });
+    const p = Bun.spawn([process.execPath, import.meta.path], { env: { ...process.env, DIDPKG_STACK_DIR: dir, NODE_EXTRA_CA_CERTS: ca }, stdio: ['ignore', 'inherit', 'inherit'] });
     process.exitCode = await p.exited;
   } finally {
     rmSync(dir, { recursive: true, force: true });

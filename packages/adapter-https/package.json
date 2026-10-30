@@ -12,6 +12,6 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@didpkg/core": "workspace:*"
+    "@didpkg/core": "*"
   }
 }

@@ -36,9 +36,9 @@
     "prepack": "bun build.ts"
   },
   "devDependencies": {
-    "@didpkg/adapter-dwn": "workspace:*",
-    "@didpkg/adapter-https": "workspace:*",
-    "@didpkg/core": "workspace:*",
+    "@didpkg/adapter-dwn": "*",
+    "@didpkg/adapter-https": "*",
+    "@didpkg/core": "*",
     "@enbox/dids": "0.1.14",
     "@noble/ed25519": "3.2.0",
     "@scure/base": "2.4.0"

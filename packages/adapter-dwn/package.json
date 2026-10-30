@@ -13,7 +13,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@didpkg/core": "workspace:*",
+    "@didpkg/core": "*",
     "@enbox/dwn-clients": "0.4.37",
     "@enbox/dwn-sdk-js": "0.4.29",
     "@noble/ed25519": "3.2.0",
