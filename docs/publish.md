@@ -94,7 +94,7 @@ The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$
 | File | Content | Mode | Action |
 |---|---|---|---|
 | `<alias>.json` | The DID document and the encrypted release key | `0600` | `didpkg publish` reads only this file. Make a backup copy. |
-| `<alias>.update-key.json` | The encrypted update key `#0` (did:dht only) | `0600` | Move it offline. didpkg 0.1.0 does not use it. A future `didpkg id update` command will use it to change the DID document. |
+| `<alias>.update-key.json` | The encrypted update key `#0` (did:dht only) | `0600` | Move it offline. didpkg 0.1.0 does not use it. You need it to change the DID document. |
 | `<alias>.did.json` | The DID document to host (did:web only) | `0644` | Host it. See step 3. |
 
 didpkg never replaces a key file. If the alias exists, `id create` stops with `<file> exists: didpkg never replaces a key`. didpkg 0.1.0 has no command to change a key. If you lose the release key, you cannot publish a new version with that DID.
@@ -201,4 +201,4 @@ The command exits with 1 for each error. If one target fails, the other targets 
 | `<name>@<version> is published with a different tarball` | The version exists with other bytes. | Increase the version. |
 | `<version>: a version with build metadata is not published` | The version has a `+` part. | Remove the `+` part. |
 
-Mainline DHT nodes drop a did:dht record that nobody sends again. Each `didpkg publish` sends the record again. [ADR 0001](adr/0001-go-no-go.md) recorded no loss of the record in 24 hours.
+Mainline DHT nodes drop a did:dht record that nobody sends again. Each `didpkg publish` sends the record again.

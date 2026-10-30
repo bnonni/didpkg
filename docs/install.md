@@ -136,7 +136,7 @@ The uninstall does not delete your identities. They are in the config folder: `$
 - The npm package has the same type of trust: you trust the npm registry and the npm account of the maintainer.
 - `SHA256SUMS` comes from the same release as the archive. The check finds a damaged or incomplete download. It does not find a bad release: a person who can change an archive can also change `SHA256SUMS`.
 - The attestation shows that the release workflow of `bnonni/didpkg` made the file, and from which commit. The script does not check it, because the check needs the GitHub CLI. Check it yourself ([manual download](#manual-download), step 3).
-- didpkg verifies each package by the DID of its publisher. In Phase 1, didpkg does not verify its own binary by a DID.
+- didpkg verifies each package by the DID of its publisher. didpkg does not verify its own binary by a DID.
 
 ## Platforms
 

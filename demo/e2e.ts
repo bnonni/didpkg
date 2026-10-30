@@ -178,7 +178,7 @@ try {
   if (webMirror.reads.tgz === 0) throw new Error('the TLS site gave no tarball');
 
   const ms = Math.round(performance.now() - t0);
-  if (ms > LIMIT_MS) throw new Error(`the demo took ${ms} ms, the limit is ${LIMIT_MS} ms (exit criterion 1)`);
+  if (ms > LIMIT_MS) throw new Error(`the demo took ${ms} ms, the limit is ${LIMIT_MS} ms`);
   console.log(`PASS (${ms} ms)`);
 } catch (e) {
   console.error(`FAIL ${e instanceof Error ? e.message : String(e)}`);

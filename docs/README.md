@@ -11,8 +11,6 @@
 | [Install names](spec/install-names.md) | Contributor, client author | The install-name grammar draft 1, the codec, the shim routes and the test vectors. |
 | [Release records](spec/release-records.md) | Contributor, client author | The release record, the index, the digests, the proofs, the static layout v1 and the DWN paths. |
 | [Deploy a DWN](deploy.md) | Operator | The runbook of the demo DWN `dwn.didpkg.dev`. |
-| [ADR 0001](adr/0001-go-no-go.md) | Contributor | Gate 1: the Phase 0 go or no-go decision. |
-| [ADR 0002](adr/0002-continue.md) | Contributor | Gate 2: the Phase 1 evidence, and the decision to continue, pause or stop. |
 | [ADR 0003](adr/0003-storage-contract.md) | Contributor | The storage contract, the DWN protocol v1, the static layout v1 and the packument rules. |
 
 All commands: [CLI reference](cli.md). Vulnerability reports and the denylist: [SECURITY.md](../SECURITY.md).

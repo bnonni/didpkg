@@ -90,17 +90,17 @@ The shim pins the first index that it accepts for each DID and package name. Thi
 
 `KEY_CHANGED` and `HISTORY_CHANGED` obey the mode. In `--mode warn`, the shim writes a warning to its log and installs the package. In the default mode (`enforce`), the shim refuses the package. All other codes refuse the package in each mode.
 
-Phase 1 keeps the pins in memory. When the shim stops, it forgets the pins.
+The shim keeps the pins in memory. When the shim stops, it forgets the pins.
 
 ## Limits
 
-didpkg is a Phase 1 proof of concept. It had no security audit. These limits apply:
+didpkg is experimental. It had no security audit. These limits apply:
 
 1. Each shim start is a first use, because the pins are in memory only. On first use, the shim accepts each valid index. If the DWN is down, a stale mirror can serve an older valid index.
 2. Only the `@didpkg` packages go through the shim. The dependencies of a `@didpkg` package come from your usual registry, and didpkg does not check them.
 3. The shim does not find 2 valid index copies with the same `sequence` and different content at read time. The pin finds them later (`EQUIVOCATION`).
 4. A cold DWN read of a packument with more than about 110 versions fails with 502. The cause is the request rate limit of the DWN reader.
-5. A hash-form install name needs a DID binding, which comes in Phase 2. The [install-name grammar](spec/install-names.md) is draft 1 and can change before 1.0.
+5. A hash-form install name does not install, because didpkg has no DID binding for it. The [install-name grammar](spec/install-names.md) is draft 1 and can change before 1.0.
 
 ## More
 

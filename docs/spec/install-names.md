@@ -1,6 +1,6 @@
 # Install names (grammar draft 1)
 
-Status: draft 1 (2026-10-23). The grammar can change before 1.0. A codec change gives other install names for the same DID, so it breaks the `package.json` entries and the lockfiles that use the old names.
+Version: draft 1 (2026-10-23). The grammar can change before 1.0. A codec change gives other install names for the same DID, so it breaks the `package.json` entries and the lockfiles that use the old names.
 
 Reference code: [`packages/core/src/name/grammar.ts`](../../packages/core/src/name/grammar.ts) and [`route.ts`](../../packages/core/src/name/route.ts). Commands: `didpkg name <did> <pkg-name>` and `didpkg parse <install-name>` ([CLI reference](../cli.md)).
 
@@ -81,7 +81,7 @@ Example: the DID `did:web:example.com%3A3000:user:alice` and the pkg-name `hello
 1. The did-hash is the RFC 4648 base32 in lowercase, with no `=` fill, of the SHA-256 of the UTF-8 bytes of the full DID. It has 52 characters.
 2. 256 bits need 52 groups of 5 bits. The last group holds 1 bit and 4 zero bits, thus the last character is `a` or `q`.
 3. A hash-form name does not hold the DID. A client must get the DID from another source, for example the lockfile or a local alias. The source is not trusted: the client must make the format of the DID and the pkg-name, and compare it with the name (`bindHash`, code `E_HASH_BIND`).
-4. Phase 1 has no DID source for a hash-form name. Thus the shim gives HTTP 404 for a hash-form name. The DID binding comes in Phase 2.
+4. This draft defines no DID binding for a hash-form name. Thus the shim gives HTTP 404 for a hash-form name.
 
 ## 5. Format
 

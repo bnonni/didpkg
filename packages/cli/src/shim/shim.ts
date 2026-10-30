@@ -67,8 +67,8 @@ export function shimHandler(o: ShimOptions): (req: Request) => Promise<Response>
       // route() gives 404 for each other path, also /-/npm/v1/attestations/* (pnpm 11 asks for it).
       const r = route(req.method, url.pathname);
       if (r.kind === 'reject') throw new HttpError(r.status, r.reason);
-      if (r.kind === 'publish') throw new HttpError(405, 'the shim does not publish (Phase 3)');
-      if (r.parsed.form !== 'direct') throw new HttpError(404, 'a hash-form name needs a DID binding (Phase 2)');
+      if (r.kind === 'publish') throw new HttpError(405, 'the shim does not publish');
+      if (r.parsed.form !== 'direct') throw new HttpError(404, 'a hash-form name needs a DID binding');
       const { did, name } = r.parsed;
       if (denied.has(did)) throw new PolicyError('DID_RESOLUTION', `${did} is on the denylist (SECURITY.md)`);
       const code = errorCode(await o.resolver.resolve(did));

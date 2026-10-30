@@ -1,6 +1,6 @@
 # Release records and the storage layout (v1)
 
-Status: v1 (Phase 1). A later v1 can add members, but it does not remove or change a member.
+Version: v1. A later v1 revision can add members, but it does not remove or change a member.
 
 Reference code: [`packages/core/src/trust/`](../../packages/core/src/trust/) (`release.ts`, `digest.ts`, `proof.ts`, `verify.ts`). Decisions: [ADR 0003](../adr/0003-storage-contract.md) sections 6 and 7. The install checks: [How didpkg works](../how-it-works.md).
 
@@ -111,7 +111,7 @@ The paths are relative to the endpoint URL:
 | `<name>/index.json` | The index | Yes |
 | `<name>/<version>.json` | The release record | No |
 | `<name>/<version>.tgz` | The `npm pack` bytes, with no wrapper | No |
-| `didpkg.json` | The repository root. Optional. Phase 1 does not read or write it. | Yes |
+| `didpkg.json` | The repository root. Optional. didpkg 0.1.0 does not read or write it. | Yes |
 
 1. Each path segment is the `encodeURIComponent` of the name or the version, with `+` as `%2B`. Each segment must match `^[0-9A-Za-z][0-9A-Za-z.+-]*$`.
 2. A reader uses only `https:` with no private host.

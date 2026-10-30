@@ -1,6 +1,6 @@
 # Runbook: the demo DWN on a VPS
 
-This runbook puts the demo DWN `dwn.didpkg.dev` on one VPS (PLAN.md Phase 1 item 6). Exit criterion 2 of Phase 1 needs this DWN. The files are in `deploy/`.
+This runbook puts the demo DWN `dwn.didpkg.dev` on one VPS. The files are in `deploy/`.
 
 ## What runs
 

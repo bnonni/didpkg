@@ -135,7 +135,7 @@ describe('HTTP results', () => {
     const lost = await get(tarballPath('1.0.0'));
     expect(lost.status).toBe(404);
     expect(await error(lost)).toStartWith('TARBALL_MISSING:');
-    expect(await error(await get(`/@didpkg/hello__${'a'.repeat(51)}q`))).toBe('a hash-form name needs a DID binding (Phase 2)');
+    expect(await error(await get(`/@didpkg/hello__${'a'.repeat(51)}q`))).toBe('a hash-form name needs a DID binding');
     expect((await get('/left-pad')).status).toBe(404);
     expect((await get(`/-/npm/v1/attestations/${INSTALL}@1.0.0`)).status).toBe(404);
   });

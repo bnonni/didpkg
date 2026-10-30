@@ -22,7 +22,7 @@ test('resolves a signed packet: document, versionId, updated, source', async () 
   expect(r.didDocumentMetadata).toEqual({ versionId: '1793113192', updated: '2026-10-27T14:59:52Z' });
   const doc = r.didDocument!;
   expect(doc.id).toBe(fx.did);
-  // Enbox also puts #0 in assertionMethod by default (ADR 0001 finding).
+  // Enbox also puts #0 in assertionMethod by default.
   expect(doc.assertionMethod).toEqual([`${fx.did}#0`, `${fx.did}#didpkg-1`]);
   expect(doc.service).toEqual([{ id: `${fx.did}#pkg`, type: SERVICE_TYPE, serviceEndpoint: ['https://bnonni.github.io/didpkg-spike-pages/', 'https://dwn.example/'] }]);
   // The same document as the Enbox resolver gives for the same packet.

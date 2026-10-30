@@ -2,7 +2,7 @@
 
 Install npm packages by DID. A publisher signs each release with a key in its DID document. The didpkg shim on your computer verifies the signature before npm gets the package.
 
-Status: Phase 1 proof of concept. The [install-name grammar](https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md) is draft 1 and can change before 1.0.
+didpkg is experimental. The [install-name grammar](https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md) is draft 1 and can change before 1.0.
 
 ## Install
 

@@ -20,11 +20,11 @@ services:
       DS_PORT: "3000"
       # didpkg uses no subscriptions.
       DS_WEBSOCKET_SERVER: "off"
-      # The default did:dht gateway of @enbox/dids failed for a live DID; relay.pkarr.org served it (ADR 0001).
+      # The default did:dht gateway of @enbox/dids failed for a live DID; relay.pkarr.org served it.
       DID_DHT_GATEWAY_URI: https://relay.pkarr.org
       # The DWN records (messages, data, tasks) in SQLite. The admin store and the quotas need a SQL store.
       DWN_STORAGE: sqlite://data/dwn.db
-      # The tenant store (ADR 0001, "From spike 06", item 3). Only a registered DID can write.
+      # The tenant store. Only a registered DID can write.
       DWN_REGISTRATION_STORE_URL: sqlite://data/registration.db
       DWN_TTL_CACHE_URL: sqlite://data/registration.db
       # A DID registers itself: it agrees to the terms (their SHA-256) and sends a proof of work (about 2^24 hashes).
