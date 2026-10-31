@@ -118,6 +118,8 @@ stdout gets the JSON result: `alias`, `did`, `keyId`, `logUrl`, `documentUrl` an
 
 The did.json is the parallel did:web DID that the did:webvh specification describes. The address `nonni.org:pkgs` gives `did:web:nonni.org:pkgs`. Its `alsoKnownAs` lists the did:webvh DID, and the did:webvh document lists the did:web DID. A did:web resolver can read the document, but it does not check the history of the log. didpkg install names use the did:webvh DID.
 
+The host must send the header `Access-Control-Allow-Origin: *` with `did.jsonl`. The did:webvh specification makes this a requirement, so that a resolver in a web browser can read the log. The specification also recommends the content type `text/jsonl` for `did.jsonl`. The did:web specification recommends the same `Access-Control-Allow-Origin` header for `did.json`. Set these headers in the configuration of your static host.
+
 A DWN accepts the writes of a did:webvh publisher only if it resolves did:webvh. `dwn-server` 0.1.45 resolves only did:dht, did:jwk, did:key and did:web. Use `didpkg publish --to dir:<path>` and a static host for a did:webvh publisher.
 
 ## didpkg id register

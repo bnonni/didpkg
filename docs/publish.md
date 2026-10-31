@@ -81,7 +81,7 @@ Copy the file `web.did.json` to that URL as `did.json`. The `--web` value gives 
 | `me.github.io:pkgs` | `did:web:me.github.io:pkgs` | `https://me.github.io/pkgs/did.json` |
 | `example.com%3A8443:pkgs` | `did:web:example.com%3A8443:pkgs` | `https://example.com:8443/pkgs/did.json` |
 
-The host must be in lowercase. The site must use HTTPS. If you change the hosted `did.json` file, you change the DID document.
+The host must be in lowercase. The site must use HTTPS. If you change the hosted `did.json` file, you change the DID document. The did:web specification recommends the header `Access-Control-Allow-Origin: *` for `did.json`, so that a resolver in a web browser can read it.
 
 ### One mirror for each publisher
 
@@ -95,7 +95,7 @@ The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$
 |---|---|---|---|
 | `<alias>.json` | The DID document and the encrypted release key | `0600` | `didpkg publish` reads only this file. Make a backup copy. |
 | `<alias>.update-key.json` | The encrypted update key `#0` (did:dht only) | `0600` | Move it offline. didpkg 0.1.0 does not use it. You need it to change the DID document. |
-| `<alias>.did.json` | The DID document to host (did:web only) | `0644` | Host it. See step 3. |
+| `<alias>.did.json` | The DID document to host (did:web), or the parallel did:web document (did:webvh) | `0644` | Host it. See step 3. |
 
 didpkg never replaces a key file. If the alias exists, `id create` stops with `<file> exists: didpkg never replaces a key`. didpkg 0.1.0 has no command to change a key. If you lose the release key, you cannot publish a new version with that DID.
 
