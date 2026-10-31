@@ -222,7 +222,7 @@ describe('publish', () => {
     const passphrase = async (): Promise<string> => {
       throw new Error('no prompt');
     };
-    const cases: [string, string][] = [[`${did}#0`, 'the release key must not be the update key #0'], [`${did}#x`, `${did}#x is not in the assertionMethod`]];
+    const cases: [string, string][] = [[`${did}#0`, 'the release key must not be the update key #0'], [`${did}#x`, `${did}#x is not in assertionMethod`]];
     for (const [keyId, message] of cases) {
       await expect(publishRelease({ identity: { ...id, releaseKey: { ...id.releaseKey, keyId } }, tarball, to: ['dwn'], passphrase })).rejects.toThrow(message);
     }

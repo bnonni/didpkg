@@ -1,5 +1,6 @@
 // The encrypted key: a round trip, the 600,000 default, and a failure for each changed field.
 import { expect, test } from 'bun:test';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 import * as ed from '@noble/ed25519';
 import { base64urlnopad } from '@scure/base';
 import { decryptKey, encryptKey, KEY_FORMAT, KeyfileError, PBKDF2_ITERATIONS, type EncryptedKey } from '../src/id/keyfile.ts';
@@ -16,6 +17,18 @@ test('a round trip gives the seed, and the file holds the public key', async () 
   expect([k.format, k.did, k.keyId, k.kdf.name, k.kdf.hash, k.cipher.name]).toEqual([KEY_FORMAT, did, keyId, 'PBKDF2', 'SHA-256', 'AES-256-GCM']);
   expect([base64urlnopad.decode(k.kdf.salt).length, base64urlnopad.decode(k.cipher.iv).length, base64urlnopad.decode(k.ciphertext).length]).toEqual([16, 12, 48]);
   expect(JSON.stringify(k)).not.toContain(base64urlnopad.encode(seed));
+});
+
+test('a secp256k1 key: a round trip, and the file holds x and y of the public key', async () => {
+  const secret = secp256k1.utils.randomSecretKey();
+  const k = await encryptKey({ ...fast, keyId: 'did:key:z', seed: secret, curve: 'secp256k1' });
+  expect(await decryptKey(k, fast.passphrase)).toEqual(secret);
+  const point = secp256k1.getPublicKey(secret, false);
+  expect(k.publicKeyJwk).toEqual({ kty: 'EC', crv: 'secp256k1', x: base64urlnopad.encode(point.slice(1, 33)), y: base64urlnopad.encode(point.slice(33)) });
+  const other = base64urlnopad.encode(secp256k1.getPublicKey(secp256k1.utils.randomSecretKey(), false).slice(33));
+  await expect(decryptKey({ ...k, publicKeyJwk: { ...k.publicKeyJwk, y: other } } as EncryptedKey, fast.passphrase)).rejects.toThrow('wrong passphrase');
+  const { y: _, ...noY } = k.publicKeyJwk as { y: string };
+  await expect(decryptKey({ ...k, publicKeyJwk: noY } as EncryptedKey, fast.passphrase)).rejects.toThrow('no public key');
 });
 
 test('the default is 600,000 iterations, and each file has a new salt and iv', async () => {

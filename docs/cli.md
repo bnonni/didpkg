@@ -8,7 +8,7 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 - The exit code is 0 if the command succeeds, else 1. A usage error also prints `Run "didpkg --help" for usage.`
 - An option with a value can be in each position after the command. Give a repeatable option one time for each value.
 - `-h` or `--help` after each command prints the full help.
-- Each endpoint URL (`--dwn`, `--repo`, `--relay`) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
+- Each endpoint URL (`--dwn`, `--repo`, `--relay`, `--plc`) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
 
 ## Environment
 
@@ -16,7 +16,7 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 |---|---|
 | `DIDPKG_HOME` | The config folder. The identity files are in `$DIDPKG_HOME/ids`. Default: `$XDG_CONFIG_HOME/didpkg`, else `~/.config/didpkg`. |
 | `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`. If it is not set, didpkg asks in the terminal. |
-| `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key (did:dht and did:webvh). If it is not set, didpkg asks in the terminal. |
+| `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key (did:dht, did:webvh and did:plc). If it is not set, didpkg asks in the terminal. |
 
 The install script has its own variables: see [Install didpkg](install.md#environment-variables).
 
@@ -122,6 +122,29 @@ The host must send the header `Access-Control-Allow-Origin: *` with `did.jsonl`.
 
 A DWN accepts the writes of a did:webvh publisher only if it resolves did:webvh. `dwn-server` 0.1.45 resolves only did:dht, did:jwk, did:key and did:web. Use `didpkg publish --to dir:<path>` and a static host for a did:webvh publisher.
 
+## didpkg id create (did:plc)
+
+```text
+didpkg id create <alias> --plc <directory> --repo <url>...
+```
+
+Makes a did:plc publisher DID with the release key `#didpkg-1` and a secp256k1 rotation key. Then it sends the signed genesis operation to the directory, with an HTTP POST to `<directory>/<did>`.
+
+| Option | Default | Use |
+|---|---|---|
+| `--plc <directory>` | None | The directory URL, for example `https://plc.directory`. One time only. |
+| `--repo <url>` | None | A mirror URL. Necessary. Repeatable, maximum 10. |
+
+A did:plc service has 1 URL. Thus each `--repo` URL gets a service: the first URL is `#pkg`, and the next URLs are `#pkg-2`, `#pkg-3` and so on.
+
+`--dwn`, `--relay`, `--web` and `--webvh` are not permitted with `--plc`. `dwn-server` 0.1.45 does not resolve did:plc. Use `didpkg publish --to dir:<path>` and a static host for a did:plc publisher. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`.
+
+The rotation key is the update key of did:plc. It signs the genesis operation, and only this key can change the DID. The DID document does not show it: the operation log lists it in `rotationKeys`. The document shows `#didpkg-1` as a `Multikey`, and it has no `assertionMethod`. The didpkg verifier accepts a key with the fragment `#didpkg-<n>` as a release key of a did:plc DID. See rule 4 in [Proofs](spec/release-records.md#4-proofs).
+
+stdout gets the JSON result: `alias`, `did`, `keyId`, `directory` and `files`. stderr tells you to move the update key file offline. If the directory does not accept the DID, the exit code is 1, but the identity is saved. Then run [`didpkg id register`](#didpkg-id-register) to send the operation again.
+
+The directory keeps the operation log of each DID public. Nobody can delete a did:plc DID or its log.
+
 ## didpkg id register
 
 ```text
@@ -129,6 +152,8 @@ didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
 ```
 
 Registers the DID of an identity as a tenant of a DWN. A DWN with registration accepts writes only from its tenants. `dwn.didpkg.dev` is a DWN with registration.
+
+For a did:plc identity, the command sends the genesis operation to the directory again. Use it if the directory did not accept the DID at `didpkg id create`. The command succeeds if the operation log of the directory starts with this operation. `--dwn` and `--accept-terms` are not permitted for a did:plc identity.
 
 | Option | Default | Use |
 |---|---|---|

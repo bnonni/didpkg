@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { format, parse, GrammarError } from '@didpkg/core/name';
 import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
+import { createPlc, registerPlc } from './id/plc.ts';
 import { registerIdentity } from './id/register.ts';
 import { idPaths, readIdentity } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
@@ -26,8 +27,11 @@ Usage:
                                   Make a did:web publisher DID and its did.json to host
   didpkg id create <alias> --webvh <host>[:<path>]... [--dwn <url>] [--repo <url>]...
                                   Make a did:webvh publisher DID and its did.jsonl log to host
+  didpkg id create <alias> --plc <directory> --repo <url>...
+                                  Make a did:plc publisher DID and send it to the directory
   didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
-                                  Accept the terms of the DWN, then register the DID there (proof of work)
+                                  Accept the terms of the DWN, then register the DID there (proof of work).
+                                  For did:plc: send the DID to the directory again
   didpkg id show <alias>          Print the public data of an identity as JSON
   didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
                                   Sign an npm pack tarball with #didpkg-1 and write it to each target
@@ -43,12 +47,13 @@ Examples:
   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id create web --web pkgs.example.com --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id create vh --webvh pkgs.example.com:vh --repo https://pkgs.example.com/vh/
+  didpkg id create plc --plc https://plc.directory --repo https://pkgs.example.com/plc/
   didpkg id register main
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
-DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht and did:webvh),
+DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht, did:webvh and did:plc),
 else from the terminal.
 
 The grammar is draft 1 and can change before 1.0. See
@@ -79,15 +84,33 @@ function options(args: string[], flags: string[]) {
 async function id(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub === 'create') {
-    const { positional, values } = options(rest, ['--dwn', '--repo', '--relay', '--web', '--webvh']);
+    const { positional, values } = options(rest, ['--dwn', '--repo', '--relay', '--web', '--webvh', '--plc']);
     if (positional.length !== 1) throw new UsageError(`"id create" needs 1 argument: <alias> (got ${positional.length})`);
-    for (const f of ['--dwn', '--web', '--webvh']) if (values[f]!.length > 1) throw new UsageError(`use ${f} one time`);
+    for (const f of ['--dwn', '--web', '--webvh', '--plc']) if (values[f]!.length > 1) throw new UsageError(`use ${f} one time`);
     const alias = positional[0]!;
     idPaths(alias); // a bad alias fails before the passphrase prompt
     const web = values['--web']![0];
     const webvh = values['--webvh']![0];
+    const plc = values['--plc']![0];
     if (web !== undefined && webvh !== undefined) throw new UsageError('use --web or --webvh, not both');
-    if ((web ?? webvh) !== undefined && values['--relay']!.length) throw new UsageError('--relay is for did:dht only');
+    if (plc !== undefined && (web ?? webvh) !== undefined) throw new UsageError('use --plc without --web and --webvh');
+    if ((web ?? webvh ?? plc) !== undefined && values['--relay']!.length) throw new UsageError('--relay is for did:dht only');
+    if (plc !== undefined) {
+      if (values['--dwn']!.length) throw new UsageError('--dwn is not for did:plc: the DWN server does not resolve did:plc');
+      if (values['--repo']!.length === 0) throw new UsageError('--plc needs --repo <url>');
+      endpoint(plc, '--plc');
+      const r = await createPlc({
+        alias, directory: plc, repos: values['--repo']!,
+        passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key #didpkg-1', confirm: true }),
+        updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the rotation key', confirm: true }),
+      });
+      process.stderr.write(`Move ${r.files.updateKey} offline. It is the only key that can change the DID.\n`);
+      if (!r.directory.ok) {
+        process.stderr.write(`didpkg: error: the identity is saved, but the directory did not take the DID (${r.directory.error}). Run "didpkg id register ${alias}" to send it again.\n`);
+        process.exitCode = 1;
+      }
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
     if (webvh !== undefined) {
       logUrl(webvh);
       const r = await createWebvh({
@@ -132,6 +155,15 @@ async function id(args: string[]): Promise<string> {
     const acceptTerms = values['--accept-terms']![0];
     if (acceptTerms !== undefined && !/^[0-9a-f]{64}$/i.test(acceptTerms)) throw new UsageError('--accept-terms: use the SHA-256 hex of the terms (64 hex digits)');
     const identity = readIdentity(idPaths(positional[0]!));
+    if (identity.plc) {
+      if (values['--dwn']!.length || acceptTerms !== undefined) throw new UsageError('--dwn and --accept-terms are not for did:plc');
+      const r = await registerPlc(identity);
+      if (!r.ok) {
+        process.stderr.write(`didpkg: error: the directory did not take the DID (${r.error}).\n`);
+        process.exitCode = 1;
+      }
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
     const r = await registerIdentity({ identity, dwn: values['--dwn']![0], acceptTerms: acceptTerms?.toLowerCase() });
     return `${JSON.stringify(r, null, 2)}\n`;
   }

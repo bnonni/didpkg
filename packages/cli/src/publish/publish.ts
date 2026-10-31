@@ -12,7 +12,7 @@ import { DEFAULT_RELAYS } from '@didpkg/core/did/dht';
 import { format } from '@didpkg/core/name';
 import type { StorageReader, StorageWriter, StoredFile } from '@didpkg/core/source';
 import {
-  checkVersion, contentDigest, ed25519Signer, parseIndex, parseRelease, proofsOf, signIndex, signRelease, sri, verifyProof,
+  checkVersion, contentDigest, ed25519Signer, keyForRelationship, parseIndex, parseRelease, proofsOf, signIndex, signRelease, sri, verifyProof,
   type DidPkgIndex, type DidPkgRelease,
 } from '@didpkg/core/trust';
 import { dwnAdapter } from '@didpkg/adapter-dwn';
@@ -77,9 +77,9 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
   const { did, document, releaseKey } = o.identity;
   const keyId = releaseKey.keyId;
   if (keyId === `${did}#0`) throw new Error('the release key must not be the update key #0');
-  if (!document.assertionMethod?.some((m) => (typeof m === 'string' ? m : m.id) === keyId)) {
-    throw new Error(`${keyId} is not in the assertionMethod of the identity document`);
-  }
+  const doc = document as unknown as DidDocument;
+  // The rule of the verifier, with the did:plc `#didpkg-<n>` keys.
+  keyForRelationship(doc, keyId);
   const { name, version, npm } = readTarball(o.tarball);
   checkVersion(version);
   const installName = format(did, name);
@@ -107,7 +107,6 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
   for (const t of targets) await t.dwn?.installProtocol();
 
   // 3. The signed copies of this key on the targets.
-  const doc = document as unknown as DidDocument;
   const own = async <T extends DidPkgIndex | DidPkgRelease>(bytes: Uint8Array, parse: (v: unknown) => T): Promise<Signed<T> | null> => {
     let value: T;
     try {

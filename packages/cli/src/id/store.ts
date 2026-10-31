@@ -1,6 +1,7 @@
 // The identity files in `<config>/ids/`. Each file has mode 0600, and the folder has mode 0700.
 //   <alias>.json             the public data and the encrypted release key #didpkg-1. `didpkg publish` reads only this file.
-//   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht, a did:key for did:webvh). Move it offline. Only `didpkg id update` reads it.
+//   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht, a did:key for did:webvh, the secp256k1 rotation
+//                            key for did:plc). Move it offline. Only `didpkg id update` reads it.
 //   <alias>.did.json         the did.json to host (mode 0644): the did:web document, or the parallel did:web document of did:webvh.
 //   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -20,6 +21,8 @@ export interface Identity {
   document: DidDocument;
   /** The signed did:dht relay payload (base64url). A keyless re-PUT sends these exact bytes. did:dht only. */
   relayPayload?: string;
+  /** The directory and the signed genesis operation. `didpkg id register` sends the operation again. did:plc only. */
+  plc?: { directory: string; genesis: Record<string, unknown> };
   releaseKey: EncryptedKey;
 }
 
@@ -71,5 +74,8 @@ export function readIdentity(paths: Paths): Identity {
     throw new Error(`${paths.identity}: the DID, the document and the release key do not agree`);
   }
   if (id.did.startsWith('did:dht:') && typeof id.relayPayload !== 'string') throw new Error(`${paths.identity}: a did:dht identity needs the relay payload`);
+  if (id.did.startsWith('did:plc:') && (typeof id.plc?.directory !== 'string' || typeof id.plc.genesis !== 'object' || id.plc.genesis === null)) {
+    throw new Error(`${paths.identity}: a did:plc identity needs the directory and the genesis operation`);
+  }
   return id;
 }
