@@ -117,7 +117,7 @@ export async function createDht(o: CreateOptions): Promise<CreateResult> {
     format: ID_FORMAT, alias: o.alias, did, created: new Date().toISOString(), document: bearer.document,
     relayPayload: base64urlnopad.encode(payload), releaseKey,
   };
-  writeIdentity(paths, identity, updateKey);
+  writeIdentity(paths, identity, { updateKey });
 
   // 3. The network: the relays first, because the DWN resolves the DID before it accepts the protocol.
   const result: CreateResult = { alias: o.alias, did, keyId, files: { identity: paths.identity, updateKey: paths.updateKey }, relays: await putPayload(relays, did, payload) };

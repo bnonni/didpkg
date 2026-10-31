@@ -1,7 +1,8 @@
 // The identity files in `<config>/ids/`. Each file has mode 0600, and the folder has mode 0700.
 //   <alias>.json             the public data and the encrypted release key #didpkg-1. `didpkg publish` reads only this file.
-//   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht). Move it offline. Only `didpkg id update` reads it.
+//   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht, a did:key for did:webvh). Move it offline. Only `didpkg id update` reads it.
 //   <alias>.did.json         the DID document for the publisher to host (did:web only, mode 0644). did:web has no update key.
+//   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -33,23 +34,26 @@ export function idPaths(alias: string, env: Record<string, string | undefined> =
   const dir = join(configDir(env), 'ids');
   return {
     dir, identity: join(dir, `${alias}.json`), updateKey: join(dir, `${alias}.update-key.json`), document: join(dir, `${alias}.did.json`),
+    log: join(dir, `${alias}.did.jsonl`),
   };
 }
 
 type Paths = ReturnType<typeof idPaths>;
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
 
-/** Writes two files. The second file is the encrypted update key (did:dht), else the did.json to host (did:web).
- * It never replaces a file, because a replaced key can lose a DID. */
-export function writeIdentity(paths: Paths, identity: Identity, updateKey?: EncryptedKey): void {
-  const second = updateKey
-    ? { file: paths.updateKey, body: updateKey, mode: 0o600 }
-    : { file: paths.document, body: identity.document, mode: 0o644 };
-  for (const f of [paths.identity, second.file]) if (existsSync(f)) throw new Error(`${f} exists: didpkg never replaces a key`);
+/** Writes the identity file last. Before it: the encrypted update key (did:dht, did:webvh), the did.json to host
+ * (did:web) or the did.jsonl to host (did:webvh). It never replaces a file, because a replaced key can lose a DID. */
+export function writeIdentity(paths: Paths, identity: Identity, o: { updateKey?: EncryptedKey; log?: string } = {}): void {
+  const files = [
+    ...(o.updateKey ? [{ file: paths.updateKey, body: json(o.updateKey), mode: 0o600 }] : []),
+    ...(identity.did.startsWith('did:web:') ? [{ file: paths.document, body: json(identity.document), mode: 0o644 }] : []),
+    ...(o.log !== undefined ? [{ file: paths.log, body: o.log, mode: 0o644 }] : []),
+    { file: paths.identity, body: json(identity), mode: 0o600 },
+  ];
+  for (const f of files) if (existsSync(f.file)) throw new Error(`${f.file} exists: didpkg never replaces a key`);
   mkdirSync(paths.dir, { recursive: true, mode: 0o700 });
   chmodSync(paths.dir, 0o700);
-  writeFileSync(second.file, json(second.body), { mode: second.mode, flag: 'wx' });
-  writeFileSync(paths.identity, json(identity), { mode: 0o600, flag: 'wx' });
+  for (const f of files) writeFileSync(f.file, f.body, { mode: f.mode, flag: 'wx' });
 }
 
 export function readIdentity(paths: Paths): Identity {

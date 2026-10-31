@@ -16,7 +16,7 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 |---|---|
 | `DIDPKG_HOME` | The config folder. The identity files are in `$DIDPKG_HOME/ids`. Default: `$XDG_CONFIG_HOME/didpkg`, else `~/.config/didpkg`. |
 | `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`. If it is not set, didpkg asks in the terminal. |
-| `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key `#0` (did:dht only). If it is not set, didpkg asks in the terminal. |
+| `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key (did:dht and did:webvh). If it is not set, didpkg asks in the terminal. |
 
 The install script has its own variables: see [Install didpkg](install.md#environment-variables).
 
@@ -97,6 +97,26 @@ Makes a did:web publisher DID with the release key `#didpkg-1`, and the file `<a
 `--relay` is not permitted with `--web`. The command asks for 1 passphrase: `DIDPKG_PASSPHRASE`. It does no network write.
 
 stdout gets the JSON result: `alias`, `did`, `keyId`, `documentUrl` and `files`. stderr tells you to host `<alias>.did.json` at `documentUrl`. For the URL of each `--web` value, read [Publish a package](publish.md#didweb).
+
+## didpkg id create (did:webvh)
+
+```text
+didpkg id create <alias> --webvh <host>[:<path>]... [--dwn <url>] [--repo <url>]...
+```
+
+Makes a did:webvh publisher DID with the release key `#didpkg-1` and an update key. It also makes the DID log `<alias>.did.jsonl` to host.
+
+| Option | Default | Use |
+|---|---|---|
+| `--webvh <address>` | None | The address: `<host>[%3A<port>][:<path>]...`. One time only. The host must be in lowercase. didpkg adds the SCID. |
+| `--dwn <url>` | None | The DWN service `#dwn`. One time only. |
+| `--repo <url>` | None | A mirror URL in the service `#pkg`. Repeatable. |
+
+`--relay` and `--web` are not permitted with `--webvh`. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`. It does no network write.
+
+stdout gets the JSON result: `alias`, `did`, `keyId`, `logUrl` and `files`. stderr tells you to host `<alias>.did.jsonl` at `logUrl`, and to move the update key file offline. The address `nonni.org:pkgs` gives the URL `https://nonni.org/pkgs/did.jsonl`. An address with no path gives `https://<host>/.well-known/did.jsonl`. Any static https host can serve the file, but the URL must not redirect to another host.
+
+A DWN accepts the writes of a did:webvh publisher only if it resolves did:webvh. `dwn-server` 0.1.45 resolves only did:dht, did:jwk, did:key and did:web. Use `didpkg publish --to dir:<path>` and a static host for a did:webvh publisher.
 
 ## didpkg id register
 

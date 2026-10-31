@@ -11,7 +11,7 @@ import { ID_FORMAT, idPaths, writeIdentity, type Identity } from './store.ts';
 
 export interface WebCreateOptions {
   alias: string;
-  /** The method-specific id: `<host>[%3A<port>][:<path>]...`, for example `me.github.io:pkgs`. */
+  /** The method-specific id: `<host>[%3A<port>][:<path>]...`, for example `nonni.org:pkgs`. */
   web: string;
   dwn?: string;
   repos?: string[];
@@ -35,8 +35,13 @@ const PATH_RE = /^[A-Za-z0-9._-]+$/;
 
 /** The https URL of the did.json file, as both did:web resolvers make it. A lowercase host only, thus one DID per host. */
 export function documentUrl(id: string): string {
+  return hostedUrl(id, '--web', 'did.json');
+}
+
+/** The https URL of a DID file to host, for the did:web or did:webvh address `<host>[%3A<port>][:<path>]...`. */
+export function hostedUrl(id: string, flag: string, file: string): string {
   const [host = '', ...path] = id.split(':');
-  const bad = (why: string) => new Error(`--web: ${JSON.stringify(id)} ${why}. Use <host>[%3A<port>][:<path>]...`);
+  const bad = (why: string) => new Error(`${flag}: ${JSON.stringify(id)} ${why}. Use <host>[%3A<port>][:<path>]...`);
   if (!HOST_RE.test(host)) throw bad('has a bad host');
   if (!path.every((s) => PATH_RE.test(s))) throw bad('has a bad path segment');
   let url: URL;
@@ -46,7 +51,7 @@ export function documentUrl(id: string): string {
     throw bad('is not a host');
   }
   if (url.host !== decodeURIComponent(host)) throw bad('is not a normal host');
-  return path.length ? `${url.origin}/${path.join('/')}/did.json` : `${url.origin}/.well-known/did.json`;
+  return path.length ? `${url.origin}/${path.join('/')}/${file}` : `${url.origin}/.well-known/${file}`;
 }
 
 export async function createWeb(o: WebCreateOptions): Promise<WebCreateResult> {

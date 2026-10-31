@@ -8,6 +8,7 @@ import { passphrase } from './id/passphrase.ts';
 import { registerIdentity } from './id/register.ts';
 import { idPaths, readIdentity } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
+import { createWebvh, logUrl } from './id/webvh.ts';
 import { publish } from './publish/publish.ts';
 import { startShim } from './shim/start.ts';
 import pkg from '../package.json' with { type: 'json' };
@@ -23,6 +24,8 @@ Usage:
                                   Make a did:dht publisher DID with the release key #didpkg-1
   didpkg id create <alias> --web <host>[:<path>]... [--dwn <url>] [--repo <url>]...
                                   Make a did:web publisher DID and its did.json to host
+  didpkg id create <alias> --webvh <host>[:<path>]... [--dwn <url>] [--repo <url>]...
+                                  Make a did:webvh publisher DID and its did.jsonl log to host
   didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
                                   Accept the terms of the DWN, then register the DID there (proof of work)
   didpkg id show <alias>          Print the public data of an identity as JSON
@@ -37,14 +40,16 @@ Examples:
   didpkg name did:web:nonni.org hello
   didpkg name did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y my-lib
   didpkg parse @didpkg/hello_web_nonni.org
-  didpkg id create main --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
-  didpkg id create web --web me.github.io:pkgs --dwn https://dwn.didpkg.dev --repo https://me.github.io/pkgs/
+  didpkg id create main --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
+  didpkg id create web --web pkgs.example.com --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
+  didpkg id create vh --webvh pkgs.example.com:vh --repo https://pkgs.example.com/vh/
   didpkg id register main
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
-DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key #0), else from the terminal.
+DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht and did:webvh),
+else from the terminal.
 
 The grammar is draft 1 and can change before 1.0. See
 https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md
@@ -74,15 +79,26 @@ function options(args: string[], flags: string[]) {
 async function id(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub === 'create') {
-    const { positional, values } = options(rest, ['--dwn', '--repo', '--relay', '--web']);
+    const { positional, values } = options(rest, ['--dwn', '--repo', '--relay', '--web', '--webvh']);
     if (positional.length !== 1) throw new UsageError(`"id create" needs 1 argument: <alias> (got ${positional.length})`);
-    if (values['--dwn']!.length > 1) throw new UsageError('use --dwn one time');
-    if (values['--web']!.length > 1) throw new UsageError('use --web one time');
+    for (const f of ['--dwn', '--web', '--webvh']) if (values[f]!.length > 1) throw new UsageError(`use ${f} one time`);
     const alias = positional[0]!;
     idPaths(alias); // a bad alias fails before the passphrase prompt
     const web = values['--web']![0];
+    const webvh = values['--webvh']![0];
+    if (web !== undefined && webvh !== undefined) throw new UsageError('use --web or --webvh, not both');
+    if ((web ?? webvh) !== undefined && values['--relay']!.length) throw new UsageError('--relay is for did:dht only');
+    if (webvh !== undefined) {
+      logUrl(webvh);
+      const r = await createWebvh({
+        alias, webvh, dwn: values['--dwn']![0], repos: values['--repo'],
+        passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key #didpkg-1', confirm: true }),
+        updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the update key', confirm: true }),
+      });
+      process.stderr.write(`Host ${r.files.log} at ${r.logUrl}. Move ${r.files.updateKey} offline. Only "didpkg id update" needs it.\n`);
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
     if (web !== undefined) {
-      if (values['--relay']!.length) throw new UsageError('--relay is for did:dht only');
       documentUrl(web);
       const r = await createWeb({
         alias, web, dwn: values['--dwn']![0], repos: values['--repo'],
