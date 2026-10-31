@@ -1,8 +1,13 @@
-// Test fixtures for did/: a fake fetch, signed did:dht relay payloads and did:webvh logs. No network.
+// Test fixtures for did/: a fake fetch, signed did:dht relay payloads, did:webvh logs and did:plc audit logs.
+// No network.
 import { createBep44PutMessage, DidDht, DidDhtDocument, identifierToIdentityKeyBytes } from '@enbox/dids';
+import { encode } from '@ipld/dag-cbor';
+import { p256 } from '@noble/curves/nist.js';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 import * as ed from '@noble/ed25519';
-import { base58 } from '@scure/base';
+import { base58, base64urlnopad } from '@scure/base';
 import { createDID, deactivateDID, defaultVerifier as verifier, prepareDataForSigning, updateDID, type DIDDocument, type DIDLog, type Signer } from 'didwebvh-ts';
+import { cidOf, didOf } from '../../src/did/drivers/plc.ts';
 import type { FetchLike } from '../../src/did/fetch.ts';
 import { toMultikey } from '../../src/trust/keys.ts';
 
@@ -98,3 +103,49 @@ export async function webvhFixture(address = 'pkg.example.com', paths?: string[]
 }
 
 export const textResponse = (body: string, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/jsonl' } });
+
+type PlcOp = Record<string, unknown>;
+
+/**
+ * A did:plc with a P-256 recovery key and a secp256k1 rotation key (in this order), a release key #didpkg-1
+ * and a #pkg service. `log` is in the audit log form of the directory. `url` is the audit log URL.
+ */
+export async function plcFixture() {
+  const keys = {
+    recovery: { curve: p256, prefix: [0x80, 0x24], secret: p256.utils.randomSecretKey() },
+    rotation: { curve: secp256k1, prefix: [0xe7, 0x01], secret: secp256k1.utils.randomSecretKey() },
+    other: { curve: secp256k1, prefix: [0xe7, 0x01], secret: secp256k1.utils.randomSecretKey() },
+  };
+  const didKey = (k: (typeof keys)['rotation']) => `did:key:z${base58.encode(Uint8Array.of(...k.prefix, ...k.curve.getPublicKey(k.secret)))}`;
+  const releaseKey = toMultikey({ alg: 'Ed25519', bytes: (await ed.keygenAsync()).publicKey });
+  /** DAG-CBOR without sig, ECDSA-SHA256 with low S, base64url with no padding. */
+  const sign = (op: PlcOp, key: keyof typeof keys = 'rotation'): PlcOp => {
+    const { sig: _, ...unsigned } = op;
+    const k = keys[key];
+    return { ...unsigned, sig: base64urlnopad.encode(k.curve.sign(encode(unsigned), k.secret, { prehash: true, lowS: true })) };
+  };
+  const operation = (endpoint: string, prev: string | null): PlcOp => ({
+    type: 'plc_operation',
+    rotationKeys: [didKey(keys.recovery), didKey(keys.rotation)],
+    verificationMethods: { 'didpkg-1': `did:key:${releaseKey}` },
+    alsoKnownAs: ['at://pkg.example.com'],
+    services: { pkg: { type: SERVICE_TYPE, endpoint } },
+    prev,
+  });
+  const genesis = sign(operation('https://pkg.example.com/', null));
+  const did = didOf(genesis);
+  let day = 0;
+  const entry = (op: PlcOp, nullified = false) => ({
+    did,
+    operation: op,
+    cid: cidOf(op),
+    nullified,
+    createdAt: `2026-01-${String(++day).padStart(2, '0')}T00:00:00.${String(day).padStart(3, '0')}Z`,
+  });
+  type Entry = ReturnType<typeof entry>;
+  const head = (log: Entry[]) => log.filter((e) => !e.nullified).at(-1)!.cid;
+  /** Adds an operation that moves the #pkg service to `endpoint`. */
+  const update = (log: Entry[], endpoint: string, key: keyof typeof keys = 'rotation') => [...log, entry(sign(operation(endpoint, head(log)), key))];
+  const tombstone = (log: Entry[]) => [...log, entry(sign({ type: 'plc_tombstone', prev: head(log) }))];
+  return { did, log: [entry(genesis)], releaseKey, url: `https://plc.directory/${did}/log/audit`, sign, operation, entry, update, tombstone };
+}

@@ -1,14 +1,16 @@
-// The conformance suite passes for 5 drivers.
+// The conformance suite passes for 6 drivers.
 import { expect, test } from 'bun:test';
 import { DidJwk, DidKey } from '@enbox/dids';
 import { runDriverConformance } from '../../src/did/conformance.ts';
 import { dhtDriver } from '../../src/did/drivers/dht.ts';
 import { jwkDriver } from '../../src/did/drivers/jwk.ts';
 import { keyDriver } from '../../src/did/drivers/key.ts';
+import { plcDriver } from '../../src/did/drivers/plc.ts';
 import { webDriver } from '../../src/did/drivers/web.ts';
 import { webvhDriver } from '../../src/did/drivers/webvh.ts';
 import type { DidMethodDriver } from '../../src/did/types.ts';
-import { bytesResponse, dhtFixture, fakeFetch, jsonResponse, textResponse, webvhFixture } from './helpers.ts';
+import { bytesResponse, dhtFixture, fakeFetch, jsonResponse, plcFixture, textResponse, webvhFixture } from './helpers.ts';
+import vectors from './vectors/plc.json' with { type: 'json' };
 
 test('did:key passes', async () => {
   const fails = await runDriverConformance(keyDriver(), {
@@ -72,6 +74,24 @@ test('did:webvh passes', async () => {
     valid: [a.did, b.did],
     invalid: ['did:webvh:abc', `did:webvh:${scid}`],
     notFound: [a.did.replace('pkg.example.com', 'none.example.com')],
+    deactivated: [gone.did],
+  });
+  expect(fails).toEqual([]);
+});
+
+test('did:plc passes', async () => {
+  const a = await plcFixture();
+  const gone = await plcFixture();
+  const legacy = 'did:plc:yk4dd2qkboz2yv6tpubpc6co';
+  const { fetch } = fakeFetch({
+    [a.url]: jsonResponse(a.update(a.log, 'https://two.example.com/', 'recovery')),
+    [`https://plc.directory/${legacy}/log/audit`]: jsonResponse(vectors[legacy].auditLog),
+    [gone.url]: jsonResponse(gone.tombstone(gone.log)),
+  });
+  const fails = await runDriverConformance(plcDriver({ fetch }), {
+    valid: [a.did, legacy],
+    invalid: ['did:plc:abc', legacy.toUpperCase().replace('DID:PLC:', 'did:plc:'), 'did:plc:ewvi7nxzyoun6zhxrhs64oi1'],
+    notFound: ['did:plc:aaaaaaaaaaaaaaaaaaaaaaaa'],
     deactivated: [gone.did],
   });
   expect(fails).toEqual([]);

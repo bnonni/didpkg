@@ -88,7 +88,7 @@ The index owns the status of each version:
 1. A proof is a W3C Data Integrity proof with `type` `"DataIntegrityProof"`.
 2. The cryptosuite is `eddsa-jcs-2022` (Ed25519, VC DI EdDSA 1.0 section 3.3) or `bip340-jcs-2025` (secp256k1 Schnorr, an editor's draft). `proofValue` is the multibase base58btc form of the signature (it starts with `z`).
 3. The signed data has 64 bytes: the SHA-256 of the JCS form of the proof with no `proofValue`, then the SHA-256 of the JCS form of the object with no `proof`. `bip340-jcs-2025` signs the SHA-256 of these 64 bytes.
-4. `proofPurpose` is `assertionMethod`. The key of `verificationMethod` must be in the current `assertionMethod` of the publisher DID document.
+4. `proofPurpose` is `assertionMethod`. The key of `verificationMethod` must be in the current `assertionMethod` of the publisher DID document. A did:plc document has no `assertionMethod`. For a did:plc publisher, a key in `verificationMethod` with the fragment `didpkg-<n>` (for example `#didpkg-1`) counts as an `assertionMethod` key. Other did:plc keys, for example `#atproto`, do not count.
 5. `didpkg publish` signs with the release key `#didpkg-1`. A verifier refuses a proof by the did:dht update key `#0` (`INDEX_SIGNATURE`, `MANIFEST_SIGNATURE`).
 6. `created` is a claim of the publisher. A verifier must not use it for a security decision.
 7. The content digest of each release record must be the digest that the current signed index gives for its version. After a key rotation, the old key is not in the DID document. Then only this digest vouches for the release record.

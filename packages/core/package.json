@@ -13,6 +13,7 @@
     "./did/dht": "./src/did/drivers/dht.ts",
     "./did/web": "./src/did/drivers/web.ts",
     "./did/webvh": "./src/did/drivers/webvh.ts",
+    "./did/plc": "./src/did/drivers/plc.ts",
     "./did/conformance": "./src/did/conformance.ts",
     "./trust": "./src/trust/index.ts",
     "./source": "./src/source/index.ts",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "@enbox/dids": "0.1.14",
+    "@ipld/dag-cbor": "10.0.1",
     "@noble/curves": "2.4.0",
     "@noble/ed25519": "3.2.0",
     "@noble/hashes": "2.4.0",

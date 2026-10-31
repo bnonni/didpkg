@@ -56,7 +56,7 @@ The [docs index](docs/README.md) lists all documents. Start with these:
 
 | Path | npm name | Role |
 |---|---|---|
-| `packages/core` | `@didpkg/core` | `name/`: the install-name grammar and the shim request router. `did/`: the DID resolver and the did:key, did:jwk, did:dht and did:web drivers. `trust/`: the release proofs and the release verifier. `source/`: the storage contract and the npm packument. |
+| `packages/core` | `@didpkg/core` | `name/`: the install-name grammar and the shim request router. `did/`: the DID resolver and the did:key, did:jwk, did:dht, did:web, did:webvh and did:plc drivers. `trust/`: the release proofs and the release verifier. `source/`: the storage contract and the npm packument. |
 | `packages/adapter-https` | `@didpkg/adapter-https` | The static HTTPS mirror (`DIDPackageRepository`): the reader `httpsAdapter` and the `dir:` writer `DirWriter`, which also reads its folder back (ADR 0003 section 7). |
 | `packages/adapter-dwn` | `@didpkg/adapter-dwn` | The publisher DWN (`DecentralizedWebNode`): the protocol v1, the reader `dwnAdapter` (with a rate limit per DWN origin) and the writer `DwnWriter` (ADR 0003 section 6). |
 | `packages/cli` | `didpkg` | `didpkg name` and `didpkg parse` (from `didpkg@0.0.1`). `didpkg id create\|show`: a did:dht publisher DID, with the encrypted release key `#didpkg-1` and a separate update key file (`#0`). `didpkg id register`: accepts the terms of a DWN, then registers the DID there with a proof of work. `didpkg publish`: signs an `npm pack` tarball with `#didpkg-1` and writes the same bytes to the DWN and to `dir:` folders. `didpkg shim start`: the npm shim on 127.0.0.1, which verifies each packument and tarball before it serves them. |

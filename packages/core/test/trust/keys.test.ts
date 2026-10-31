@@ -89,3 +89,17 @@ test('keyForRelationship: another relationship, another DID and another controll
   expect(await failure(() => keyForRelationship(doc, `${DID}#key-3`))).toBe(VM_ERROR);
   expect(await failure(() => keyForRelationship({ id: DID }, `${DID}#key-1`))).toBe(VM_ERROR);
 });
+
+test('keyForRelationship: a did:plc method #didpkg-<n> is an assertionMethod key, and #atproto is not', async () => {
+  const plc = 'did:plc:ewvi7nxzyoun6zhxrhs64oiz';
+  const vm = (did: string, fragment: string) => ({ id: `${did}#${fragment}`, type: 'Multikey', controller: did, publicKeyMultibase: 'z6Mk' });
+  const d: DidDocument = { id: plc, verificationMethod: ['didpkg-1', 'didpkg-12', 'didpkg-01', 'atproto'].map((f) => vm(plc, f)) };
+  expect(keyForRelationship(d, `${plc}#didpkg-1`).id).toBe(`${plc}#didpkg-1`);
+  expect(keyForRelationship(d, `${plc}#didpkg-12`).id).toBe(`${plc}#didpkg-12`);
+  expect(await failure(() => keyForRelationship(d, `${plc}#didpkg-01`))).toBe(VM_ERROR);
+  expect(await failure(() => keyForRelationship(d, `${plc}#atproto`))).toBe(VM_ERROR);
+  expect(await failure(() => keyForRelationship(d, `${plc}#didpkg-2`))).toBe(VM_ERROR);
+  expect(await failure(() => keyForRelationship(d, `${plc}#didpkg-1`, 'authentication'))).toBe(VM_ERROR);
+  const web = 'did:web:pkg.example.com';
+  expect(await failure(() => keyForRelationship({ id: web, verificationMethod: [vm(web, 'didpkg-1')] }, `${web}#didpkg-1`))).toBe(VM_ERROR);
+});

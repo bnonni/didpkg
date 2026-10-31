@@ -99,8 +99,14 @@ export function publicKeyOf(vm: VerificationMethod): PublicKey {
 
 const absolute = (doc: DidDocument, ref: string) => (ref.startsWith('#') ? doc.id + ref : ref);
 
+// A did:plc document has keys only in verificationMethod, with no relationship (did:plc spec v0.3.0,
+// "Presentation as DID Document"). The didpkg rule: a did:plc method with the fragment didpkg-<n> is an
+// assertionMethod key. The #atproto key is not, because the PDS host often holds it.
+const PLC_RELEASE_KEY = /^did:plc:[a-z2-7]{24}#didpkg-[1-9][0-9]*$/;
+
 /**
- * The method `vmId` if the DID document binds it to `relationship` (DID Core 1.0 section 5.3).
+ * The method `vmId` if the DID document binds it to `relationship` (DID Core 1.0 section 5.3),
+ * or if it is a did:plc release key and `relationship` is assertionMethod.
  * The method must be a fragment of the document `id`, and its controller must be the document `id`
  * (VC Data Integrity 1.0 section 2.6).
  */
@@ -120,6 +126,9 @@ export function keyForRelationship(
       vm = ref;
     }
     if (vm) break;
+  }
+  if (!vm && relationship === 'assertionMethod' && PLC_RELEASE_KEY.test(vmId)) {
+    vm = doc.verificationMethod?.find((v) => absolute(doc, v.id) === vmId);
   }
   if (!vm) throw fail(`${vmId} is not in ${relationship}`);
   if (vm.controller !== doc.id) throw fail(`${vmId}: controller ${vm.controller} is not ${doc.id}`);

@@ -67,7 +67,7 @@ A failed check stops the install with an HTTP error. The [quickstart](quickstart
 You trust these parts:
 
 - The publisher, and the keys in its DID document.
-- The DID method. A did:dht DID is a public key, and its DID document is a record that the key signs. A relay can hold back a record, but it cannot change a signed record. A did:web DID is as safe as its web host: the person who controls the DNS name and the TLS certificate controls the DID.
+- The DID method. A did:dht DID is a public key, and its DID document is a record that the key signs. A relay can hold back a record, but it cannot change a signed record. A did:web DID is as safe as its web host: the person who controls the DNS name and the TLS certificate controls the DID. A did:plc DID is the hash of its first signed operation. One directory (`plc.directory`) keeps the operation log of each DID. didpkg checks each signature in the log, but the directory can hold back an operation.
 - The didpkg CLI that you install, from npm or from GitHub.
 
 You do not trust these parts:
