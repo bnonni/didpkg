@@ -95,7 +95,7 @@ async function id(args: string[]): Promise<string> {
         passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key #didpkg-1', confirm: true }),
         updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the update key', confirm: true }),
       });
-      process.stderr.write(`Host ${r.files.log} at ${r.logUrl}. Move ${r.files.updateKey} offline. Only "didpkg id update" needs it.\n`);
+      process.stderr.write(`Host ${r.files.log} at ${r.logUrl} and ${r.files.document} at ${r.documentUrl}. Move ${r.files.updateKey} offline. Only "didpkg id update" needs it.\n`);
       return `${JSON.stringify(r, null, 2)}\n`;
     }
     if (web !== undefined) {

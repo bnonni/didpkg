@@ -1,4 +1,4 @@
-// `didpkg id create --webvh` and a did:webvh publish to a folder. A fetch stub serves the did.jsonl file.
+// `didpkg id create --webvh` and a did:webvh publish to a folder. A fetch stub serves the did.jsonl and did.json files.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import * as ed from '@noble/ed25519';
 import { base64urlnopad } from '@scure/base';
 import { DidResolver } from '@didpkg/core/did';
+import { webDriver } from '@didpkg/core/did/web';
 import { webvhDriver } from '@didpkg/core/did/webvh';
 import { toMultikey, verifyProof } from '@didpkg/core/trust';
 import { DirWriter } from '@didpkg/adapter-https/dir';
@@ -54,12 +55,31 @@ describe('id create --webvh', async () => {
     expect(doc.service).toContainEqual({ id: `${r.did}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: ['https://example.com/pkgs/'] });
   });
 
-  test('the identity and the update key have mode 0600, the did.jsonl has mode 0644, and there is no did.json', () => {
+  test('the identity and the update key have mode 0600, and the did.jsonl and the did.json have mode 0644', () => {
     expect(statSync(r.files.identity).mode & 0o777).toBe(0o600);
     expect(statSync(r.files.updateKey).mode & 0o777).toBe(0o600);
     expect(statSync(r.files.log).mode & 0o777).toBe(0o644);
-    expect(existsSync(paths.document)).toBe(false);
+    expect(r.files.document).toBe(paths.document);
+    expect(statSync(r.files.document).mode & 0o777).toBe(0o644);
     expect(jsonl.trim().split('\n')).toHaveLength(1);
+  });
+
+  test('the did.json is the parallel did:web document, and each document lists the other DID in alsoKnownAs', async () => {
+    const webDid = 'did:web:example.com:pkgs';
+    expect(r.documentUrl).toBe('https://example.com/pkgs/did.json');
+    expect(resolved.didDocument!.alsoKnownAs).toEqual([webDid]);
+    const body = readFileSync(r.files.document, 'utf8');
+    const web = await new DidResolver({
+      drivers: [webDriver({ fetch: async (url) => (url === r.documentUrl ? new Response(body) : new Response('not found', { status: 404 })) })],
+    }).resolve(webDid);
+    const doc = web.didDocument!;
+    expect(doc.id).toBe(webDid);
+    expect(doc.alsoKnownAs).toEqual([r.did]);
+    expect(doc.assertionMethod).toEqual([`${webDid}#didpkg-1`]);
+    expect(doc.verificationMethod![0]!.publicKeyJwk).toEqual(resolved.didDocument!.verificationMethod![0]!.publicKeyJwk!);
+    expect(doc.service).toContainEqual({ id: `${webDid}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: ['https://example.com/pkgs/'] });
+    expect(doc.service).toContainEqual({ id: '#files', type: 'relativeRef', serviceEndpoint: 'https://example.com/pkgs/' });
+    expect(JSON.stringify({ ...doc, alsoKnownAs: [] })).not.toContain('did:webvh:');
   });
 
   test('each key decrypts only with its own passphrase, and the log lists the update key', async () => {
@@ -102,14 +122,19 @@ describe('the CLI', () => {
     return { code, out, err };
   };
 
-  test('id create --webvh tells where to host the log', async () => {
+  test('id create --webvh tells where to host the log and the did.json', async () => {
     const r = await run(['id', 'create', 'cli', '--webvh', 'example.net', '--repo', 'https://example.net/'], {
       DIDPKG_PASSPHRASE: PASS, DIDPKG_UPDATE_PASSPHRASE: UPDATE_PASS,
     });
     expect(r.code).toBe(0);
     const out = JSON.parse(r.out);
-    expect(out).toMatchObject({ did: expect.stringMatching(/^did:webvh:Qm\w+:example\.net$/), logUrl: 'https://example.net/.well-known/did.jsonl' });
-    expect(r.err).toContain(`Host ${out.files.log} at https://example.net/.well-known/did.jsonl. Move ${out.files.updateKey} offline.`);
+    expect(out).toMatchObject({
+      did: expect.stringMatching(/^did:webvh:Qm\w+:example\.net$/), logUrl: 'https://example.net/.well-known/did.jsonl',
+      documentUrl: 'https://example.net/.well-known/did.json',
+    });
+    expect(r.err).toContain(
+      `Host ${out.files.log} at https://example.net/.well-known/did.jsonl and ${out.files.document} at https://example.net/.well-known/did.json. Move ${out.files.updateKey} offline.`,
+    );
   });
 
   test('--webvh with --web, with --relay, or with a bad address fails before a file write', async () => {

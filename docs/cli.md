@@ -104,7 +104,7 @@ stdout gets the JSON result: `alias`, `did`, `keyId`, `documentUrl` and `files`.
 didpkg id create <alias> --webvh <host>[:<path>]... [--dwn <url>] [--repo <url>]...
 ```
 
-Makes a did:webvh publisher DID with the release key `#didpkg-1` and an update key. It also makes the DID log `<alias>.did.jsonl` to host.
+Makes a did:webvh publisher DID with the release key `#didpkg-1` and an update key. It also makes 2 files to host: the DID log `<alias>.did.jsonl` and the parallel did:web document `<alias>.did.json`.
 
 | Option | Default | Use |
 |---|---|---|
@@ -114,7 +114,9 @@ Makes a did:webvh publisher DID with the release key `#didpkg-1` and an update k
 
 `--relay` and `--web` are not permitted with `--webvh`. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`. It does no network write.
 
-stdout gets the JSON result: `alias`, `did`, `keyId`, `logUrl` and `files`. stderr tells you to host `<alias>.did.jsonl` at `logUrl`, and to move the update key file offline. The address `nonni.org:pkgs` gives the URL `https://nonni.org/pkgs/did.jsonl`. An address with no path gives `https://<host>/.well-known/did.jsonl`. Any static https host can serve the file, but the URL must not redirect to another host.
+stdout gets the JSON result: `alias`, `did`, `keyId`, `logUrl`, `documentUrl` and `files`. stderr tells you to host `<alias>.did.jsonl` at `logUrl` and `<alias>.did.json` at `documentUrl`, and to move the update key file offline. The address `nonni.org:pkgs` gives the URLs `https://nonni.org/pkgs/did.jsonl` and `https://nonni.org/pkgs/did.json`. An address with no path gives `https://<host>/.well-known/did.jsonl` and `https://<host>/.well-known/did.json`. Any static https host can serve the files, but the URLs must not redirect to another host.
+
+The did.json is the parallel did:web DID that the did:webvh specification describes. The address `nonni.org:pkgs` gives `did:web:nonni.org:pkgs`. Its `alsoKnownAs` lists the did:webvh DID, and the did:webvh document lists the did:web DID. A did:web resolver can read the document, but it does not check the history of the log. didpkg install names use the did:webvh DID.
 
 A DWN accepts the writes of a did:webvh publisher only if it resolves did:webvh. `dwn-server` 0.1.45 resolves only did:dht, did:jwk, did:key and did:web. Use `didpkg publish --to dir:<path>` and a static host for a did:webvh publisher.
 

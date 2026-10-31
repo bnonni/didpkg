@@ -3,11 +3,13 @@
 // key of the document: the log lists it as a did:key in `updateKeys`. Move the update key file offline.
 // The release key #didpkg-1 is a JsonWebKey, as in did:dht and did:web, because a DWN verifies a message
 // signature only with publicKeyJwk.
-// This command does no network write. Any static https host can serve the did.jsonl file.
+// It also writes the parallel did:web document did.json, as the did:webvh specification describes, for did:web
+// resolvers. The did:webvh document lists that did:web DID in alsoKnownAs.
+// This command does no network write. Any static https host can serve the did.jsonl and did.json files.
 import * as ed from '@noble/ed25519';
 import { base58, base64urlnopad } from '@scure/base';
 import { toMultikey } from '@didpkg/core/trust';
-import { createDID, defaultVerifier, prepareDataForSigning, type DIDDocument, type Signer } from 'didwebvh-ts';
+import { createDID, defaultVerifier, generateParallelDidWeb, prepareDataForSigning, type DIDDocument, type Signer } from 'didwebvh-ts';
 import { RELEASE_KEY, servicesOf } from './dht.ts';
 import { encryptKey } from './keyfile.ts';
 import { ID_FORMAT, idPaths, writeIdentity, type Identity } from './store.ts';
@@ -32,7 +34,9 @@ export interface WebvhCreateResult {
   keyId: string;
   /** The URL where the publisher must host `files.log`. */
   logUrl: string;
-  files: { identity: string; updateKey: string; log: string };
+  /** The URL where the publisher must host `files.document`, the parallel did:web document. */
+  documentUrl: string;
+  files: { identity: string; updateKey: string; log: string; document: string };
 }
 
 /** The https URL of the did.jsonl file for the address. */
@@ -41,6 +45,7 @@ export const logUrl = (address: string) => hostedUrl(address, '--webvh', 'did.js
 export async function createWebvh(o: WebvhCreateOptions): Promise<WebvhCreateResult> {
   const paths = idPaths(o.alias, o.env);
   const url = logUrl(o.webvh);
+  const documentUrl = hostedUrl(o.webvh, '--webvh', 'did.json');
   if (o.passphrase === o.updatePassphrase) throw new Error('the update key passphrase must not be the release key passphrase');
   const [host, ...path] = o.webvh.split(':') as [string, ...string[]];
 
@@ -66,6 +71,7 @@ export async function createWebvh(o: WebvhCreateOptions): Promise<WebvhCreateRes
   };
   const created = await createDID({
     address: decodeURIComponent(host), paths: path.length ? path : undefined, signer, verifier: defaultVerifier, updateKeys: [updateKey], didDocument,
+    alsoKnownAsWeb: true,
   });
 
   const did = created.did;
@@ -77,6 +83,10 @@ export async function createWebvh(o: WebvhCreateOptions): Promise<WebvhCreateRes
   writeIdentity(paths, identity, {
     updateKey: await encryptKey({ did, keyId: updateKeyId, seed: update.secretKey, passphrase: o.updatePassphrase, iterations: o.iterations }),
     log: created.log.map((e) => JSON.stringify(e)).join('\n') + '\n',
+    webDocument: generateParallelDidWeb(did, created.doc) as Identity['document'],
   });
-  return { alias: o.alias, did, keyId, logUrl: url, files: { identity: paths.identity, updateKey: paths.updateKey, log: paths.log } };
+  return {
+    alias: o.alias, did, keyId, logUrl: url, documentUrl,
+    files: { identity: paths.identity, updateKey: paths.updateKey, log: paths.log, document: paths.document },
+  };
 }

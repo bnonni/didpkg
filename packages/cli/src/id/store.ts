@@ -1,7 +1,7 @@
 // The identity files in `<config>/ids/`. Each file has mode 0600, and the folder has mode 0700.
 //   <alias>.json             the public data and the encrypted release key #didpkg-1. `didpkg publish` reads only this file.
 //   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht, a did:key for did:webvh). Move it offline. Only `didpkg id update` reads it.
-//   <alias>.did.json         the DID document for the publisher to host (did:web only, mode 0644). did:web has no update key.
+//   <alias>.did.json         the did.json to host (mode 0644): the did:web document, or the parallel did:web document of did:webvh.
 //   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -42,11 +42,14 @@ type Paths = ReturnType<typeof idPaths>;
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
 
 /** Writes the identity file last. Before it: the encrypted update key (did:dht, did:webvh), the did.json to host
- * (did:web) or the did.jsonl to host (did:webvh). It never replaces a file, because a replaced key can lose a DID. */
-export function writeIdentity(paths: Paths, identity: Identity, o: { updateKey?: EncryptedKey; log?: string } = {}): void {
+ * (did:web, did:webvh) and the did.jsonl to host (did:webvh). It never replaces a file, because a replaced key can lose a DID. */
+export function writeIdentity(
+  paths: Paths, identity: Identity, o: { updateKey?: EncryptedKey; log?: string; webDocument?: DidDocument } = {},
+): void {
+  const document = identity.did.startsWith('did:web:') ? identity.document : o.webDocument;
   const files = [
     ...(o.updateKey ? [{ file: paths.updateKey, body: json(o.updateKey), mode: 0o600 }] : []),
-    ...(identity.did.startsWith('did:web:') ? [{ file: paths.document, body: json(identity.document), mode: 0o644 }] : []),
+    ...(document ? [{ file: paths.document, body: json(document), mode: 0o644 }] : []),
     ...(o.log !== undefined ? [{ file: paths.log, body: o.log, mode: 0o644 }] : []),
     { file: paths.identity, body: json(identity), mode: 0o600 },
   ];
