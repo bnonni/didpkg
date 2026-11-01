@@ -3,6 +3,7 @@
 // is the build.ts bundle, dist/cli.js, for Node 22 or later. The CI job `package` tests it.
 import { existsSync, readFileSync } from 'node:fs';
 import { format, parse, GrammarError } from '@didpkg/core/name';
+import { readConfig } from './config.ts';
 import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
 import { createPlc, registerPlc } from './id/plc.ts';
@@ -35,7 +36,7 @@ Usage:
   didpkg id show <alias>          Print the public data of an identity as JSON
   didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
                                   Sign an npm pack tarball with #didpkg-1 and write it to each target
-  didpkg shim start [--port <n>] [--relay <url>]... [--mode enforce|warn] [--allow-loopback]
+  didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--mode enforce|warn] [--allow-loopback]
                                   Serve verified @didpkg packages to npm on 127.0.0.1 (default port 2092)
   didpkg --help                   Print this help
   didpkg --version                Print the version
@@ -51,10 +52,12 @@ Examples:
   didpkg id register main
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
+  didpkg shim start --cas https://ipfs.didpkg.dev
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht, did:webvh and did:plc),
-else from the terminal.
+else from the terminal. The shim reads $DIDPKG_HOME/config.json if it exists: the IPFS gateways ("cas") and
+the Esplora APIs ("esplora") for did:btcr2. The --cas options replace the "cas" list of the file.
 
 The grammar is draft 1 and can change before 1.0. See
 https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md
@@ -210,16 +213,20 @@ async function shimCommand(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub !== 'start') throw new UsageError(sub === undefined ? '"shim" needs a subcommand: start' : `unknown shim subcommand ${JSON.stringify(sub)}`);
   const loopback = rest.includes('--allow-loopback');
-  const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--port', '--relay', '--mode']);
+  const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--port', '--relay', '--cas', '--mode']);
   if (positional.length !== 0) throw new UsageError(`"shim start" takes no arguments (got ${positional.length})`);
   if (values['--port']!.length > 1 || values['--mode']!.length > 1) throw new UsageError('use --port and --mode one time');
   const port = values['--port']![0] ?? '2092';
   if (!/^\d{1,5}$/.test(port) || Number(port) > 65535) throw new UsageError(`--port: ${port} is not a port`);
   const mode = values['--mode']![0] ?? 'enforce';
   if (mode !== 'enforce' && mode !== 'warn') throw new UsageError(`--mode: ${mode} is not enforce or warn`);
+  const cas = values['--cas']!.map((u) => endpoint(u, '--cas'));
+  const config = readConfig();
   const shim = await startShim({
     port: Number(port), mode, allowLoopback: loopback,
     relays: values['--relay']!.map((r) => endpoint(r, 'relay')),
+    cas: cas.length ? cas : config.cas,
+    esplora: config.esplora,
     log: (line) => process.stderr.write(`${line}\n`),
   });
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void shim.stop().then(() => process.exit(0)));

@@ -71,7 +71,7 @@ You trust these parts:
   - A did:dht DID is a public key, and its DID document is a record that the key signs. A relay can hold back a record, but it cannot change a signed record.
   - A did:web DID is as safe as its web host: the person who controls the DNS name and the TLS certificate controls the DID.
   - A did:plc DID is the hash of its first signed operation. One directory (`plc.directory`) keeps the operation log of each DID. didpkg checks each signature in the log, but the directory can hold back an operation.
-  - A did:btcr2 DID is a secp256k1 public key or the hash of its genesis document. Bitcoin transactions announce its updates. The shim gets the transactions from an Esplora API (`mempool.space`). It gets the genesis document and the updates from IPFS through a gateway (`trustless-gateway.link`). didpkg checks each hash and each signature, but the Esplora API can hold back a transaction.
+  - A did:btcr2 DID is a secp256k1 public key or the hash of its genesis document. Bitcoin transactions announce its updates. The shim gets the transactions from an Esplora API (`mempool.space`). It gets the genesis document and the updates from IPFS through a gateway (`trustless-gateway.link`). You can set your own gateways and Esplora APIs: see [the config file](cli.md#config-file). didpkg checks each hash and each signature, but the Esplora API can hold back a transaction.
 - The didpkg CLI that you install, from npm or from GitHub.
 
 You do not trust these parts:

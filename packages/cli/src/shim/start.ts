@@ -4,7 +4,7 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { DidResolver, jwkDriver, keyDriver } from '@didpkg/core/did';
-import { btcr2Driver } from '@didpkg/core/did/btcr2';
+import { btcr2Driver, type Btcr2DriverOptions } from '@didpkg/core/did/btcr2';
 import { dhtDriver } from '@didpkg/core/did/dht';
 import { plcDriver } from '@didpkg/core/did/plc';
 import { webDriver } from '@didpkg/core/did/web';
@@ -23,6 +23,10 @@ export interface StartShimOptions {
   /** 0 selects a free port. Default: 2092. */
   port?: number;
   relays?: readonly string[];
+  /** IPFS Trustless Gateway base URLs for did:btcr2. Default: CAS_GATEWAYS of the driver. */
+  cas?: readonly string[];
+  /** The Esplora API base URL for each network of did:btcr2. It replaces the default of that network. */
+  esplora?: Btcr2DriverOptions['esplora'];
   mode?: PolicyMode;
   /** Read DWN and repository endpoints, DID documents and relays on a loopback host. Only for tests and a local demo. */
   allowLoopback?: boolean;
@@ -35,7 +39,7 @@ export async function startShim(o: StartShimOptions = {}): Promise<{ url: string
     drivers: [
       keyDriver(), jwkDriver(), webDriver({ allowPrivateHosts: loopback }), webvhDriver({ allowPrivateHosts: loopback }), plcDriver(),
       dhtDriver({ relays: o.relays?.length ? o.relays : undefined, allowPrivateRelays: loopback }),
-      btcr2Driver({ allowPrivateHosts: loopback }),
+      btcr2Driver({ cas: o.cas, esplora: o.esplora, allowPrivateHosts: loopback }),
     ],
     staleIfErrorMs: STALE_IF_ERROR_MS,
   });

@@ -8,13 +8,13 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 - The exit code is 0 if the command succeeds, else 1. A usage error also prints `Run "didpkg --help" for usage.`
 - An option with a value can be in each position after the command. Give a repeatable option one time for each value.
 - `-h` or `--help` after each command prints the full help.
-- Each endpoint URL (`--dwn`, `--repo`, `--relay`, `--plc`) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
+- Each endpoint URL (`--dwn`, `--repo`, `--relay`, `--plc`, `--cas`, and the URLs in the [config file](#config-file)) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
 
 ## Environment
 
 | Variable | Use |
 |---|---|
-| `DIDPKG_HOME` | The config folder. The identity files are in `$DIDPKG_HOME/ids`. Default: `$XDG_CONFIG_HOME/didpkg`, else `~/.config/didpkg`. |
+| `DIDPKG_HOME` | The config folder. The identity files are in `$DIDPKG_HOME/ids`. The [config file](#config-file) is `$DIDPKG_HOME/config.json`. Default: `$XDG_CONFIG_HOME/didpkg`, else `~/.config/didpkg`. |
 | `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`. If it is not set, didpkg asks in the terminal. |
 | `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key (did:dht, did:webvh and did:plc). If it is not set, didpkg asks in the terminal. |
 
@@ -216,7 +216,7 @@ For the full steps and the errors, read [Publish a package](publish.md).
 ## didpkg shim start
 
 ```text
-didpkg shim start [--port <n>] [--relay <url>]... [--mode enforce|warn] [--allow-loopback]
+didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--mode enforce|warn] [--allow-loopback]
 ```
 
 Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` package before npm gets it.
@@ -225,6 +225,7 @@ Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` pac
 |---|---|---|
 | `--port <n>` | `2092` | The port. `0` selects a free port. |
 | `--relay <url>` | `https://relay.pkarr.org`, `https://pkarr.pubky.org` | The Pkarr relays that resolve a did:dht DID. Repeatable. |
+| `--cas <url>` | `cas` of the [config file](#config-file), else `https://trustless-gateway.link` | The IPFS gateways ([Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/)) that give the genesis document and the update data of a did:btcr2 DID. The shim tries them in order. Repeatable. The options replace the `cas` list of the config file. |
 | `--mode <mode>` | `enforce` | `warn` installs a package with a changed key or a changed release history, and writes a warning to the log. See [Pins](how-it-works.md#pins). |
 | `--allow-loopback` | Off | Read DIDs, DWNs and mirrors on a loopback host. Only for tests and the local demo. This option has no value. |
 
@@ -235,6 +236,26 @@ The shim prints one JSON line to stdout, with the URL and the `.npmrc` line:
 ```
 
 Then it writes one line for each request to stderr. It runs until SIGINT (Ctrl+C) or SIGTERM, and then exits with 0. If the port is in use, it exits with 1. For the HTTP errors of the shim, read [Quickstart](quickstart.md#errors).
+
+### Config file
+
+The shim reads `$DIDPKG_HOME/config.json` if the file exists. Each key is optional:
+
+| Key | Default | Use |
+|---|---|---|
+| `cas` | `["https://trustless-gateway.link"]` | The IPFS gateways for did:btcr2, in order. `--cas` replaces this list. An empty list (`[]`) turns IPFS off: then the shim resolves only a did:btcr2 DID that needs no data from IPFS. |
+| `esplora` | `https://mempool.space/api` (`bitcoin`), `https://mempool.space/testnet/api` (`testnet3`), `https://mempool.space/testnet4/api` (`testnet4`), `https://mempool.space/signet/api` (`signet`), `https://mutinynet.com/api` (`mutinynet`) | The Esplora API for each Bitcoin network of did:btcr2. The keys are `bitcoin`, `testnet3`, `testnet4`, `signet`, `mutinynet` and `regtest`. A key replaces the default of its network. `regtest` has no default. |
+
+Example:
+
+```json
+{
+  "cas": ["https://ipfs.didpkg.dev", "https://trustless-gateway.link"],
+  "esplora": { "testnet4": "https://esplora.example.com/testnet4/api" }
+}
+```
+
+An unknown key or a bad value stops the shim before it starts, with exit code 1.
 
 ## didpkg --help
 
