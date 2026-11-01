@@ -94,8 +94,10 @@ The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$
 | File | Content | Mode | Action |
 |---|---|---|---|
 | `<alias>.json` | The DID document and the encrypted release key | `0600` | `didpkg publish` reads only this file. Make a backup copy. |
-| `<alias>.update-key.json` | The encrypted update key `#0` (did:dht only) | `0600` | Move it offline. didpkg 0.1.0 does not use it. You need it to change the DID document. |
+| `<alias>.update-key.json` | The encrypted update key of the DID (each method except did:web) | `0600` | Move it offline. didpkg 0.1.0 does not use it. You need it to change the DID document. |
 | `<alias>.did.json` | The DID document to host (did:web), or the parallel did:web document (did:webvh) | `0644` | Host it. See step 3. |
+| `<alias>.genesis.json` | The JCS bytes of the Genesis Document (did:btcr2 only) | `0644` | Put it in IPFS as a raw block. See [the CLI reference](cli.md#didpkg-id-create-didbtcr2). |
+| `<alias>.sidecar.json` | The Sidecar Data with the Genesis Document (did:btcr2 only) | `0644` | Keep it. It has the same document as the genesis file. |
 
 didpkg never replaces a key file. If the alias exists, `id create` stops with `<file> exists: didpkg never replaces a key`. didpkg 0.1.0 has no command to change a key. If you lose the release key, you cannot publish a new version with that DID.
 

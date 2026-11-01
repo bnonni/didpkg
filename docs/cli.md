@@ -145,6 +145,39 @@ stdout gets the JSON result: `alias`, `did`, `keyId`, `directory` and `files`. s
 
 The directory keeps the operation log of each DID public. Nobody can delete a did:plc DID or its log.
 
+## didpkg id create (did:btcr2)
+
+```text
+didpkg id create <alias> --btcr2 <network> --repo <url>...
+```
+
+Makes a did:btcr2 publisher DID with the release key `#didpkg-1` and a secp256k1 update key `#initialKey`. The DID is an `x1` identifier: the hash of a Genesis Document. The command makes no Bitcoin transaction and no network request.
+
+| Option | Default | Use |
+|---|---|---|
+| `--btcr2 <network>` | None | The Bitcoin network: `bitcoin`, `signet`, `regtest`, `testnet3`, `testnet4` or `mutinynet`. One time only. |
+| `--repo <url>` | None | A mirror URL in the service `#pkg`. Necessary. Repeatable. |
+
+`--dwn`, `--relay`, `--web`, `--webvh` and `--plc` are not permitted with `--btcr2`. `dwn-server` 0.1.45 does not resolve did:btcr2. Use `didpkg publish --to dir:<path>` and a static host for a did:btcr2 publisher. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`.
+
+The Genesis Document is the DID document with the placeholder id `did:btcr2:_`. It has these items:
+
+- `#initialKey`: a secp256k1 `Multikey` in `capabilityInvocation`. The did:btcr2 specification permits only this key type to sign an update.
+- `#didpkg-1`: an Ed25519 `Multikey` in `assertionMethod`.
+- `#initialP2WPKH`: a `SingletonBeacon` service. Its address is the P2WPKH address of `#initialKey`. An update spends a UTXO of this address.
+- `#pkg`: the `DIDPackageRepository` service with the `--repo` URLs.
+
+The command writes 2 more files in `$DIDPKG_HOME/ids`:
+
+| File | Content |
+|---|---|
+| `<alias>.genesis.json` | The JCS bytes (RFC 8785) of the Genesis Document. The SHA-256 of the file is in the DID. |
+| `<alias>.sidecar.json` | The Sidecar Data of the specification, with the Genesis Document. |
+
+A resolver must have the Genesis Document, because the DID has only its hash. The shim gets it from CAS (IPFS). Put the genesis file in IPFS as a raw block. The CID in the result is the CIDv1 of that block. With Kubo, run `ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true <alias>.genesis.json`. The shim then gets the block from the IPFS gateways (see [`--cas`](#didpkg-shim-start)).
+
+stdout gets the JSON result: `alias`, `did`, `keyId`, `network`, `cid` and `files`. stderr tells you to move the update key file offline, and gives the IPFS command.
+
 ## didpkg id register
 
 ```text
@@ -154,6 +187,8 @@ didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
 Registers the DID of an identity as a tenant of a DWN. A DWN with registration accepts writes only from its tenants. `dwn.didpkg.dev` is a DWN with registration.
 
 For a did:plc identity, the command sends the genesis operation to the directory again. Use it if the directory did not accept the DID at `didpkg id create`. The command succeeds if the operation log of the directory starts with this operation. `--dwn` and `--accept-terms` are not permitted for a did:plc identity.
+
+A did:btcr2 DID has no registration. For a did:btcr2 identity, the command stops with exit code 1.
 
 | Option | Default | Use |
 |---|---|---|

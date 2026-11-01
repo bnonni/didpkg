@@ -1,9 +1,11 @@
 // The identity files in `<config>/ids/`. Each file has mode 0600, and the folder has mode 0700.
 //   <alias>.json             the public data and the encrypted release key #didpkg-1. `didpkg publish` reads only this file.
 //   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht, a did:key for did:webvh, the secp256k1 rotation
-//                            key for did:plc). Move it offline. Only `didpkg id update` reads it.
+//                            key for did:plc, the secp256k1 #initialKey for did:btcr2). Move it offline. Only `didpkg id update` reads it.
 //   <alias>.did.json         the did.json to host (mode 0644): the did:web document, or the parallel did:web document of did:webvh.
 //   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
+//   <alias>.sidecar.json     the Sidecar Data with the Genesis Document (did:btcr2 only, mode 0644).
+//   <alias>.genesis.json     the JCS bytes of the Genesis Document: the raw block to put in CAS (did:btcr2 only, mode 0644).
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -23,6 +25,8 @@ export interface Identity {
   relayPayload?: string;
   /** The directory and the signed genesis operation. `didpkg id register` sends the operation again. did:plc only. */
   plc?: { directory: string; genesis: Record<string, unknown> };
+  /** The network and the Genesis Document. A resolver needs the Genesis Document of an x1 DID. did:btcr2 only. */
+  btcr2?: { network: string; genesisDocument: Record<string, unknown> };
   releaseKey: EncryptedKey;
 }
 
@@ -37,23 +41,28 @@ export function idPaths(alias: string, env: Record<string, string | undefined> =
   const dir = join(configDir(env), 'ids');
   return {
     dir, identity: join(dir, `${alias}.json`), updateKey: join(dir, `${alias}.update-key.json`), document: join(dir, `${alias}.did.json`),
-    log: join(dir, `${alias}.did.jsonl`),
+    log: join(dir, `${alias}.did.jsonl`), sidecar: join(dir, `${alias}.sidecar.json`), genesis: join(dir, `${alias}.genesis.json`),
   };
 }
 
 type Paths = ReturnType<typeof idPaths>;
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
 
-/** Writes the identity file last. Before it: the encrypted update key (did:dht, did:webvh), the did.json to host
- * (did:web, did:webvh) and the did.jsonl to host (did:webvh). It never replaces a file, because a replaced key can lose a DID. */
+/** Writes the identity file last. Before it: the encrypted update key (did:dht, did:webvh, did:plc, did:btcr2), the did.json
+ * to host (did:web, did:webvh), the did.jsonl to host (did:webvh), and the sidecar and genesis files (did:btcr2).
+ * It never replaces a file, because a replaced key can lose a DID. */
 export function writeIdentity(
-  paths: Paths, identity: Identity, o: { updateKey?: EncryptedKey; log?: string; webDocument?: DidDocument } = {},
+  paths: Paths, identity: Identity,
+  o: { updateKey?: EncryptedKey; log?: string; webDocument?: DidDocument; sidecar?: object; genesis?: Uint8Array } = {},
 ): void {
   const document = identity.did.startsWith('did:web:') ? identity.document : o.webDocument;
   const files = [
     ...(o.updateKey ? [{ file: paths.updateKey, body: json(o.updateKey), mode: 0o600 }] : []),
     ...(document ? [{ file: paths.document, body: json(document), mode: 0o644 }] : []),
     ...(o.log !== undefined ? [{ file: paths.log, body: o.log, mode: 0o644 }] : []),
+    ...(o.sidecar ? [{ file: paths.sidecar, body: json(o.sidecar), mode: 0o644 }] : []),
+    // The exact bytes: the hash of the file is the DID.
+    ...(o.genesis ? [{ file: paths.genesis, body: o.genesis, mode: 0o644 }] : []),
     { file: paths.identity, body: json(identity), mode: 0o600 },
   ];
   for (const f of files) if (existsSync(f.file)) throw new Error(`${f.file} exists: didpkg never replaces a key`);
@@ -76,6 +85,9 @@ export function readIdentity(paths: Paths): Identity {
   if (id.did.startsWith('did:dht:') && typeof id.relayPayload !== 'string') throw new Error(`${paths.identity}: a did:dht identity needs the relay payload`);
   if (id.did.startsWith('did:plc:') && (typeof id.plc?.directory !== 'string' || typeof id.plc.genesis !== 'object' || id.plc.genesis === null)) {
     throw new Error(`${paths.identity}: a did:plc identity needs the directory and the genesis operation`);
+  }
+  if (id.did.startsWith('did:btcr2:') && (typeof id.btcr2?.network !== 'string' || typeof id.btcr2.genesisDocument !== 'object' || id.btcr2.genesisDocument === null)) {
+    throw new Error(`${paths.identity}: a did:btcr2 identity needs the network and the genesis document`);
   }
   return id;
 }

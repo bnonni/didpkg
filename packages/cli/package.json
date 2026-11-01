@@ -36,6 +36,8 @@
     "prepack": "bun build.ts"
   },
   "devDependencies": {
+    "@did-btcr2/bitcoin": "0.12.0",
+    "@did-btcr2/method": "0.75.1",
     "@didpkg/adapter-dwn": "*",
     "@didpkg/adapter-https": "*",
     "@didpkg/core": "*",
@@ -43,7 +45,9 @@
     "@ipld/dag-cbor": "10.0.1",
     "@noble/curves": "2.4.0",
     "@noble/ed25519": "3.2.0",
+    "@noble/hashes": "2.4.0",
     "@scure/base": "2.4.0",
+    "canonicalize": "5.1.0",
     "didwebvh-ts": "3.0.0"
   }
 }
