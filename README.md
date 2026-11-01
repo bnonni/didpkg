@@ -33,12 +33,13 @@ echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
 npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
-The install name holds the package name, the DID method and the DID. The demo has the package `hello` from 2 publishers:
+The install name holds the package name, the DID method and the DID. The demo has the package `hello` from 3 publishers:
 
 | DID method | Install name |
 |---|---|
 | did:dht | `@didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` |
 | did:web | `@didpkg/hello_web_bnonni.github.io_didpkg-demo` |
+| did:plc | `@didpkg/hello_plc_3zo7womke3qzjadke2q4lukr` |
 
 The [quickstart](docs/quickstart.md) gives each step and the HTTP errors.
 
@@ -98,10 +99,16 @@ The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dw
 npm run stack
 ```
 
-The live demo has 2 publishers. Both publish `hello@1.0.0` to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)): `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` and `did:web:bnonni.github.io:didpkg-demo`. This command starts a shim with the public Pkarr relays, then installs both packages with npm, pnpm and bun:
+The live demo has 3 publishers. Each publisher publishes `hello@1.0.0`:
+
+- `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` publishes to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)).
+- `did:web:bnonni.github.io:didpkg-demo` publishes to `dwn.didpkg.dev` and to the `web/` folder of the same mirror.
+- `did:plc:3zo7womke3qzjadke2q4lukr` publishes only to a static mirror at `https://nonni.org/pkgs/plc/`.
+
+This command starts a shim with the public Pkarr relays. Then it installs the 3 packages with npm, pnpm and bun:
 
 ```sh
-npm run live -- @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo
+npm run live -- @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo @didpkg/hello_plc_3zo7womke3qzjadke2q4lukr
 ```
 
 ## Old drpm code
