@@ -34,11 +34,11 @@ test('import borders: each library has only the expected importers', async () =>
   }
   for (const files of Object.values(importers)) files.sort();
   expect(importers).toEqual({
-    '@noble/hashes': ['did/drivers/plc.ts', 'name/grammar.ts', 'trust/digest.ts', 'trust/proof.ts'],
+    '@noble/hashes': ['did/drivers/btcr2.ts', 'did/drivers/btcr2.ts', 'did/drivers/plc.ts', 'name/grammar.ts', 'trust/digest.ts', 'trust/proof.ts'],
     '@noble/curves': ['did/drivers/plc.ts', 'did/drivers/plc.ts', 'trust/keys.ts', 'trust/proof.ts'],
     '@noble/ed25519': ['trust/proof.ts'],
     canonicalize: ['trust/jcs.ts'],
-    '@scure/base': ['did/drivers/jwk.ts', 'did/drivers/key.ts', 'did/drivers/plc.ts', 'trust/digest.ts', 'trust/keys.ts', 'trust/proof.ts'],
+    '@scure/base': ['did/drivers/btcr2.ts', 'did/drivers/jwk.ts', 'did/drivers/key.ts', 'did/drivers/plc.ts', 'trust/digest.ts', 'trust/keys.ts', 'trust/proof.ts'],
     '@enbox/dids': ['did/drivers/dht.ts'],
     'web-did-resolver': ['did/drivers/web.ts'],
     'didwebvh-ts': ['did/drivers/webvh.ts'],

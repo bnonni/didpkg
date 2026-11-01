@@ -27,6 +27,8 @@ export interface FetchLimits {
   allowPrivateHosts?: boolean;
   /** The response can change, so no cache may give it (fetch option `cache: 'no-store'`). */
   noStore?: boolean;
+  /** The value of the Accept request header. */
+  accept?: string;
 }
 
 export interface FetchedBytes {
@@ -48,7 +50,13 @@ export async function fetchBytes(url: string, limits: FetchLimits = {}): Promise
   for (let hop = 0; ; hop++) {
     const host = current.host;
     try {
-      const res = await doFetch(current.href, { method: 'GET', redirect: 'manual', signal, ...(limits.noStore && { cache: 'no-store' }) });
+      const res = await doFetch(current.href, {
+        method: 'GET',
+        redirect: 'manual',
+        signal,
+        ...(limits.noStore && { cache: 'no-store' }),
+        ...(limits.accept && { headers: { accept: limits.accept } }),
+      });
       if (res.type === 'opaqueredirect') throw new FetchError(`${host}: the redirect target is not readable`, false);
       if (REDIRECTS.has(res.status)) {
         const location = res.headers.get('location');

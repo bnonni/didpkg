@@ -4,6 +4,7 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { DidResolver, jwkDriver, keyDriver } from '@didpkg/core/did';
+import { btcr2Driver } from '@didpkg/core/did/btcr2';
 import { dhtDriver } from '@didpkg/core/did/dht';
 import { plcDriver } from '@didpkg/core/did/plc';
 import { webDriver } from '@didpkg/core/did/web';
@@ -34,6 +35,7 @@ export async function startShim(o: StartShimOptions = {}): Promise<{ url: string
     drivers: [
       keyDriver(), jwkDriver(), webDriver({ allowPrivateHosts: loopback }), webvhDriver({ allowPrivateHosts: loopback }), plcDriver(),
       dhtDriver({ relays: o.relays?.length ? o.relays : undefined, allowPrivateRelays: loopback }),
+      btcr2Driver({ allowPrivateHosts: loopback }),
     ],
     staleIfErrorMs: STALE_IF_ERROR_MS,
   });
