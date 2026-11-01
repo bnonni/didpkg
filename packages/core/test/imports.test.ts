@@ -43,6 +43,8 @@ test('import borders: each library has only the expected importers', async () =>
     'web-did-resolver': ['did/drivers/web.ts'],
     'didwebvh-ts': ['did/drivers/webvh.ts'],
     '@ipld/dag-cbor': ['did/drivers/plc.ts'],
+    '@did-btcr2/method': ['did/drivers/btcr2.ts', 'did/drivers/btcr2.ts'],
+    '@did-btcr2/bitcoin': ['did/drivers/btcr2.ts'],
   });
 });
 

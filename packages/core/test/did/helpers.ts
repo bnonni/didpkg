@@ -1,14 +1,19 @@
-// Test fixtures for did/: a fake fetch, signed did:dht relay payloads, did:webvh logs and did:plc audit logs.
-// No network.
+// Test fixtures for did/: a fake fetch, signed did:dht relay payloads, did:webvh logs, did:plc audit logs,
+// and did:btcr2 sidecar data with a fake Esplora API. No network.
+import { DidBtcr2, type Btcr2DidDocument, type Sidecar, type SignedBTCR2Update } from '@did-btcr2/method';
 import { createBep44PutMessage, DidDht, DidDhtDocument, identifierToIdentityKeyBytes } from '@enbox/dids';
 import { encode } from '@ipld/dag-cbor';
 import { p256 } from '@noble/curves/nist.js';
-import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { schnorr, secp256k1 } from '@noble/curves/secp256k1.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import * as ed from '@noble/ed25519';
 import { base58, base64urlnopad } from '@scure/base';
 import { createDID, deactivateDID, defaultVerifier as verifier, prepareDataForSigning, updateDID, type DIDDocument, type DIDLog, type Signer } from 'didwebvh-ts';
+import canonicalize from 'canonicalize';
 import { cidOf, didOf } from '../../src/did/drivers/plc.ts';
 import type { FetchLike } from '../../src/did/fetch.ts';
+import type { DidDocument, Service } from '../../src/did/types.ts';
 import { toMultikey } from '../../src/trust/keys.ts';
 
 export type Route = (req: { url: string; init: RequestInit }) => Response | Promise<Response>;
@@ -148,4 +153,88 @@ export async function plcFixture() {
   const update = (log: Entry[], endpoint: string, key: keyof typeof keys = 'rotation') => [...log, entry(sign(operation(endpoint, head(log)), key))];
   const tombstone = (log: Entry[]) => [...log, entry(sign({ type: 'plc_tombstone', prev: head(log) }))];
   return { did, log: [entry(genesis)], releaseKey, url: `https://plc.directory/${did}/log/audit`, sign, operation, entry, update, tombstone };
+}
+
+export const BTCR2_ESPLORA = 'https://mempool.space/testnet4/api';
+const BTCR2_PAGE = 25; // ESPLORA_CHAIN_PAGE_SIZE of @did-btcr2/bitcoin
+
+export interface Btcr2Signal { address: string; txid: string; blockHeight: number; blockHash: string; blockTime: number; mediantime: number; signalBytes: string }
+
+/**
+ * A testnet4 x1 did:btcr2 with a #pkg service in the genesis document, and one signed update that adds #pkg-2.
+ * The update is in a beacon signal at the P2PKH beacon address. `esplora(signals)` is a fake Esplora API.
+ */
+export async function btcr2Fixture() {
+  const secret = secp256k1.utils.randomSecretKey();
+  const signer = {
+    publicKey: secp256k1.getPublicKey(secret),
+    sign(data: Uint8Array, scheme: string) {
+      if (scheme !== 'bip340') throw new Error(`no ${scheme} signatures`);
+      return schnorr.sign(data, secret);
+    },
+  };
+  // The genesis document is the k1 document of the key with the placeholder id, and a #pkg service.
+  const k1 = DidBtcr2.create(signer.publicKey, { idType: 'KEY', network: 'testnet4' });
+  const k1Doc = await resolveOffline(k1, {});
+  const genesisDocument = JSON.parse(JSON.stringify(k1Doc).replaceAll(k1, 'did:btcr2:_')) as { service: Service[] };
+  genesisDocument.service.push({ id: 'did:btcr2:_#pkg', type: SERVICE_TYPE, serviceEndpoint: 'https://pkg.example.com/' });
+  const did = DidBtcr2.create(sha256(new TextEncoder().encode(canonicalize(genesisDocument)!)), { idType: 'EXTERNAL', network: 'testnet4' });
+  const genesis = await resolveOffline(did, { sidecar: { genesisDocument } });
+
+  const updater = DidBtcr2.update({
+    sourceDocument: genesis,
+    patches: [{ op: 'add', path: '/service/-', value: { id: `${did}#pkg-2`, type: SERVICE_TYPE, serviceEndpoint: 'https://mirror.example.com/' } }],
+    sourceVersionId: 1,
+    verificationMethodId: `${did}#initialKey`,
+    beaconId: `${did}#initialP2PKH`,
+  });
+  let update: SignedBTCR2Update | undefined;
+  for (let state = updater.advance(); state.status === 'action-required' && !update; state = updater.advance()) {
+    for (const need of state.needs) {
+      if (need.kind === 'NeedSigningKey') updater.provide(need, signer as never);
+      else if (need.kind === 'NeedFunding') updater.provide(need, { utxoCount: 1 });
+      else update = need.signedUpdate;
+    }
+  }
+  if (!update) throw new Error('the updater gave no signed update');
+
+  const address = String(genesis.service!.find((s) => s.id === `${did}#initialP2PKH`)!.serviceEndpoint).slice('bitcoin:'.length);
+  const signal: Btcr2Signal = {
+    address,
+    txid: '22'.repeat(32),
+    blockHeight: 150_000,
+    blockHash: '00'.repeat(4) + '33'.repeat(28),
+    blockTime: 1_789_000_000,
+    mediantime: 1_788_999_000,
+    signalBytes: bytesToHex(sha256(new TextEncoder().encode(canonicalize(update)!))),
+  };
+  const tip = 150_009;
+  const beacons = genesis.service!.filter((s) => String(s.serviceEndpoint).startsWith('bitcoin:')).map((s) => String(s.serviceEndpoint).slice(8));
+  const esplora = (signals: Btcr2Signal[] = [signal], extra: Record<string, Route | Response> = {}) => {
+    const routes: Record<string, Route | Response> = { [`${BTCR2_ESPLORA}/blocks/tip/height`]: new Response(String(tip)) };
+    for (const a of beacons) routes[`${BTCR2_ESPLORA}/address/${a}/txs/chain?max_txs=${BTCR2_PAGE}`] = jsonResponse([]);
+    for (const s of signals) {
+      routes[`${BTCR2_ESPLORA}/address/${s.address}/txs/chain?max_txs=${BTCR2_PAGE}`] = jsonResponse([{
+        txid: s.txid,
+        status: { confirmed: true, block_height: s.blockHeight, block_hash: s.blockHash, block_time: s.blockTime },
+        vin: [{ txid: '11'.repeat(32), vout: 0, prevout: { scriptpubkey_address: s.address } }],
+        vout: [{ scriptpubkey: `6a20${s.signalBytes}`, value: 0 }],
+      }]);
+      routes[`${BTCR2_ESPLORA}/block/${s.blockHash}`] = jsonResponse({ id: s.blockHash, height: s.blockHeight, mediantime: s.mediantime });
+    }
+    return fakeFetch({ ...routes, ...extra });
+  };
+  return { did, k1, genesisDocument, update, signal, tip, esplora };
+}
+
+/** Resolves with the library alone. Each beacon address has no signal. */
+async function resolveOffline(did: string, options: { sidecar?: Sidecar }) {
+  const resolver = DidBtcr2.resolve(did, options);
+  for (let state = resolver.resolve(); ; state = resolver.resolve()) {
+    if (state.status === 'resolved') return state.result.didDocument as unknown as DidDocument & Btcr2DidDocument;
+    for (const need of state.needs) {
+      if (need.kind !== 'NeedBeaconSignals') throw new Error(`the offline resolver needs ${need.kind}`);
+      resolver.provide(need, new Map(need.beaconServices.map((s) => [s, []])));
+    }
+  }
 }

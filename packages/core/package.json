@@ -14,6 +14,7 @@
     "./did/web": "./src/did/drivers/web.ts",
     "./did/webvh": "./src/did/drivers/webvh.ts",
     "./did/plc": "./src/did/drivers/plc.ts",
+    "./did/btcr2": "./src/did/drivers/btcr2.ts",
     "./did/conformance": "./src/did/conformance.ts",
     "./trust": "./src/trust/index.ts",
     "./source": "./src/source/index.ts",
@@ -23,6 +24,8 @@
     "validate-npm-package-name": "8.0.0"
   },
   "dependencies": {
+    "@did-btcr2/bitcoin": "0.12.0",
+    "@did-btcr2/method": "0.75.1",
     "@enbox/dids": "0.1.14",
     "@ipld/dag-cbor": "10.0.1",
     "@noble/curves": "2.4.0",

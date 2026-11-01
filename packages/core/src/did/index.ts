@@ -1,6 +1,6 @@
 // DID resolution: DidResolver, the W3C error shapes, and the drivers that use no library (key, jwk).
-// The dht, web, webvh and plc drivers are separate entry points (@didpkg/core/did/dht, @didpkg/core/did/web,
-// @didpkg/core/did/webvh, @didpkg/core/did/plc), so that a user of this entry point does not load their libraries.
+// The other drivers are separate entry points: @didpkg/core/did/dht, /web, /webvh, /plc and /btcr2.
+// Thus a user of this entry point does not load their libraries.
 export { DidResolver, DID_TIMEOUT_MS, REPRESENTATIONS } from './resolver.ts';
 export type { DidResolverOptions } from './resolver.ts';
 export { DID_ERROR_NS, DID_ERROR_CODES, problem, failure, errorCode, fromLibraryResult, fromLibraryError } from './errors.ts';

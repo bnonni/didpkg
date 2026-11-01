@@ -2,14 +2,16 @@
 import { expect, test } from 'bun:test';
 import { DidJwk, DidKey } from '@enbox/dids';
 import { runDriverConformance } from '../../src/did/conformance.ts';
+import { btcr2Driver } from '../../src/did/drivers/btcr2.ts';
 import { dhtDriver } from '../../src/did/drivers/dht.ts';
 import { jwkDriver } from '../../src/did/drivers/jwk.ts';
 import { keyDriver } from '../../src/did/drivers/key.ts';
 import { plcDriver } from '../../src/did/drivers/plc.ts';
 import { webDriver } from '../../src/did/drivers/web.ts';
 import { webvhDriver } from '../../src/did/drivers/webvh.ts';
+import type { FetchLike } from '../../src/did/fetch.ts';
 import type { DidMethodDriver } from '../../src/did/types.ts';
-import { bytesResponse, dhtFixture, fakeFetch, jsonResponse, plcFixture, textResponse, webvhFixture } from './helpers.ts';
+import { btcr2Fixture, bytesResponse, dhtFixture, fakeFetch, jsonResponse, plcFixture, textResponse, webvhFixture } from './helpers.ts';
 import vectors from './vectors/plc.json' with { type: 'json' };
 
 test('did:key passes', async () => {
@@ -93,6 +95,26 @@ test('did:plc passes', async () => {
     invalid: ['did:plc:abc', legacy.toUpperCase().replace('DID:PLC:', 'did:plc:'), 'did:plc:ewvi7nxzyoun6zhxrhs64oi1'],
     notFound: ['did:plc:aaaaaaaaaaaaaaaaaaaaaaaa'],
     deactivated: [gone.did],
+  });
+  expect(fails).toEqual([]);
+});
+
+test('did:btcr2 passes', async () => {
+  const a = await btcr2Fixture();
+  const b = await btcr2Fixture();
+  const fetches = [a.esplora().fetch, b.esplora([]).fetch];
+  const fetch: FetchLike = async (url, init) => {
+    for (const f of fetches) {
+      const res = await f(url, init);
+      if (res.status !== 404) return res;
+    }
+    return new Response('not found', { status: 404 });
+  };
+  const sidecar = async (did: string) => (did === a.did ? { genesisDocument: a.genesisDocument, updates: [a.update] } : undefined);
+  const fails = await runDriverConformance(btcr2Driver({ fetch, sidecar }), {
+    valid: [a.did, b.k1],
+    invalid: ['did:btcr2:x1qqqq', a.did.slice(0, -1) + (a.did.endsWith('q') ? 'p' : 'q'), 'did:btcr2:' + a.did.slice(10).toUpperCase() + 'q'],
+    notFound: [b.did],
   });
   expect(fails).toEqual([]);
 });
