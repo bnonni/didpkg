@@ -8,6 +8,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertNoNativeAddon, PLUGINS } from './bundle.ts';
 import { RULE, thirdPartyLicenses } from './licenses.ts';
 import pkg from './package.json' with { type: 'json' };
 
@@ -49,8 +50,9 @@ try {
     const dir = join(stage, folder);
     mkdirSync(dir);
     const bin = join(dir, 'didpkg');
-    const r = await Bun.build({ entrypoints: ['src/cli.ts'], compile: { target: TARGETS[name], outfile: bin }, minify: true, metafile: true });
+    const r = await Bun.build({ entrypoints: ['src/cli.ts'], compile: { target: TARGETS[name], outfile: bin }, minify: true, metafile: true, plugins: PLUGINS });
     if (!r.success) throw new AggregateError(r.logs, `bun build failed for ${name}`);
+    assertNoNativeAddon(r.metafile!);
     copyFileSync(join(pkgDir, '../../LICENSE'), join(dir, 'LICENSE'));
     writeFileSync(join(dir, 'THIRD_PARTY_LICENSES.txt'), `${BUN}${RULE}${thirdPartyLicenses(r.metafile!, 'The didpkg program')}`);
     // On its own platform, the binary must run and print the package version.

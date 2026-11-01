@@ -4,6 +4,7 @@
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertNoNativeAddon, PLUGINS } from './bundle.ts';
 import { thirdPartyLicenses } from './licenses.ts';
 
 const pkgDir = fileURLToPath(new URL('.', import.meta.url));
@@ -11,8 +12,9 @@ const dist = join(pkgDir, 'dist');
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist);
 process.chdir(pkgDir); // the metafile paths are relative to the working folder
-const r = await Bun.build({ entrypoints: ['src/cli.ts'], target: 'node', outdir: dist, metafile: true });
+const r = await Bun.build({ entrypoints: ['src/cli.ts'], target: 'node', outdir: dist, metafile: true, plugins: PLUGINS });
 if (!r.success) throw new AggregateError(r.logs, 'bun build failed');
+assertNoNativeAddon(r.metafile!);
 
 // Bun copies the source shebang. npm runs the bin with the shebang, so it must name node.
 const cli = join(dist, 'cli.js');
