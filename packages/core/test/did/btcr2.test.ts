@@ -128,6 +128,20 @@ test('an empty cas list sends no CAS request', async () => {
   expect(calls.some((u) => u.includes('/ipfs/'))).toBe(false);
 });
 
+test('the default CAS gateways are tried in order', async () => {
+  const [, second] = CAS_GATEWAYS as [string, string];
+  const { fetch, calls } = f.esplora(undefined, {
+    [block(GATEWAY, genesisBytes)]: new Response('down', { status: 521 }),
+    [block(GATEWAY, updateBytes)]: new Response('down', { status: 521 }),
+    [block(second, genesisBytes)]: new Response(genesisBytes),
+    [block(second, updateBytes)]: new Response(updateBytes),
+  });
+  const r = await btcr2Driver({ fetch }).resolve(f.did, {}, ctx);
+  expect(r.didDocument?.id).toBe(f.did);
+  expect(CAS_GATEWAYS).toEqual(['https://trustless-gateway.link', 'https://ipfs.didpkg.dev']);
+  expect(calls.filter((u) => u.includes('/ipfs/')).slice(0, 2)).toEqual([block(GATEWAY, genesisBytes), block(second, genesisBytes)]);
+});
+
 test('a CAS gateway with HTTP 503 or a timeout gives a transient NOT_FOUND', async () => {
   const busy = await btcr2Driver({ fetch: f.esplora(undefined, { [block(GATEWAY, genesisBytes)]: new Response('busy', { status: 503 }) }).fetch }).resolve(f.did, {}, ctx);
   expect(code(busy)).toBe('NOT_FOUND');

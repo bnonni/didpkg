@@ -265,7 +265,7 @@ Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` pac
 |---|---|---|
 | `--port <n>` | `2092` | The port. `0` selects a free port. |
 | `--relay <url>` | `https://relay.pkarr.org`, `https://pkarr.pubky.org` | The Pkarr relays that resolve a did:dht DID. Repeatable. |
-| `--cas <url>` | `cas` of the [config file](#config-file), else `https://trustless-gateway.link` | The IPFS gateways ([Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/)) that give the genesis document and the update data of a did:btcr2 DID. The shim tries them in order. Repeatable. The options replace the `cas` list of the config file. |
+| `--cas <url>` | `cas` of the [config file](#config-file), else `https://trustless-gateway.link` and `https://ipfs.didpkg.dev` | The IPFS gateways ([Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/)) that give the genesis document and the update data of a did:btcr2 DID. The shim tries them in order. Repeatable. The options replace the `cas` list of the config file. |
 | `--sidecar <url>` | `sidecar` of the [config file](#config-file), else none | A mirror of did:btcr2 Sidecar Data. For a DID, the shim gets `<url>/<id>.sidecar.json`, where `<id>` is the DID without `did:btcr2:`. The shim tries the mirrors in order. Repeatable. The options replace the `sidecar` list of the config file. |
 | `--mode <mode>` | `enforce` | `warn` installs a package with a changed key or a changed release history, and writes a warning to the log. See [Pins](how-it-works.md#pins). |
 | `--allow-loopback` | Off | Read DIDs, DWNs and mirrors on a loopback host. Only for tests and the local demo. This option has no value. |
@@ -294,7 +294,7 @@ The shim reads `$DIDPKG_HOME/config.json` if the file exists. Each key is option
 
 | Key | Default | Use |
 |---|---|---|
-| `cas` | `["https://trustless-gateway.link"]` | The IPFS gateways for did:btcr2, in order. `--cas` replaces this list. An empty list (`[]`) turns IPFS off: then the shim resolves only a did:btcr2 DID that needs no data from IPFS. |
+| `cas` | `["https://trustless-gateway.link", "https://ipfs.didpkg.dev"]` | The IPFS gateways for did:btcr2, in order. `--cas` replaces this list. An empty list (`[]`) turns IPFS off: then the shim resolves only a did:btcr2 DID that needs no data from IPFS. |
 | `sidecar` | `[]` | The Sidecar Data mirrors for did:btcr2, in order. `--sidecar` replaces this list. See [did:btcr2 Sidecar Data](#didbtcr2-sidecar-data). |
 | `esplora` | `https://mempool.space/api` (`bitcoin`), `https://mempool.space/testnet/api` (`testnet3`), `https://mempool.space/testnet4/api` (`testnet4`), `https://mempool.space/signet/api` (`signet`), `https://mutinynet.com/api` (`mutinynet`) | The Esplora API for each Bitcoin network of did:btcr2. The keys are `bitcoin`, `testnet3`, `testnet4`, `signet`, `mutinynet` and `regtest`. A key replaces the default of its network. `regtest` has no default. |
 
@@ -302,7 +302,7 @@ Example:
 
 ```json
 {
-  "cas": ["https://ipfs.didpkg.dev", "https://trustless-gateway.link"],
+  "cas": ["https://ipfs.example.com", "https://trustless-gateway.link"],
   "esplora": { "testnet4": "https://esplora.example.com/testnet4/api" },
   "sidecar": ["https://pkgs.example.com/btcr2/"]
 }

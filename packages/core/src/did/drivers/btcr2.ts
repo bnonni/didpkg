@@ -27,8 +27,11 @@ export const ESPLORA: Readonly<Partial<Record<NetworkName, string>>> = {
 /** A page of address transactions is larger than a DID document. */
 const ESPLORA_MAX_BYTES = 1024 * 1024;
 
-/** The default CAS: the IPFS Trustless Gateway of @did-btcr2/api. */
-export const CAS_GATEWAYS: readonly string[] = ['https://trustless-gateway.link'];
+/**
+ * The default CAS, in order: the IPFS Trustless Gateway of @did-btcr2/api, then the gateway of the didpkg project.
+ * The second gateway gets a request only if the first one fails or does not have the block.
+ */
+export const CAS_GATEWAYS: readonly string[] = ['https://trustless-gateway.link', 'https://ipfs.didpkg.dev'];
 
 /** A gateway that does not have a block finds it in the IPFS network first. @did-btcr2/api uses the same limit. */
 const CAS_TIMEOUT_MS = 30_000;

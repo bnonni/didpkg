@@ -92,13 +92,19 @@ didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
 The command does no network write and makes no Bitcoin transaction. A did:btcr2 identity has no DWN, so publish with `--to dir:<path>` only. The DID is the hash of a Genesis Document. A resolver must have this document. Use one of these methods to give it:
 
 1. Sidecar Data. `didpkg publish --to dir:<path>` writes the file `<id>.sidecar.json` to the root of the folder. `<id>` is the DID without `did:btcr2:`. Push the folder (step 7). Each user of the package must start the shim with `--sidecar <URL of the folder>`, or put the URL in the `sidecar` list of the [config file](cli.md#config-file).
-2. CAS (IPFS). Put the file `btc.genesis.json` in IPFS as a raw block, and keep it pinned. The shim gets the block through an IPFS gateway (default: `trustless-gateway.link`). With Kubo:
+2. CAS (IPFS). Put the file `btc.genesis.json` in IPFS as a raw block, and keep it pinned. The shim gets the block through an IPFS gateway (default: `trustless-gateway.link`, then `ipfs.didpkg.dev`). With Kubo:
 
 ```sh
 ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ~/.config/didpkg/ids/btc.genesis.json
 ```
 
-The CID in the output must be the `cid` of the `id create` result. The did:btcr2 specification recommends one method for the life of the DID.
+The CID in the output must be the `cid` of the `id create` result. Other IPFS nodes must get the block from your node, so your node must accept connections on its swarm port (Kubo: 4001). Make sure that a public gateway gives the block:
+
+```sh
+curl -sf -H 'Accept: application/vnd.ipld.raw' 'https://trustless-gateway.link/ipfs/<cid>?format=raw' | sha256sum
+```
+
+The hash must be the SHA-256 of the genesis file. The did:btcr2 specification recommends one method for the life of the DID.
 
 ### One mirror for each publisher
 
