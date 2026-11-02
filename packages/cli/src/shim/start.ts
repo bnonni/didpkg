@@ -20,9 +20,8 @@ export const DEFAULT_PORT = 2092;
 /** Install uses a cached DID document for 7 days if the method fails. */
 export const STALE_IF_ERROR_MS = 7 * 24 * 60 * 60 * 1000;
 
-export interface StartShimOptions {
-  /** 0 selects a free port. Default: 2092. */
-  port?: number;
+/** The read side of the shim and of `didpkg drl`: the DID drivers and the storage adapters. */
+export interface ReadSideOptions {
   relays?: readonly string[];
   /** IPFS Trustless Gateway base URLs for did:btcr2. Default: CAS_GATEWAYS of the driver. */
   cas?: readonly string[];
@@ -32,13 +31,19 @@ export interface StartShimOptions {
   sidecar?: readonly string[];
   /** The config folder: the Sidecar Data of its identities, and a copy of each verified did:btcr2 resolve. Default: none. */
   home?: string;
-  mode?: PolicyMode;
   /** Read DWN and repository endpoints, DID documents and relays on a loopback host. Only for tests and a local demo. */
   allowLoopback?: boolean;
   log?: (line: string) => void;
 }
 
-export async function startShim(o: StartShimOptions = {}): Promise<{ url: string; stop: () => Promise<void> }> {
+export interface StartShimOptions extends ReadSideOptions {
+  /** 0 selects a free port. Default: 2092. */
+  port?: number;
+  mode?: PolicyMode;
+}
+
+/** One resolver with every DID driver, and one PackageSource with the DWN and the https adapters. */
+export function readSide(o: ReadSideOptions = {}): { resolver: DidResolver; source: PackageSource } {
   const loopback = o.allowLoopback ?? false;
   const sidecar = sidecarSource({ home: o.home, mirrors: o.sidecar, allowPrivateHosts: loopback, log: o.log });
   const btcr2 = btcr2Driver({ cas: o.cas, esplora: o.esplora, sidecar: sidecar.get, allowPrivateHosts: loopback });
@@ -62,6 +67,11 @@ export async function startShim(o: StartShimOptions = {}): Promise<{ url: string
     adapters: [dwnAdapter({ allowLoopback: loopback }), httpsAdapter({ allowLoopback: loopback })],
     log: o.log,
   });
+  return { resolver, source };
+}
+
+export async function startShim(o: StartShimOptions = {}): Promise<{ url: string; stop: () => Promise<void> }> {
+  const { resolver, source } = readSide(o);
   let port = 0;
   let handler: ((req: Request) => Promise<Response>) | undefined;
   const server = createServer((req, res) => {

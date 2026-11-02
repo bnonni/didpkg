@@ -125,6 +125,30 @@ http://127.0.0.1:2092/@didpkg/hello_web_bnonni.github.io_didpkg-demo/-/hello_web
 1. Start the shim on the same port before each install from the lockfile, also before `npm ci` in CI.
 2. The value `rec` is the digest of the signed release. If the publisher changes the signed release of that version, the shim refuses the tarball (`HISTORY_CHANGED`, 403).
 
+## One-off install with no shim
+
+`didpkg drl` verifies one version as the shim does. Then it prints the HTTPS URL of the signed tarball and its sha512:
+
+```sh
+didpkg drl @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
+```
+
+Install from the `url` value. The URL has `&`, so put it in single quotes:
+
+```sh
+npm install 
+```
+
+`pnpm add` and `bun add` take the same URL. The trade-off:
+
+1. npm checks no DID signature. The host of the URL can send other bytes to npm than to `didpkg drl`.
+2. Thus, after the install, compare the lockfile with the `integrity` value of `didpkg drl`. The two values must be equal. The lockfile value is `integrity` in `package-lock.json`, `resolution.integrity` in `pnpm-lock.yaml`, and the last item of the package line in `bun.lock`.
+3. Each install from the lockfile checks this sha512. Thus a later change of the bytes stops the install.
+4. The URL names one host. If that host is down, the install fails. The shim tries each endpoint of the DID document.
+5. The URL pins one version. No update, yank or deprecation notice gets to the project. For a new version, run `didpkg drl` again.
+
+The key in `dependencies` is the package name (`hello`), not the install name.
+
 ## Errors
 
 The shim answers npm with an HTTP status and a reason. npm shows the reason in its error line, and the shim log shows the same reason:

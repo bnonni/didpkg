@@ -73,6 +73,15 @@ test('canRead: a public https repository only, unless the loopback test option i
   expect(() => plain.reader(endpoint('http://127.0.0.1:8080/'), { fetch })).toThrow(TypeError);
 });
 
+test('copies: the same bytes as read, each with its layout URL; "+" is "%2B"', async () => {
+  const r = reader();
+  const out: [string, string][] = [];
+  for await (const c of r.copies!({ kind: 'tarball', name: 'hello', version: '1.0.0+b.1' }, { signal: AbortSignal.timeout(2000), maxBytes: 1 << 20 })) {
+    out.push([new TextDecoder().decode(c.bytes), c.url]);
+  }
+  expect(out).toEqual([['build', `${server!.base}hello/1.0.0%2Bb.1.tgz`]]);
+});
+
 test('read: the exact stored bytes of each file, relative to the base path', async () => {
   const r = reader();
   expect(await copies(r, { kind: 'index', name: 'hello' })).toEqual([bytes('{"i":1}')]);

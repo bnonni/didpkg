@@ -25,6 +25,13 @@ export interface ReadOptions {
   maxBytes: number;
 }
 
+/** One stored copy, and the plain HTTPS URL that gives these bytes to an anonymous GET. */
+export interface StoredCopy {
+  bytes: Uint8Array;
+  /** For a DWN: a DRL. For a static mirror: the layout URL. */
+  url: string;
+}
+
 /** The read side of one endpoint. Anonymous: no keys and no credentials. */
 export interface StorageReader {
   /**
@@ -33,6 +40,8 @@ export interface StorageReader {
    * nothing. If the endpoint fails (network, HTTP status, size limit), throw.
    */
   read(file: StoredFile, options: ReadOptions): AsyncIterable<Uint8Array>;
+  /** Optional. The same copies as `read`, in the same order, each with its URL. */
+  copies?(file: StoredFile, options: ReadOptions): AsyncIterable<StoredCopy>;
 }
 
 export interface StorageAdapter {

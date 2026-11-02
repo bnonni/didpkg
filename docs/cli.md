@@ -290,7 +290,7 @@ The mirrors come before the copy, so an old copy does not hide a new update. The
 
 ### Config file
 
-The shim reads `$DIDPKG_HOME/config.json` if the file exists. Each key is optional:
+The shim and `didpkg drl` read `$DIDPKG_HOME/config.json` if the file exists. Each key is optional:
 
 | Key | Default | Use |
 |---|---|---|
@@ -309,6 +309,36 @@ Example:
 ```
 
 An unknown key or a bad value stops the shim before it starts, with exit code 1.
+
+## didpkg drl
+
+```text
+didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--allow-loopback]
+```
+
+Does the checks of the shim for one version. Then it prints the plain HTTPS URL of the signed tarball. npm, pnpm and bun can install the package from this URL with no shim and no `.npmrc` line. For the trade-off, read [Quickstart](quickstart.md#one-off-install-with-no-shim).
+
+If you give no version, the command uses the `latest` dist-tag of the signed index. The options and the [config file](#config-file) are the same as for [didpkg shim start](#didpkg-shim-start).
+
+The URL comes from the first endpoint that gives the signed tarball. The DWN endpoints come first:
+
+- For a DWN, the URL is a DRL (Decentralized Resource Locator): `<dwn>/<did>/read/protocols/<protocol>/package/release/tarball?filter.contextId=<id>&filter.tags.version=<version>`. `<protocol>` is the base64url form of `https://didpkg.dev/protocols/repository/v1`. `<id>` is the `contextId` of the package record.
+- For a static mirror, the URL is `<repo>/<name>/<version>.tgz`.
+
+The command prints JSON to stdout:
+
+```json
+{
+  "did": "did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy",
+  "name": "hello",
+  "version": "1.0.0",
+  "url": "https://dwn.didpkg.dev/did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy/read/protocols/aHR0cHM6Ly9kaWRwa2cuZGV2L3Byb3RvY29scy9yZXBvc2l0b3J5L3Yx/package/release/tarball?filter.contextId=bafyreibi24qfiffofl2nr6klm4zi4v4wylfrjfr2ru6f5h6mljd45z7zp4&filter.tags.version=1.0.0",
+  "endpoint": "did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy#dwn",
+  "integrity": "sha512-qa1JOuvzD6wPtfFBewB39/tlS3lMXHaiPukx1gT/9dkX+znRN2ZtZJsZkRw/4M5WjR5kG8BHx/gwkfsvmdTxkQ=="
+}
+```
+
+`endpoint` is the service of the DID document that gave the tarball. `integrity` is the sha512 of the signed release. Each policy warning goes to stderr. If a check fails, the command stops with exit code 1. The error gives the code of the check, for example `YANKED` or `INTEGRITY`. Thus a yanked version gives no URL.
 
 ## didpkg --help
 

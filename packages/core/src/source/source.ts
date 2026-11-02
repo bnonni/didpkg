@@ -9,6 +9,13 @@ import type { ReleaseReader } from '../trust/verify.ts';
 import { storageEndpoints } from './endpoints.ts';
 import type { Endpoint, StorageAdapter, StorageReader, StoredFile } from './types.ts';
 
+/** The signed tarball bytes, the endpoint that gave them, and their URL if the adapter gives URLs. */
+export interface FoundTarball {
+  bytes: Uint8Array;
+  endpoint: Endpoint;
+  url?: string;
+}
+
 /** The DWN protocol `$size` limits (ADR 0003). */
 export const MAX_JSON_BYTES = 256 * 1024;
 export const MAX_TARBALL_BYTES = 64 * 1024 * 1024;
@@ -65,6 +72,10 @@ function check(name: string, version?: string) {
   if (version !== undefined && !SEMVER.test(version)) throw new TypeError(`bad version: ${version}`);
 }
 
+async function* bytesOnly(copies: AsyncIterable<Uint8Array>): AsyncGenerator<{ bytes: Uint8Array; url?: string }> {
+  for await (const bytes of copies) yield { bytes };
+}
+
 export class PackageSource implements ReleaseReader {
   readonly #o: PackageSourceOptions;
   /** The release bytes per did, name, version and signed digest, the oldest first. */
@@ -88,7 +99,7 @@ export class PackageSource implements ReleaseReader {
       const values: unknown[] = [];
       let failed = false;
       try {
-        for await (const bytes of this.#read(b, file, MAX_JSON_BYTES, this.#o.jsonTimeoutMs ?? JSON_TIMEOUT_MS)) {
+        for await (const { bytes } of this.#read(b, file, MAX_JSON_BYTES, this.#o.jsonTimeoutMs ?? JSON_TIMEOUT_MS)) {
           const json = parseJson(bytes);
           if (json) {
             values.push(json.value);
@@ -141,18 +152,25 @@ export class PackageSource implements ReleaseReader {
 
   /** The first tarball copy, in endpoint order, with the size and the sha512 in the signed release. */
   async getTarball(did: string, name: string, version: string, dist: { integrity: string; size: number }): Promise<Uint8Array | null> {
-    check(name, version);
-    return this.#first(did, { kind: 'tarball', name, version }, MAX_TARBALL_BYTES, this.#o.tarballTimeoutMs ?? TARBALL_TIMEOUT_MS, async (bytes) =>
-      bytes.length === dist.size && (await sri('sha512', bytes)) === dist.integrity ? bytes : undefined);
+    return (await this.findTarball(did, name, version, dist))?.bytes ?? null;
   }
 
-  async #first<T>(did: string, file: StoredFile, maxBytes: number, timeoutMs: number, match: (bytes: Uint8Array) => Promise<T | undefined>): Promise<T | null> {
+  /** As getTarball, and also the endpoint and the URL of the copy (`didpkg drl`). */
+  async findTarball(did: string, name: string, version: string, dist: { integrity: string; size: number }): Promise<FoundTarball | null> {
+    check(name, version);
+    return this.#first(did, { kind: 'tarball', name, version }, MAX_TARBALL_BYTES, this.#o.tarballTimeoutMs ?? TARBALL_TIMEOUT_MS, async (bytes, b, url) =>
+      bytes.length === dist.size && (await sri('sha512', bytes)) === dist.integrity ? { bytes, endpoint: b.endpoint, url } : undefined);
+  }
+
+  async #first<T>(
+    did: string, file: StoredFile, maxBytes: number, timeoutMs: number, match: (bytes: Uint8Array, b: Bound, url?: string) => Promise<T | undefined>,
+  ): Promise<T | null> {
     let failed = false;
     let mismatch = false;
     for (const b of await this.#bound(did)) {
       try {
-        for await (const bytes of this.#read(b, file, maxBytes, timeoutMs)) {
-          const value = await match(bytes);
+        for await (const { bytes, url } of this.#read(b, file, maxBytes, timeoutMs)) {
+          const value = await match(bytes, b, url);
           if (value !== undefined) return value;
           mismatch = true;
           this.#log(b, file, 'the copy is not the signed copy, try the next copy');
@@ -167,11 +185,13 @@ export class PackageSource implements ReleaseReader {
     return null;
   }
 
-  // The size check here does not trust the adapter to stop at maxBytes.
-  async *#read(b: Bound, file: StoredFile, maxBytes: number, timeoutMs: number): AsyncGenerator<Uint8Array> {
-    for await (const bytes of b.reader.read(file, { signal: AbortSignal.timeout(timeoutMs), maxBytes })) {
-      if (bytes.length > maxBytes) throw new Error(`a copy is larger than ${maxBytes} bytes`);
-      yield bytes;
+  // The size check here does not trust the adapter to stop at maxBytes. An adapter with no `copies` gives no URL.
+  async *#read(b: Bound, file: StoredFile, maxBytes: number, timeoutMs: number): AsyncGenerator<{ bytes: Uint8Array; url?: string }> {
+    const options = { signal: AbortSignal.timeout(timeoutMs), maxBytes };
+    const copies = b.reader.copies ? b.reader.copies(file, options) : bytesOnly(b.reader.read(file, options));
+    for await (const copy of copies) {
+      if (copy.bytes.length > maxBytes) throw new Error(`a copy is larger than ${maxBytes} bytes`);
+      yield copy;
     }
   }
 

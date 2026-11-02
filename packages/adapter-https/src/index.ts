@@ -2,7 +2,7 @@
 // sections 3 and 7). Only https and no private address, with the limits of did/fetch.ts. Safe in a browser.
 import { fetchBytes, isPrivateHost } from '@didpkg/core/did';
 import { REPOSITORY_SERVICE_TYPE } from '@didpkg/core/source';
-import type { Endpoint, ReadOptions, StorageAdapter, StorageReader, StoredFile } from '@didpkg/core/source';
+import type { Endpoint, ReadOptions, StorageAdapter, StorageReader, StoredCopy, StoredFile } from '@didpkg/core/source';
 import { layoutPath } from './layout.ts';
 
 export { layoutPath } from './layout.ts';
@@ -41,9 +41,13 @@ class HttpsReader implements StorageReader {
     this.#fetch = f;
   }
 
+  async *read(file: StoredFile, options: ReadOptions): AsyncGenerator<Uint8Array> {
+    for await (const copy of this.copies(file, options)) yield copy.bytes;
+  }
+
   // A static mirror has 0 or 1 copies. Only 404 and 410 mean "absent". Each other status is a failed
   // endpoint, so a broken mirror cannot make a published file look absent (ADR 0003 section 5).
-  async *read(file: StoredFile, { signal, maxBytes }: ReadOptions): AsyncGenerator<Uint8Array> {
+  async *copies(file: StoredFile, { signal, maxBytes }: ReadOptions): AsyncGenerator<StoredCopy> {
     // encodeURIComponent changes only "+" (SemVer build metadata) to "%2B". Some hosts read a literal "+" as a space.
     const url = new URL(layoutPath(file).map(encodeURIComponent).join('/'), this.#base);
     // fetchBytes allows a redirect only to the same host and protocol, so a loopback endpoint stays loopback.
@@ -53,6 +57,6 @@ class HttpsReader implements StorageReader {
     });
     if (status === 404 || status === 410) return;
     if (status !== 200) throw new Error(`${url.host}: HTTP ${status}`);
-    yield body;
+    yield { bytes: body, url: url.href };
   }
 }

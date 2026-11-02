@@ -5,6 +5,7 @@
 - Deciders: bnonni
 - Code: `packages/core/src/source/`, the `ReleaseReader` change and `checkRelease` in `packages/core/src/trust/verify.ts`. Tests: `packages/core/test/source/`.
 - Amended: 2026-10-27, section 8 (the npm packument); section 7 items 1-5 (the static HTTPS adapter); section 6 items 5-9 (the DWN writer); section 5 item 4 and section 6 items 10-13 (the DWN reader and the caches). Code: `packages/adapter-https/`, `packages/adapter-dwn/`.
+- Amended: 2026-11-02, section 3 item 8 (`copies`, the URL of a stored copy, for `didpkg drl`).
 
 ## Context
 
@@ -42,6 +43,7 @@ type StoredFile = { kind: 'index'; name } | { kind: 'release'; name; version } |
 
 interface StorageReader {        // one endpoint, anonymous, no keys
   read(file: StoredFile, options: { signal: AbortSignal; maxBytes: number }): AsyncIterable<Uint8Array>;
+  copies?(file: StoredFile, options: { signal: AbortSignal; maxBytes: number }): AsyncIterable<{ bytes: Uint8Array; url: string }>;
 }
 interface StorageAdapter {
   readonly kind: string;
@@ -61,6 +63,7 @@ interface StorageWriter {
 5. `writeIndex` does each status change (yank, deprecate, revoke) and each dist-tag change.
 6. Each adapter package exports its own writer constructor, because the credentials differ (a DWN signing key, a folder path). Core has no writer factory.
 7. A reader must refuse a private network address, unless a test option allows the loopback address. The adapters use `isPrivateHost` from `did/`.
+8. A reader can also have `copies`. It yields the same copies as `read`, in the same order, each with the URL that gives these bytes to an anonymous GET. For a DWN, the URL is the DRL of the record. For a static mirror, it is the layout URL. `PackageSource.findTarball` gives the URL of the signed tarball copy, and `didpkg drl` prints it. A reader with no `copies` gives no URL.
 
 ### 4. Endpoint selection
 

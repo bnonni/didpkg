@@ -42,6 +42,9 @@ const ERRORS: [string, string[], string][] = [
   ['parse: zero mask', ['parse', '@didpkg/hello_web.a_nonni.org'], 'E_MASK'],
   ['parse: legacy tilde', ['parse', '@didpkg/hello~web~nonni.org'], 'E_SHAPE'],
   ['parse: short hash', ['parse', '@didpkg/hello__abc'], 'E_HASH'],
+  ['drl: no argument', ['drl'], '"drl" needs 1 argument'],
+  ['drl: unknown option', ['drl', '@didpkg/hello_web_nonni.org', '--port', '2092'], 'unknown option --port'],
+  ['drl: other scope', ['drl', '@other/hello_web_nonni.org@1.0.0'], 'E_SCOPE'],
 ];
 
 describe('CLI on bun', () => {

@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { sidecarFile } from '@didpkg/core/did/btcr2';
 import { format, parse, GrammarError } from '@didpkg/core/name';
 import { readConfig } from './config.ts';
+import { drl } from './drl.ts';
 import { createBtcr2, network } from './id/btcr2.ts';
 import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
@@ -14,7 +15,7 @@ import { configDir, idPaths, readIdentity } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
 import { createWebvh, logUrl } from './id/webvh.ts';
 import { publish } from './publish/publish.ts';
-import { startShim } from './shim/start.ts';
+import { startShim, readSide, type ReadSideOptions } from './shim/start.ts';
 import pkg from '../package.json' with { type: 'json' };
 
 const VERSION: string = pkg.version;
@@ -42,6 +43,8 @@ Usage:
                                   Sign an npm pack tarball with #didpkg-1 and write it to each target
   didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--mode enforce|warn] [--allow-loopback]
                                   Serve verified @didpkg packages to npm on 127.0.0.1 (default port 2092)
+  didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--allow-loopback]
+                                  Verify one version as the shim does, then print the tarball URL and the signed sha512
   didpkg --help                   Print this help
   didpkg --version                Print the version
 
@@ -59,12 +62,13 @@ Examples:
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
   didpkg shim start --cas https://ipfs.didpkg.dev
   didpkg shim start --sidecar https://pkgs.example.com/btcr2/
+  didpkg drl @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht, did:webvh, did:plc and did:btcr2),
 else from the terminal. The shim reads $DIDPKG_HOME/config.json if it exists: the IPFS gateways ("cas"), the Esplora
-APIs ("esplora") and the Sidecar Data mirrors ("sidecar") for did:btcr2. The --cas and --sidecar options replace the
-lists of the file.
+APIs ("esplora") and the Sidecar Data mirrors ("sidecar") for did:btcr2. The shim and "drl" read it. The --cas and
+--sidecar options replace the lists of the file.
 
 The grammar is draft 1 and can change before 1.0. See
 https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md
@@ -242,6 +246,22 @@ async function publishCommand(args: string[]): Promise<string> {
   return `${JSON.stringify(r, null, 2)}\n`;
 }
 
+/** The read side of "shim start" and "drl": the options first, else config.json. Each log line goes to stderr. */
+function readOptions(values: Record<string, string[]>, allowLoopback: boolean): ReadSideOptions {
+  const cas = values['--cas']!.map((u) => endpoint(u, '--cas'));
+  const sidecar = values['--sidecar']!.map((u) => endpoint(u, '--sidecar'));
+  const config = readConfig();
+  return {
+    allowLoopback,
+    relays: values['--relay']!.map((r) => endpoint(r, 'relay')),
+    cas: cas.length ? cas : config.cas,
+    esplora: config.esplora,
+    sidecar: sidecar.length ? sidecar : config.sidecar,
+    home: configDir(),
+    log: (line) => process.stderr.write(`${line}\n`),
+  };
+}
+
 /** Runs until SIGINT or SIGTERM. Prints the shim URL as JSON on stdout, and one line per request on stderr. */
 async function shimCommand(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
@@ -254,20 +274,20 @@ async function shimCommand(args: string[]): Promise<string> {
   if (!/^\d{1,5}$/.test(port) || Number(port) > 65535) throw new UsageError(`--port: ${port} is not a port`);
   const mode = values['--mode']![0] ?? 'enforce';
   if (mode !== 'enforce' && mode !== 'warn') throw new UsageError(`--mode: ${mode} is not enforce or warn`);
-  const cas = values['--cas']!.map((u) => endpoint(u, '--cas'));
-  const sidecar = values['--sidecar']!.map((u) => endpoint(u, '--sidecar'));
-  const config = readConfig();
-  const shim = await startShim({
-    port: Number(port), mode, allowLoopback: loopback,
-    relays: values['--relay']!.map((r) => endpoint(r, 'relay')),
-    cas: cas.length ? cas : config.cas,
-    esplora: config.esplora,
-    sidecar: sidecar.length ? sidecar : config.sidecar,
-    home: configDir(),
-    log: (line) => process.stderr.write(`${line}\n`),
-  });
+  const shim = await startShim({ port: Number(port), mode, ...readOptions(values, loopback) });
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void shim.stop().then(() => process.exit(0)));
   return `${JSON.stringify({ url: shim.url, npmrc: `@didpkg:registry=${shim.url}/` })}\n`;
+}
+
+/** Prints the tarball URL and the signed sha512 as JSON on stdout, and each warning on stderr. */
+async function drlCommand(args: string[]): Promise<string> {
+  const loopback = args.includes('--allow-loopback');
+  const { positional, values } = options(args.filter((a) => a !== '--allow-loopback'), ['--relay', '--cas', '--sidecar']);
+  if (positional.length !== 1) throw new UsageError(`"drl" needs 1 argument: <install-name>[@<version>] (got ${positional.length})`);
+  const o = readOptions(values, loopback);
+  const { warnings, ...out } = await drl({ spec: positional[0]!, ...readSide(o) });
+  for (const w of warnings) o.log!(`warn ${w.code}: ${w.message}`);
+  return `${JSON.stringify(out, null, 2)}\n`;
 }
 
 async function run(argv: string[]): Promise<string> {
@@ -296,6 +316,8 @@ async function run(argv: string[]): Promise<string> {
       return publishCommand(args);
     case 'shim':
       return shimCommand(args);
+    case 'drl':
+      return drlCommand(args);
     default:
       throw new UsageError(`unknown command ${JSON.stringify(cmd)}`);
   }

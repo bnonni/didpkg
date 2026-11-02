@@ -89,16 +89,8 @@ export function shimHandler(o: ShimOptions): (req: Request) => Promise<Response>
       const v = await verifyRelease({ ...opts, version: r.version, exactPin: rec !== null });
       const digest = v.index.releases[r.version]!.digest;
       if (rec !== null && rec !== digest) throw new PolicyError('HISTORY_CHANGED', 'the release in the lockfile is not the signed release');
-      let packed: { name: string; version: string };
-      try {
-        packed = readTarball(v.tarball);
-      } catch (e) {
-        throw new HttpError(403, `the signed tarball is not an npm pack tarball: ${(e as Error).message}`);
-      }
-      // `didpkg publish` signs the `npm pack` tarball of the package name, so package.json has `name`, not the install name.
-      if (packed.name !== name || packed.version !== r.version) {
-        throw new HttpError(403, `the tarball package.json is ${packed.name}@${packed.version}, not ${name}@${r.version}`);
-      }
+      const bad = packedError(v.tarball, name, r.version);
+      if (bad) throw new HttpError(403, bad);
       for (const w of v.warnings) log(`  warn ${w.code}: ${w.message}`);
       log(`${line} 200`);
       return new Response(v.tarball, { headers: { 'content-type': 'application/octet-stream' } });
@@ -108,6 +100,21 @@ export function shimHandler(o: ShimOptions): (req: Request) => Promise<Response>
       return json(status, { error: message });
     }
   };
+}
+
+/**
+ * The error text if the signed tarball is not the `npm pack` tarball of `name@version`. `didpkg publish`
+ * signs the `npm pack` tarball of the package name, so package.json has `name`, not the install name.
+ */
+export function packedError(tarball: Uint8Array, name: string, version: string): string | undefined {
+  let packed: { name: string; version: string };
+  try {
+    packed = readTarball(tarball);
+  } catch (e) {
+    return `the signed tarball is not an npm pack tarball: ${(e as Error).message}`;
+  }
+  if (packed.name !== name || packed.version !== version) return `the tarball package.json is ${packed.name}@${packed.version}, not ${name}@${version}`;
+  return undefined;
 }
 
 /** The HTTP result of an error. A defect (not a PolicyError, SourceError or HttpError) gives 500. */

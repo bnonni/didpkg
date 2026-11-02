@@ -2,7 +2,7 @@
 // no DWN SDK, no keys. Safe in a browser. The DWN is untrusted storage: core checks every byte.
 import { fetchBytes, isPrivateHost } from '@didpkg/core/did';
 import { DWN_SERVICE_TYPE } from '@didpkg/core/source';
-import type { Endpoint, ReadOptions, StorageAdapter, StorageReader, StoredFile } from '@didpkg/core/source';
+import type { Endpoint, ReadOptions, StorageAdapter, StorageReader, StoredCopy, StoredFile } from '@didpkg/core/source';
 import { DIDPKG_PROTOCOL } from './protocol.ts';
 
 /** A query reply holds the package records of one name. */
@@ -100,7 +100,7 @@ interface Shared {
   contextTtlMs: number;
   indexTtlMs: number;
   contexts: TtlCache<string[]>;
-  indexes: TtlCache<Uint8Array[]>;
+  indexes: TtlCache<StoredCopy[]>;
   limit: RateLimit;
 }
 
@@ -146,9 +146,14 @@ class DwnReader implements StorageReader {
     this.#shared = shared;
   }
 
+  async *read(file: StoredFile, options: ReadOptions): AsyncGenerator<Uint8Array> {
+    for await (const copy of this.copies(file, options)) yield copy.bytes;
+  }
+
   // A DRL read gives the newest published record that matches. Thus one copy per package contextId
   // (ADR 0003 section 6 item 3). `filter.contextId` is a subtree match, so a nested record needs one request.
-  async *read(file: StoredFile, { signal, maxBytes }: ReadOptions): AsyncGenerator<Uint8Array> {
+  // The URL of a copy is its DRL: an anonymous GET of it gives the same bytes.
+  async *copies(file: StoredFile, { signal, maxBytes }: ReadOptions): AsyncGenerator<StoredCopy> {
     if (file.kind === 'index') {
       yield* await this.#shared.indexes.get(`${this.#tenant.href}\n${file.name}`, this.#shared.indexTtlMs, async () => {
         const contexts = await this.#contexts(file.name, signal);
@@ -159,8 +164,8 @@ class DwnReader implements StorageReader {
     }
     const path = file.kind === 'release' ? 'package/release' : 'package/release/tarball';
     for (const c of await this.#contexts(file.name, signal)) {
-      const bytes = await this.#read(path, { 'filter.contextId': c, 'filter.tags.version': file.version }, signal, maxBytes);
-      if (bytes) yield bytes;
+      const copy = await this.#read(path, { 'filter.contextId': c, 'filter.tags.version': file.version }, signal, maxBytes);
+      if (copy) yield copy;
     }
   }
 
@@ -182,19 +187,21 @@ class DwnReader implements StorageReader {
     }, (ids) => ids.length > 0);
   }
 
-  /** The bytes of one record, or null if absent. Only 404 means absent (ADR 0003 section 5). */
-  async #read(path: string, params: Record<string, string>, signal: AbortSignal, maxBytes: number): Promise<Uint8Array | null> {
-    const { status, body } = await this.#get(`read/protocols/${PROTOCOL_PATH}/${path}?${qs(params)}`, signal, maxBytes);
+  /** One record and its DRL, or null if absent. Only 404 means absent (ADR 0003 section 5). */
+  async #read(path: string, params: Record<string, string>, signal: AbortSignal, maxBytes: number): Promise<StoredCopy | null> {
+    const { drl, status, body } = await this.#get(`read/protocols/${PROTOCOL_PATH}/${path}?${qs(params)}`, signal, maxBytes);
     if (status === 404) return null;
     if (status !== 200) throw new Error(`${this.#tenant.host}: HTTP ${status}`);
-    return body;
+    return { bytes: body, url: drl };
   }
 
   // PackageSource sets the time limit with the signal, so no own timer. fetchBytes allows a redirect
-  // only to the same host and protocol, so a loopback endpoint stays loopback.
+  // only to the same host and protocol, so a loopback endpoint stays loopback. `drl` is the request URL,
+  // not the URL after a redirect.
   async #get(route: string, signal: AbortSignal, maxBytes: number) {
     const url = new URL(route, this.#tenant);
     await this.#shared.limit.wait(url.origin, signal);
-    return fetchBytes(url.href, { fetch: this.#fetch, signal, timeoutMs: Infinity, maxBytes, allowPrivateHosts: isLoopback(url.hostname) });
+    const r = await fetchBytes(url.href, { fetch: this.#fetch, signal, timeoutMs: Infinity, maxBytes, allowPrivateHosts: isLoopback(url.hostname) });
+    return { ...r, drl: url.href };
   }
 }

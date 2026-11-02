@@ -21,6 +21,8 @@ class Host {
   /** Fail only the reads of this file. */
   failOn?: string;
   hang = false;
+  /** The reader also has `copies`, with the URL <endpoint>/<file>/<copy number>. */
+  urls = false;
   reads: { file: string; maxBytes: number }[] = [];
 
   /** The same signed bytes as the publisher store, as every adapter stores them. */
@@ -37,15 +39,20 @@ class Host {
 const adapter = (hosts: Record<string, Host>): StorageAdapter => ({
   kind: 'fake',
   canRead: (e) => e.url.startsWith('fake://'),
-  reader: (e) => ({
-    async *read(file: StoredFile, o: ReadOptions) {
+  reader: (e) => {
+    async function* read(file: StoredFile, o: ReadOptions) {
       const host = hosts[e.url]!;
       host.reads.push({ file: fileKey(file), maxBytes: o.maxBytes });
       if (host.hang) await new Promise((_, reject) => o.signal.addEventListener('abort', () => reject(o.signal.reason)));
       if (host.fail && (!host.failOn || host.failOn === fileKey(file))) throw new Error(host.fail);
       yield* host.files.get(fileKey(file)) ?? [];
-    },
-  }),
+    }
+    async function* copies(file: StoredFile, o: ReadOptions) {
+      let n = 0;
+      for await (const bytes of read(file, o)) yield { bytes, url: `${e.url}/${fileKey(file)}/${n++}` };
+    }
+    return hosts[e.url]!.urls ? { read, copies } : { read };
+  },
 });
 
 let key: Key;
@@ -161,6 +168,23 @@ test('a swapped release or tarball on the first endpoint: the next endpoint give
   const r = await make({ 'fake://dwn': dwn, 'fake://m1/': Host.from(mem) }).release();
   expect(text(r.tarball)).toBe('fake-tgz:1.0.0');
   expect(r.release.npm).toEqual({ dependencies: {}, hasInstallScript: false });
+});
+
+test('findTarball: the first signed copy, its endpoint, and its URL if the reader gives URLs', async () => {
+  const dwn = Host.from(mem);
+  dwn.urls = true;
+  dwn.files.set('1.0.0.tarball', [tgz('swapped'), dwn.files.get('1.0.0.tarball')![0]!]);
+  const { source, release } = make({ 'fake://dwn': dwn, 'fake://m1/': Host.from(mem) });
+  const { dist } = (await release()).release;
+  const found = await source.findTarball(DID, NAME, '1.0.0', dist);
+  expect(text(found!.bytes)).toBe('fake-tgz:1.0.0');
+  expect(found!.url).toBe('fake://dwn/1.0.0.tarball/1');
+  expect(found!.endpoint.serviceId).toBe(`${DID}#dwn`);
+  // A reader with no `copies`: the bytes and the endpoint, but no URL.
+  const plain = await make({ 'fake://m1/': Host.from(mem) }).source.findTarball(DID, NAME, '1.0.0', dist);
+  expect(text(plain!.bytes)).toBe('fake-tgz:1.0.0');
+  expect(plain!.endpoint.url).toBe('fake://m1/');
+  expect(plain!.url).toBeUndefined();
 });
 
 test('if every copy is swapped, the result is MISMATCH (502) and no bytes reach the verifier', async () => {

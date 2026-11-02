@@ -98,6 +98,20 @@ test('an install from the DWN through PackageSource and the verifier: 4 requests
   expect(routes).toEqual(['package/release/tarball']);
 });
 
+test('findTarball gives the DRL of the tarball; an anonymous GET of the DRL gives the signed bytes', async () => {
+  const source = new PackageSource({ resolver, adapters: [dwnAdapter({ allowLoopback: true })] });
+  const { release } = await verifyRelease({ did: fx.did, name: NAME, version: '1.0.0', resolver, reader: source, trust: new Map<string, Pin>() });
+  const found = (await source.findTarball(fx.did, NAME, '1.0.0', release.dist))!;
+  const url = new URL(found.url!);
+  // The base64url of the protocol URI.
+  expect(`${url.origin}${url.pathname}`).toBe(`${dwn.url}/${fx.did}/read/protocols/aHR0cHM6Ly9kaWRwa2cuZGV2L3Byb3RvY29scy9yZXBvc2l0b3J5L3Yx/package/release/tarball`);
+  expect([...url.searchParams.keys()]).toEqual(['filter.contextId', 'filter.tags.version']);
+  expect(url.searchParams.get('filter.tags.version')).toBe('1.0.0');
+  const r = await fetch(found.url!);
+  expect(r.status).toBe(200);
+  expect(new Uint8Array(await r.arrayBuffer())).toEqual(new Uint8Array(v10.tarball));
+});
+
 test('a packument reads each listed release one time; a second packument sends no request', async () => {
   const { fetch, routes } = counted();
   const source = new PackageSource({ resolver, adapters: [dwnAdapter({ allowLoopback: true })], fetch });
