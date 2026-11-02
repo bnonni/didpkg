@@ -33,7 +33,7 @@ echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
 npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
-The install name holds the package name, the DID method and the DID. The demo has the package `hello` from 4 publishers:
+The install name holds the package name, the DID method and the DID. The demo has the package `hello` from 5 publishers:
 
 | DID method | Install name |
 |---|---|
@@ -41,6 +41,7 @@ The install name holds the package name, the DID method and the DID. The demo ha
 | did:web | `@didpkg/hello_web_bnonni.github.io_didpkg-demo` |
 | did:webvh | `@didpkg/hello_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs` |
 | did:plc | `@didpkg/hello_plc_3zo7womke3qzjadke2q4lukr` |
+| did:btcr2 | `@didpkg/hello_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6` |
 
 The [quickstart](docs/quickstart.md) gives each step and the HTTP errors.
 
@@ -100,17 +101,18 @@ The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dw
 npm run stack
 ```
 
-The live demo has 4 publishers. Each publisher publishes `hello@1.0.0`:
+The live demo has 5 publishers. Each publisher publishes `hello@1.0.0`:
 
 - `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` publishes to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)).
 - `did:web:bnonni.github.io:didpkg-demo` publishes to `dwn.didpkg.dev` and to the `web/` folder of the same mirror.
 - `did:webvh:QmYpG6W1WsQVeXs8eJ2z4NMAaRFr4EkUe3vyKJMMdHxUiJ:nonni.org:pkgs` publishes only to a static mirror at `https://nonni.org/pkgs/`.
 - `did:plc:3zo7womke3qzjadke2q4lukr` publishes only to a static mirror at `https://nonni.org/pkgs/plc/`.
+- `did:btcr2:x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6` publishes only to a static mirror at `https://nonni.org/pkgs/btcr2/`. Its genesis document is a raw block in IPFS.
 
-This command starts a shim with the public Pkarr relays. Then it installs the 4 packages with npm, pnpm and bun:
+This command starts a shim with the public Pkarr relays. Then it installs the 5 packages with npm, pnpm and bun:
 
 ```sh
-npm run live -- @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo @didpkg/hello_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_plc_3zo7womke3qzjadke2q4lukr
+npm run live -- @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo @didpkg/hello_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_plc_3zo7womke3qzjadke2q4lukr @didpkg/hello_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6
 ```
 
 ## Old drpm code
