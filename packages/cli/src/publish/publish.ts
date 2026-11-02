@@ -5,9 +5,11 @@
 //    that its own key signed. If one read fails, it signs and writes nothing, because an old head gives
 //    two indexes with one sequence.
 // 4. It signs a release and the next index, or uses the signed copies again. Thus a failed publish can run again.
-// 5. Each target gets the same bytes: the DWN first, then each folder.
+// 5. Each target gets the same bytes: the DWN first, then each folder. A did:btcr2 publisher also writes its Sidecar Data
+//    to each folder, as `<method-specific id>.sidecar.json`. A shim with that folder URL in `--sidecar` reads it.
 import { base64urlnopad } from '@scure/base';
 import type { DidDocument } from '@didpkg/core/did';
+import { sidecarFile } from '@didpkg/core/did/btcr2';
 import { DEFAULT_RELAYS } from '@didpkg/core/did/dht';
 import { format } from '@didpkg/core/name';
 import type { StorageReader, StorageWriter, StoredFile } from '@didpkg/core/source';
@@ -18,6 +20,7 @@ import {
 import { dwnAdapter } from '@didpkg/adapter-dwn';
 import { DwnWriter, ed25519MessageSigner } from '@didpkg/adapter-dwn/writer';
 import { DirWriter } from '@didpkg/adapter-https/dir';
+import { sidecarData } from '../id/btcr2.ts';
 import { endpoint, putPayload, type StepResult } from '../id/dht.ts';
 import { decryptKey } from '../id/keyfile.ts';
 import type { Identity } from '../id/store.ts';
@@ -52,7 +55,7 @@ export interface PublishResult {
   targets: StepResult[];
 }
 
-interface Target { url: string; reader: StorageReader; writer: StorageWriter; dwn?: DwnWriter }
+interface Target { url: string; reader: StorageReader; writer: StorageWriter; dwn?: DwnWriter; dir?: DirWriter }
 interface Signed<T> { value: T; bytes: Uint8Array }
 
 /** The DWN URLs first, then the folders, with no duplicates. */
@@ -98,7 +101,7 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
     }),
     ...dirs.map((dir) => {
       const writer = new DirWriter(dir);
-      return { url: `dir:${dir}`, reader: writer, writer };
+      return { url: `dir:${dir}`, reader: writer, writer, dir: writer };
     }),
   ];
 
@@ -162,9 +165,12 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
   }
 
   // 5. One serialization of each object for all targets. A failed target does not stop the others.
+  const sidecar = o.identity.btcr2 && te.encode(`${JSON.stringify(sidecarData(o.identity.btcr2.genesisDocument), null, 2)}\n`);
   const results: StepResult[] = [];
   for (const t of targets) {
     try {
+      // The shim resolves the DID before it reads the index.
+      if (sidecar) await t.dir?.writeFile(sidecarFile(did), sidecar);
       await t.writer.publish({ name, version, release: release.bytes, tarball: o.tarball, index: index.bytes });
       results.push({ url: t.url, ok: true });
     } catch (e) {

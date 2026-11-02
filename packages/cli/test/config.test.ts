@@ -1,9 +1,10 @@
-// The config file `$DIDPKG_HOME/config.json`, and the `--cas` option of `didpkg shim start`.
+// The config file `$DIDPKG_HOME/config.json`, and the `--cas` and `--sidecar` options of `didpkg shim start`.
 import { afterAll, beforeEach, describe, expect, setDefaultTimeout, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sidecarFile } from '@didpkg/core/did/btcr2';
 import { format } from '@didpkg/core/name';
 import { btcr2Fixture } from '../../core/test/did/helpers.ts';
 import { configFile, readConfig } from '../src/config.ts';
@@ -32,8 +33,11 @@ describe('readConfig', () => {
     expect(configFile({ XDG_CONFIG_HOME: '/x' })).toBe('/x/didpkg/config.json');
   });
 
-  test('cas and esplora', () => {
-    const config = { cas: ['https://ipfs.didpkg.dev', 'http://127.0.0.1:8080'], esplora: { testnet4: 'https://esplora.example.com/testnet4/api', regtest: 'http://localhost:3000' } };
+  test('cas, esplora and sidecar', () => {
+    const config = {
+      cas: ['https://ipfs.didpkg.dev', 'http://127.0.0.1:8080'], esplora: { testnet4: 'https://esplora.example.com/testnet4/api', regtest: 'http://localhost:3000' },
+      sidecar: ['https://pkgs.example.com/btcr2/', 'http://127.0.0.1:8081'],
+    };
     write(config);
     expect(readConfig(env())).toEqual(config);
   });
@@ -54,6 +58,8 @@ describe('readConfig', () => {
     ['unknown network', { esplora: { mainnet: 'https://mempool.space/api' } }, '"mainnet" is not a network'],
     ['esplora URL is a number', { esplora: { bitcoin: 1 } }, 'the value of bitcoin must be a URL'],
     ['esplora with http', { esplora: { bitcoin: 'http://mempool.space/api' } }, 'must use https'],
+    ['sidecar is a string', { sidecar: 'https://pkgs.example.com/' }, '"sidecar" must be a list of URLs'],
+    ['sidecar with http', { sidecar: ['http://pkgs.example.com/'] }, 'must use https'],
   ];
   test.each(BAD)('error: %s', (_l, v, msg) => {
     write(v);
@@ -87,7 +93,7 @@ describe('didpkg shim start', () => {
 
   beforeEach(() => {
     paths.length = 0;
-    write({ cas: [`${base}/file`], esplora: { testnet4: `${base}/esplora` } });
+    write({ cas: [`${base}/file`], esplora: { testnet4: `${base}/esplora` }, sidecar: [`${base}/mirror`] });
   });
 
   test('the config file gives the gateway and the Esplora API to the did:btcr2 driver', async () => {
@@ -102,6 +108,15 @@ describe('didpkg shim start', () => {
     expect(cas).toEqual(['/flag-1', '/flag-2']);
   });
 
+  test('the config file gives the Sidecar Data mirrors; --sidecar replaces the list, in order', async () => {
+    const mirrors = () => paths.filter((p) => p.endsWith('.sidecar.json'));
+    await shim([], [f.did]);
+    expect(mirrors()).toEqual([`/mirror/${sidecarFile(f.did)}`]);
+    paths.length = 0;
+    await shim(['--sidecar', `${base}/flag-1/`, '--sidecar', `${base}/flag-2`], [f.did]);
+    expect(mirrors()).toEqual([`/flag-1/${sidecarFile(f.did)}`, `/flag-2/${sidecarFile(f.did)}`]);
+  });
+
   test('a bad config file stops the shim before it starts', () => {
     write({ gateways: [] });
     const r = Bun.spawnSync([process.execPath, cli, 'shim', 'start', '--port', '0'], { env: { PATH: process.env.PATH!, HOME: home, DIDPKG_HOME: home }, timeout: 10_000 });
@@ -110,9 +125,9 @@ describe('didpkg shim start', () => {
     expect(r.stderr.toString()).toStartWith(`didpkg: error: ${configFile(env())}: unknown key "gateways"`);
   });
 
-  test('--cas must use https', () => {
-    const r = Bun.spawnSync([process.execPath, cli, 'shim', 'start', '--port', '0', '--cas', 'http://ipfs.didpkg.dev'], { env: { PATH: process.env.PATH!, HOME: home, DIDPKG_HOME: home }, timeout: 10_000 });
+  test.each(['--cas', '--sidecar'])('%s must use https', (flag) => {
+    const r = Bun.spawnSync([process.execPath, cli, 'shim', 'start', '--port', '0', flag, 'http://ipfs.didpkg.dev'], { env: { PATH: process.env.PATH!, HOME: home, DIDPKG_HOME: home }, timeout: 10_000 });
     expect(r.exitCode).toBe(1);
-    expect(r.stderr.toString()).toContain('--cas: http://ipfs.didpkg.dev must use https');
+    expect(r.stderr.toString()).toContain(`${flag}: http://ipfs.didpkg.dev must use https`);
   });
 });

@@ -13,6 +13,7 @@ import { PackageSource } from '@didpkg/core/source';
 import type { PolicyMode } from '@didpkg/core/trust';
 import { dwnAdapter } from '@didpkg/adapter-dwn';
 import { httpsAdapter } from '@didpkg/adapter-https';
+import { sidecarSource } from './sidecar.ts';
 import { shimHandler } from './shim.ts';
 
 export const DEFAULT_PORT = 2092;
@@ -27,6 +28,10 @@ export interface StartShimOptions {
   cas?: readonly string[];
   /** The Esplora API base URL for each network of did:btcr2. It replaces the default of that network. */
   esplora?: Btcr2DriverOptions['esplora'];
+  /** The mirror base URLs of the did:btcr2 Sidecar Data, in order. Default: none. */
+  sidecar?: readonly string[];
+  /** The config folder: the Sidecar Data of its identities, and a copy of each verified did:btcr2 resolve. Default: none. */
+  home?: string;
   mode?: PolicyMode;
   /** Read DWN and repository endpoints, DID documents and relays on a loopback host. Only for tests and a local demo. */
   allowLoopback?: boolean;
@@ -35,11 +40,20 @@ export interface StartShimOptions {
 
 export async function startShim(o: StartShimOptions = {}): Promise<{ url: string; stop: () => Promise<void> }> {
   const loopback = o.allowLoopback ?? false;
+  const sidecar = sidecarSource({ home: o.home, mirrors: o.sidecar, allowPrivateHosts: loopback, log: o.log });
+  const btcr2 = btcr2Driver({ cas: o.cas, esplora: o.esplora, sidecar: sidecar.get, allowPrivateHosts: loopback });
   const resolver = new DidResolver({
     drivers: [
       keyDriver(), jwkDriver(), webDriver({ allowPrivateHosts: loopback }), webvhDriver({ allowPrivateHosts: loopback }), plcDriver(),
       dhtDriver({ relays: o.relays?.length ? o.relays : undefined, allowPrivateRelays: loopback }),
-      btcr2Driver({ cas: o.cas, esplora: o.esplora, allowPrivateHosts: loopback }),
+      {
+        ...btcr2,
+        async resolve(did, options, ctx) {
+          const r = await btcr2.resolve(did, options, ctx);
+          sidecar.settle(did, r.didResolutionMetadata.error === undefined);
+          return r;
+        },
+      },
     ],
     staleIfErrorMs: STALE_IF_ERROR_MS,
   });

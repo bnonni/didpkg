@@ -1,6 +1,7 @@
 // The config file `<config>/config.json`. Each key is optional. A key has the name of the flag that replaces it.
 //   cas      IPFS Trustless Gateway base URLs, in order, for the did:btcr2 data. `--cas` replaces the list. An empty list turns CAS off.
 //   esplora  The Esplora API base URL for each Bitcoin network of did:btcr2, for example {"testnet4": "https://..."}.
+//   sidecar  Mirror base URLs, in order, for the did:btcr2 Sidecar Data. `--sidecar` replaces the list.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Btcr2DriverOptions } from '@didpkg/core/did/btcr2';
@@ -12,6 +13,7 @@ type Esplora = NonNullable<Btcr2DriverOptions['esplora']>;
 export interface Config {
   cas?: string[];
   esplora?: Esplora;
+  sidecar?: string[];
 }
 
 const NETWORKS: Readonly<Record<keyof Esplora, true>> = { bitcoin: true, testnet3: true, testnet4: true, signet: true, mutinynet: true, regtest: true };
@@ -41,9 +43,9 @@ export function readConfig(env: Record<string, string | undefined> = process.env
   if (!isObject(v)) throw new Error(`${file}: the file must be a JSON object`);
   const config: Config = {};
   for (const [key, value] of Object.entries(v)) {
-    if (key === 'cas') {
-      if (!Array.isArray(value) || !value.every((u) => typeof u === 'string')) throw new Error(`${file}: "cas" must be a list of URLs`);
-      config.cas = value.map((u) => endpoint(u, `${file}: cas`));
+    if (key === 'cas' || key === 'sidecar') {
+      if (!Array.isArray(value) || !value.every((u) => typeof u === 'string')) throw new Error(`${file}: "${key}" must be a list of URLs`);
+      config[key] = value.map((u) => endpoint(u, `${file}: ${key}`));
     } else if (key === 'esplora') {
       if (!isObject(value)) throw new Error(`${file}: "esplora" must be an object with a URL for each network`);
       const esplora: Esplora = {};
@@ -56,7 +58,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
       }
       config.esplora = esplora;
     } else {
-      throw new Error(`${file}: unknown key ${JSON.stringify(key)} (use cas, esplora)`);
+      throw new Error(`${file}: unknown key ${JSON.stringify(key)} (use cas, esplora, sidecar)`);
     }
   }
   return config;

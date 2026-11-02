@@ -6,7 +6,8 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { expect, test } from 'bun:test';
 import canonicalize from 'canonicalize';
-import { btcr2Driver, CAS_GATEWAYS, casCid, type Btcr2DriverOptions, type Sidecar } from '../../src/did/drivers/btcr2.ts';
+import { btcr2Driver, CAS_GATEWAYS, casCid, sidecarFile, type Btcr2DriverOptions, type Sidecar } from '../../src/did/drivers/btcr2.ts';
+import { MAX_PKG_NAME } from '../../src/name/grammar.ts';
 import { DID_ERROR_NS } from '../../src/did/errors.ts';
 import type { FetchLike } from '../../src/did/fetch.ts';
 import type { DidResolutionResult } from '../../src/did/types.ts';
@@ -201,4 +202,11 @@ test('a sidecar function that throws gives INTERNAL_ERROR', async () => {
   const r = await driver(f.esplora().fetch, { sidecar: async () => { throw new Error('disk error'); } }).resolve(f.did, {}, ctx);
   expect(code(r)).toBe('INTERNAL_ERROR');
   expect(detail(r)).toBe('disk error');
+});
+
+test('sidecarFile: the method-specific id and .sidecar.json, longer than each package name; only for did:btcr2', () => {
+  expect(sidecarFile(f.did)).toBe(`${f.did.slice('did:btcr2:'.length)}.sidecar.json`);
+  for (const did of [f.did, f.k1]) expect(sidecarFile(did).length).toBeGreaterThan(MAX_PKG_NAME);
+  expect(() => sidecarFile('did:web:example.com')).toThrow();
+  expect(() => sidecarFile(f.did.toUpperCase())).toThrow();
 });

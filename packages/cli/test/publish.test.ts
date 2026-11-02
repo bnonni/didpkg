@@ -1,6 +1,6 @@
 // `didpkg publish` on a local Pkarr relay and the pinned dwn-server, with no #0 key on disk.
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from 'bun:test';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,6 +95,7 @@ describe('publish', () => {
     expect(out.relays).toEqual([{ url: relay.url, ok: true }]);
     expect(out.targets).toEqual([{ url: dwn.url, ok: true }, { url: `dir:${site}`, ok: true }]);
     expect(existsSync(idPaths('pub', { DIDPKG_HOME: home }).updateKey)).toBe(false);
+    expect(readdirSync(site)).toEqual(['hello']); // no Sidecar Data file: it is for did:btcr2 only
 
     const { dwn: d, dir: m } = await both('1.0.0');
     expect(d.map((c) => c.length)).toEqual([1, 1, 1]);

@@ -8,7 +8,7 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 - The exit code is 0 if the command succeeds, else 1. A usage error also prints `Run "didpkg --help" for usage.`
 - An option with a value can be in each position after the command. Give a repeatable option one time for each value.
 - `-h` or `--help` after each command prints the full help.
-- Each endpoint URL (`--dwn`, `--repo`, `--relay`, `--plc`, `--cas`, and the URLs in the [config file](#config-file)) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
+- Each endpoint URL (`--dwn`, `--repo`, `--relay`, `--plc`, `--cas`, `--sidecar`, and the URLs in the [config file](#config-file)) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
 
 ## Environment
 
@@ -174,9 +174,14 @@ The command writes 2 more files in `$DIDPKG_HOME/ids`:
 | `<alias>.genesis.json` | The JCS bytes (RFC 8785) of the Genesis Document. The SHA-256 of the file is in the DID. |
 | `<alias>.sidecar.json` | The Sidecar Data of the specification, with the Genesis Document. |
 
-A resolver must have the Genesis Document, because the DID has only its hash. The shim gets it from CAS (IPFS). Put the genesis file in IPFS as a raw block. The CID in the result is the CIDv1 of that block. With Kubo, run `ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true <alias>.genesis.json`. The shim then gets the block from the IPFS gateways (see [`--cas`](#didpkg-shim-start)).
+A resolver must have the Genesis Document, because the DID has only its hash. The shim gets it from one of these sources:
 
-stdout gets the JSON result: `alias`, `did`, `keyId`, `network`, `cid` and `files`. stderr tells you to move the update key file offline, and gives the IPFS command.
+1. Sidecar Data. `didpkg publish --to dir:<path>` writes a copy of `<alias>.sidecar.json` to `<path>/<id>.sidecar.json`. `<id>` is the DID without `did:btcr2:`. Host the folder. A shim with [`--sidecar <URL of the folder>`](#didpkg-shim-start) reads the file.
+2. CAS (IPFS). Put the genesis file in IPFS as a raw block. The CID in the result is the CIDv1 of that block. With Kubo, run `ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true <alias>.genesis.json`. The shim then gets the block from the IPFS gateways (see [`--cas`](#didpkg-shim-start)).
+
+The did:btcr2 specification recommends one of the two methods for the life of the DID.
+
+stdout gets the JSON result: `alias`, `did`, `keyId`, `network`, `cid` and `files`. stderr tells you to move the update key file offline. It also gives the IPFS command and the name of the Sidecar Data file in the folder.
 
 ## didpkg id register
 
@@ -251,7 +256,7 @@ For the full steps and the errors, read [Publish a package](publish.md).
 ## didpkg shim start
 
 ```text
-didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--mode enforce|warn] [--allow-loopback]
+didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--mode enforce|warn] [--allow-loopback]
 ```
 
 Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` package before npm gets it.
@@ -261,6 +266,7 @@ Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` pac
 | `--port <n>` | `2092` | The port. `0` selects a free port. |
 | `--relay <url>` | `https://relay.pkarr.org`, `https://pkarr.pubky.org` | The Pkarr relays that resolve a did:dht DID. Repeatable. |
 | `--cas <url>` | `cas` of the [config file](#config-file), else `https://trustless-gateway.link` | The IPFS gateways ([Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/)) that give the genesis document and the update data of a did:btcr2 DID. The shim tries them in order. Repeatable. The options replace the `cas` list of the config file. |
+| `--sidecar <url>` | `sidecar` of the [config file](#config-file), else none | A mirror of did:btcr2 Sidecar Data. For a DID, the shim gets `<url>/<id>.sidecar.json`, where `<id>` is the DID without `did:btcr2:`. The shim tries the mirrors in order. Repeatable. The options replace the `sidecar` list of the config file. |
 | `--mode <mode>` | `enforce` | `warn` installs a package with a changed key or a changed release history, and writes a warning to the log. See [Pins](how-it-works.md#pins). |
 | `--allow-loopback` | Off | Read DIDs, DWNs and mirrors on a loopback host. Only for tests and the local demo. This option has no value. |
 
@@ -272,6 +278,16 @@ The shim prints one JSON line to stdout, with the URL and the `.npmrc` line:
 
 Then it writes one line for each request to stderr. It runs until SIGINT (Ctrl+C) or SIGTERM, and then exits with 0. If the port is in use, it exits with 1. For the HTTP errors of the shim, read [Quickstart](quickstart.md#errors).
 
+### did:btcr2 Sidecar Data
+
+The did:btcr2 specification does not tell how a resolver gets Sidecar Data. The shim uses the first of these sources that has the Sidecar Data of the DID:
+
+1. The `<alias>.sidecar.json` file of the identity with this DID in `$DIDPKG_HOME/ids`. Thus a publisher can test an install before the first push.
+2. The mirrors of `--sidecar`, in order.
+3. The copy in `$DIDPKG_HOME/sidecar/`. After a resolve with no error, the shim keeps a copy of the mirror data there. Thus an install works when no mirror is available.
+
+The mirrors come before the copy, so an old copy does not hide a new update. The shim gets each item that the Sidecar Data does not have from the IPFS gateways. For an `x1` DID, the Sidecar Data must have the Genesis Document with the hash of the DID. Else the shim does not use the source. The shim checks each hash and each signature. Thus a mirror can hold back data, but it cannot change data.
+
 ### Config file
 
 The shim reads `$DIDPKG_HOME/config.json` if the file exists. Each key is optional:
@@ -279,6 +295,7 @@ The shim reads `$DIDPKG_HOME/config.json` if the file exists. Each key is option
 | Key | Default | Use |
 |---|---|---|
 | `cas` | `["https://trustless-gateway.link"]` | The IPFS gateways for did:btcr2, in order. `--cas` replaces this list. An empty list (`[]`) turns IPFS off: then the shim resolves only a did:btcr2 DID that needs no data from IPFS. |
+| `sidecar` | `[]` | The Sidecar Data mirrors for did:btcr2, in order. `--sidecar` replaces this list. See [did:btcr2 Sidecar Data](#didbtcr2-sidecar-data). |
 | `esplora` | `https://mempool.space/api` (`bitcoin`), `https://mempool.space/testnet/api` (`testnet3`), `https://mempool.space/testnet4/api` (`testnet4`), `https://mempool.space/signet/api` (`signet`), `https://mutinynet.com/api` (`mutinynet`) | The Esplora API for each Bitcoin network of did:btcr2. The keys are `bitcoin`, `testnet3`, `testnet4`, `signet`, `mutinynet` and `regtest`. A key replaces the default of its network. `regtest` has no default. |
 
 Example:
@@ -286,7 +303,8 @@ Example:
 ```json
 {
   "cas": ["https://ipfs.didpkg.dev", "https://trustless-gateway.link"],
-  "esplora": { "testnet4": "https://esplora.example.com/testnet4/api" }
+  "esplora": { "testnet4": "https://esplora.example.com/testnet4/api" },
+  "sidecar": ["https://pkgs.example.com/btcr2/"]
 }
 ```
 

@@ -10,7 +10,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import canonicalize from 'canonicalize';
 import { DidResolver } from '@didpkg/core/did';
-import { btcr2Driver, ESPLORA } from '@didpkg/core/did/btcr2';
+import { btcr2Driver, ESPLORA, sidecarFile } from '@didpkg/core/did/btcr2';
 import { toMultikey, verifyProof } from '@didpkg/core/trust';
 import { DirWriter } from '@didpkg/adapter-https/dir';
 import { createBtcr2 } from '../src/id/btcr2.ts';
@@ -155,6 +155,15 @@ describe('id create --btcr2', async () => {
     const [release] = await Array.fromAsync(new DirWriter(site).read({ kind: 'release', name: 'hello', version: '1.0.0' }, { signal: AbortSignal.timeout(5000), maxBytes: 1 << 20 }));
     expect((await verifyProof(JSON.parse(new TextDecoder().decode(release)), resolved.didDocument!)).verificationMethod).toBe(r.keyId);
   });
+
+  test('publish to a folder also writes the Sidecar Data file: the same bytes as the identity file', async () => {
+    const site = join(tmp, 'site-sidecar');
+    await publish({ identity, tarball: npmTgz({ name: 'hello', version: '1.0.0' }), to: [`dir:${site}`], passphrase: async () => PASS });
+    const file = join(site, sidecarFile(r.did));
+    expect(file).toBe(join(site, `${r.did.slice('did:btcr2:'.length)}.sidecar.json`));
+    expect(readFileSync(file, 'utf8')).toBe(readFileSync(r.files.sidecar, 'utf8'));
+    expect(statSync(file).mode & 0o777).toBe(0o666 & ~process.umask());
+  });
 });
 
 describe('the CLI', () => {
@@ -175,7 +184,7 @@ describe('the CLI', () => {
     expect(out.cid).toMatch(/^bafkrei/);
     expect(r.err).toContain(`Move ${out.files.updateKey} offline.`);
     expect(r.err).toContain(`with the CID ${out.cid}:\n  ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ${out.files.genesis}\n`);
-    expect(r.err).toContain(`${out.files.sidecar} has the same document as Sidecar Data`);
+    expect(r.err).toContain(`Or use the Sidecar Data in ${out.files.sidecar}: "didpkg publish --to dir:<path>" writes a copy to <path>/${sidecarFile(out.did)}.\n`);
     const register = await run(['id', 'register', 'cli']);
     expect([register.code, register.err]).toEqual([1, expect.stringContaining('"id register" is not for did:btcr2')]);
   });

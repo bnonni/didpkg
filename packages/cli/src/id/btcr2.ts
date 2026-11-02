@@ -47,6 +47,11 @@ export interface Btcr2CreateResult {
   files: { identity: string; updateKey: string; sidecar: string; genesis: string };
 }
 
+/** The Sidecar Data of a DID with no update (spec section "Sidecar Data"). */
+export function sidecarData(genesisDocument: Record<string, unknown>): { '@context': string; genesisDocument: Record<string, unknown> } {
+  return { '@context': BTCR2_CONTEXT, genesisDocument };
+}
+
 export function network(name: string): NetworkName {
   if (!(NETWORKS as readonly string[]).includes(name)) throw new Error(`--btcr2: ${JSON.stringify(name)} is not a network: use ${NETWORKS.join(', ')}`);
   return name as NetworkName;
@@ -110,7 +115,7 @@ export async function createBtcr2(o: Btcr2CreateOptions): Promise<Btcr2CreateRes
     updateKey: await encryptKey({
       did, keyId: `${did}#${UPDATE_KEY}`, seed: update, curve: 'secp256k1', passphrase: o.updatePassphrase, iterations: o.iterations,
     }),
-    sidecar: { '@context': BTCR2_CONTEXT, genesisDocument },
+    sidecar: sidecarData(genesisDocument),
     genesis: block,
   });
   return {

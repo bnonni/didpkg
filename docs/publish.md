@@ -83,6 +83,23 @@ Copy the file `web.did.json` to that URL as `did.json`. The `--web` value gives 
 
 The host must be in lowercase. The site must use HTTPS. If you change the hosted `did.json` file, you change the DID document. The did:web specification recommends the header `Access-Control-Allow-Origin: *` for `did.json`, so that a resolver in a web browser can read it.
 
+### did:btcr2
+
+```sh
+didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
+```
+
+The command does no network write and makes no Bitcoin transaction. A did:btcr2 identity has no DWN, so publish with `--to dir:<path>` only. The DID is the hash of a Genesis Document. A resolver must have this document. Use one of these methods to give it:
+
+1. Sidecar Data. `didpkg publish --to dir:<path>` writes the file `<id>.sidecar.json` to the root of the folder. `<id>` is the DID without `did:btcr2:`. Push the folder (step 7). Each user of the package must start the shim with `--sidecar <URL of the folder>`, or put the URL in the `sidecar` list of the [config file](cli.md#config-file).
+2. CAS (IPFS). Put the file `btc.genesis.json` in IPFS as a raw block, and keep it pinned. The shim gets the block through an IPFS gateway (default: `trustless-gateway.link`). With Kubo:
+
+```sh
+ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ~/.config/didpkg/ids/btc.genesis.json
+```
+
+The CID in the output must be the `cid` of the `id create` result. The did:btcr2 specification recommends one method for the life of the DID.
+
 ### One mirror for each publisher
 
 Each publisher must have its own mirror URL, because the mirror path has no DID in it. If 2 publishers write to one URL, the second publish of the same version fails with `a different file exists`. For an example, see [didpkg-demo](https://github.com/bnonni/didpkg-demo): its root is the mirror of a did:dht publisher, and `web/` is the mirror of a did:web publisher.
@@ -97,7 +114,7 @@ The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$
 | `<alias>.update-key.json` | The encrypted update key of the DID (each method except did:web) | `0600` | Move it offline. didpkg 0.1.0 does not use it. You need it to change the DID document. |
 | `<alias>.did.json` | The DID document to host (did:web), or the parallel did:web document (did:webvh) | `0644` | Host it. See step 3. |
 | `<alias>.genesis.json` | The JCS bytes of the Genesis Document (did:btcr2 only) | `0644` | Put it in IPFS as a raw block. See [the CLI reference](cli.md#didpkg-id-create-didbtcr2). |
-| `<alias>.sidecar.json` | The Sidecar Data with the Genesis Document (did:btcr2 only) | `0644` | Keep it. It has the same document as the genesis file. |
+| `<alias>.sidecar.json` | The Sidecar Data with the Genesis Document (did:btcr2 only) | `0644` | Keep it. `didpkg publish --to dir:` writes a copy to the folder. See [did:btcr2](#didbtcr2). |
 
 didpkg never replaces a key file. If the alias exists, `id create` stops with `<file> exists: didpkg never replaces a key`. didpkg 0.1.0 has no command to change a key. If you lose the release key, you cannot publish a new version with that DID.
 
@@ -172,6 +189,8 @@ hello/index.json      the signed index
 hello/1.0.0.json      the signed release
 hello/1.0.0.tgz       the tarball
 ```
+
+A did:btcr2 publisher also gets the file `<id>.sidecar.json` in the root of the folder. Each publish writes it again.
 
 Push the folder to the site at the `--repo` URL. Do not edit the files: the signatures cover them. On GitHub Pages, add an empty `.nojekyll` file to the root of the site.
 

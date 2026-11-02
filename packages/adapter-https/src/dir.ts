@@ -24,6 +24,12 @@ export class DirWriter implements StorageWriter, StorageReader {
     await this.#put({ kind: 'index', name }, index, false);
   }
 
+  /** A file in the folder root that is not in the layout, for example the Sidecar Data of a did:btcr2 publisher. It replaces an old file. */
+  async writeFile(name: string, bytes: Uint8Array): Promise<void> {
+    if (!/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(name)) throw new TypeError(`not a safe file name: ${name}`);
+    await this.#write(join(this.#dir, name), bytes);
+  }
+
   /** 0 or 1 copies. Only the size limit applies, because a local read does not stop. */
   async *read(file: StoredFile, { maxBytes }: ReadOptions): AsyncIterable<Uint8Array> {
     const bytes = await this.#get(join(this.#dir, ...layoutPath(file)));
@@ -39,8 +45,7 @@ export class DirWriter implements StorageWriter, StorageReader {
   }
 
   // A published release and tarball do not change: a lockfile holds their integrity. The same bytes
-  // again is a no-op, so a failed publish can run again. The rename makes each write atomic, so a
-  // server on the folder never gives a part of a file.
+  // again is a no-op, so a failed publish can run again.
   async #put(file: StoredFile, bytes: Uint8Array, immutable: boolean): Promise<void> {
     const path = join(this.#dir, ...layoutPath(file));
     if (immutable) {
@@ -48,6 +53,11 @@ export class DirWriter implements StorageWriter, StorageReader {
       if (old?.equals(bytes)) return;
       if (old) throw new Error(`${path}: a different file exists, and a published version does not change`);
     }
+    await this.#write(path, bytes);
+  }
+
+  // The rename makes each write atomic, so a server on the folder never gives a part of a file.
+  async #write(path: string, bytes: Uint8Array): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
     const tmp = join(dirname(path), `.${basename(path)}.${crypto.randomUUID()}.tmp`);
     try {

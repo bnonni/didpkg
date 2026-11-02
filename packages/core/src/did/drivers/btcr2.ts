@@ -156,6 +156,16 @@ function hashOf(need: ItemNeed): string {
   }
 }
 
+/**
+ * The file name of the Sidecar Data of a DID on a mirror and in a `dir:` target: `<method-specific id>.sidecar.json`.
+ * The spec gives no transport for Sidecar Data, so this name is a didpkg rule. The name has more than 64 characters,
+ * and a package name has 64 at most, so the file is never a package folder of the static layout.
+ */
+export function sidecarFile(did: string): string {
+  Identifier.decode(did);
+  return `${did.slice('did:btcr2:'.length)}.sidecar.json`;
+}
+
 /** The IPFS CIDv1 of a hex SHA-256 hash, in multibase base32 (spec section BTCR2 Update Data Distribution). */
 export function casCid(hash: string): string {
   return `b${base32nopad.encode(Uint8Array.of(...CID_PREFIX, ...hexToBytes(hash))).toLowerCase()}`;
