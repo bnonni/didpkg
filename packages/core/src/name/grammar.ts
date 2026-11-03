@@ -1,11 +1,12 @@
-// didpkg install-name grammar, draft 1 (2026-10-23). The grammar can change before 1.0.
-// Source: didpkg@0.0.1 (src/grammar.ts).
+// didpkg install-name grammar, draft 2 (2026-11-03). The grammar can change before 1.0.
+// Source: didpkg@0.0.1 (src/grammar.ts). Draft 2 adds the identifier kind ("did" or "xid").
 //
-//   install-name = "@didpkg/" pkg-name "_" method [ "." case-mask ] "_" enc-id   ; direct form
-//                / "@didpkg/" pkg-name "__" did-hash                             ; hash form
+//   install-name = "@didpkg/" pkg-name "_did_" method [ "." case-mask ] "_" enc-id   ; direct form, DID
+//                / "@didpkg/" pkg-name "_xid_" xid-hex                                ; direct form, XID
+//                / "@didpkg/" pkg-name "__" did-hash                                  ; hash form, DID
 //
-// The direct form carries the full DID. The hash form carries sha256(DID) and is used
-// only when the direct form is longer than 214 characters.
+// The direct form carries the full DID or XID. The hash form carries sha256(DID) and is used
+// only when the direct form of a DID is longer than 214 characters. A XID name is never longer than 141.
 // One runtime dependency: @noble/hashes (sha256). No Node or Bun API, so it also runs in a browser.
 
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -21,6 +22,8 @@ export const PKG_NAME_RE = /^[a-z0-9][a-z0-9.-]{0,63}$/;
 const IDCHAR = String.raw`(?:[A-Za-z0-9._-]|%[0-9A-Fa-f]{2})`;
 export const DID_RE = new RegExp(String.raw`^did:([a-z0-9]+):((?:${IDCHAR}*:)*${IDCHAR}+)$`);
 const METHOD_RE = /^[a-z0-9]+$/;
+// BCR-2024-010: a XID is 32 bytes. Its text form is the bytes in lowercase hex, as in XID(71274df1...).
+export const XID_RE = /^[0-9a-f]{64}$/;
 const MASK_RE = /^[a-z2-7]*[b-z2-7]$/; // non-empty, must not end in "a" (zero group)
 // 256 bits in 52 base32 characters: the last character holds 1 bit and 4 zero pad bits, so it is "a" or "q".
 const HASH_RE = /^[a-z2-7]{51}[aq]$/;
@@ -123,8 +126,9 @@ export function didHash(did: string): string {
 
 // ---------- format / parse ----------
 export type Parsed =
-  | { form: 'direct'; name: string; did: string; method: string; msid: string }
-  | { form: 'hash'; name: string; hash: string };
+  | { kind: 'did'; form: 'direct'; name: string; did: string; method: string; msid: string }
+  | { kind: 'did'; form: 'hash'; name: string; hash: string }
+  | { kind: 'xid'; form: 'direct'; name: string; xid: string };
 
 export function splitDid(did: string): { method: string; msid: string } {
   const m = DID_RE.exec(did);
@@ -132,18 +136,27 @@ export function splitDid(did: string): { method: string; msid: string } {
   return { method: m[1], msid: m[2] };
 }
 
+// The direct form of a DID name. It can be longer than 214 characters: format() then gives the hash form.
 export function formatDirect(did: string, name: string): string {
   if (!PKG_NAME_RE.test(name)) throw new GrammarError('E_NAME', `bad package name: ${name}`);
   const { method, msid } = splitDid(did);
   const { enc, mask } = encodeId(msid);
-  return `${SCOPE}/${name}_${method}${mask ? '.' + mask : ''}_${enc}`;
+  return `${SCOPE}/${name}_did_${method}${mask ? '.' + mask : ''}_${enc}`;
 }
 
-// The canonical install name for (did, name). Exactly one name per pair.
-export function format(did: string, name: string): string {
-  const direct = formatDirect(did, name);
+function formatXid(xid: string, name: string): string {
+  if (!PKG_NAME_RE.test(name)) throw new GrammarError('E_NAME', `bad package name: ${name}`);
+  if (!XID_RE.test(xid)) throw new GrammarError('E_XID', 'a XID must be 64 lowercase hex characters');
+  return `${SCOPE}/${name}_xid_${xid}`;
+}
+
+// The canonical install name for (id, name). The id is a DID, or a XID as 64 hex characters.
+// Exactly one name per pair.
+export function format(id: string, name: string): string {
+  if (/^[0-9A-Fa-f]{64}$/.test(id)) return formatXid(id, name);
+  const direct = formatDirect(id, name);
   if (direct.length <= MAX_NPM_NAME) return direct;
-  return `${SCOPE}/${name}__${didHash(did)}`;
+  return `${SCOPE}/${name}__${didHash(id)}`;
 }
 
 // Parse one install name. It never decodes percent escapes and never guesses.
@@ -160,12 +173,21 @@ export function parse(s: string): Parsed {
   if (rest.startsWith('_')) {
     const hash = rest.slice(1);
     if (!HASH_RE.test(hash)) throw new GrammarError('E_HASH', 'hash form needs 52 base32 characters');
-    return { form: 'hash', name, hash };
+    return { kind: 'did', form: 'hash', name, hash };
   }
-  const j = rest.indexOf('_');
+  const k = rest.indexOf('_');
+  if (k < 0) throw new GrammarError('E_SHAPE', 'no "_" after the identifier kind');
+  const kind = rest.slice(0, k);
+  const tail = rest.slice(k + 1);
+  if (kind === 'xid') {
+    if (!XID_RE.test(tail)) throw new GrammarError('E_XID', 'a XID must be 64 lowercase hex characters');
+    return { kind: 'xid', form: 'direct', name, xid: tail };
+  }
+  if (kind !== 'did') throw new GrammarError('E_KIND', `unknown identifier kind: ${kind} (expected did or xid)`);
+  const j = tail.indexOf('_');
   if (j < 0) throw new GrammarError('E_SHAPE', 'no "_" after the method tag');
-  const tag = rest.slice(0, j);
-  const enc = rest.slice(j + 1);
+  const tag = tail.slice(0, j);
+  const enc = tail.slice(j + 1);
   const dot = tag.indexOf('.');
   const method = dot < 0 ? tag : tag.slice(0, dot);
   const mask = dot < 0 ? '' : tag.slice(dot + 1);
@@ -176,7 +198,7 @@ export function parse(s: string): Parsed {
   const did = `did:${method}:${msid}`;
   if (!DID_RE.test(did)) throw new GrammarError('E_DID', `decoded value is not a DID: ${did}`);
   if (formatDirect(did, name) !== s) throw new GrammarError('E_CANONICAL', 'name is not in canonical form');
-  return { form: 'direct', name, did, method, msid };
+  return { kind: 'did', form: 'direct', name, did, method, msid };
 }
 
 // The shim calls this after it gets a DID for a hash-form name (local alias store,

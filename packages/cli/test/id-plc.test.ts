@@ -135,7 +135,7 @@ describe('id create --plc', async () => {
     const out = await publish({ identity, tarball: npmTgz({ name: 'hello', version: '1.0.0' }), to: [`dir:${site}`], passphrase: async () => PASS });
     expect(out.relays).toEqual([]);
     expect(out.targets).toEqual([{ url: `dir:${site}`, ok: true }]);
-    expect(out.installName).toBe(`@didpkg/hello_plc_${r.did.slice('did:plc:'.length)}`);
+    expect(out.installName).toBe(`@didpkg/hello_did_plc_${r.did.slice('did:plc:'.length)}`);
     const [release] = await Array.fromAsync(new DirWriter(site).read({ kind: 'release', name: 'hello', version: '1.0.0' }, { signal: AbortSignal.timeout(5000), maxBytes: 1 << 20 }));
     expect((await verifyProof(JSON.parse(new TextDecoder().decode(release)), resolved.didDocument!)).verificationMethod).toBe(r.keyId);
   });

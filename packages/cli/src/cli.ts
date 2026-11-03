@@ -23,7 +23,8 @@ const VERSION: string = pkg.version;
 const HELP = `didpkg ${VERSION}: install names and publisher identities for packages that a DID owns
 
 Usage:
-  didpkg name <did> <pkg-name>    Print the install name for the DID and the package name
+  didpkg name <did|xid> <pkg-name>
+                                  Print the install name for the DID or the XID (64 hex characters) and the package name
   didpkg parse <install-name>     Print the parts of an install name as JSON
   didpkg id create <alias> [--dwn <url>] [--repo <url>]... [--relay <url>]...
                                   Make a did:dht publisher DID with the release key #didpkg-1
@@ -51,7 +52,8 @@ Usage:
 Examples:
   didpkg name did:web:nonni.org hello
   didpkg name did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y my-lib
-  didpkg parse @didpkg/hello_web_nonni.org
+  didpkg name 71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c hello
+  didpkg parse @didpkg/hello_did_web_nonni.org
   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id create web --web pkgs.example.com --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id create vh --webvh pkgs.example.com:vh --repo https://pkgs.example.com/vh/
@@ -62,7 +64,7 @@ Examples:
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
   didpkg shim start --cas https://ipfs.didpkg.dev
   didpkg shim start --sidecar https://pkgs.example.com/btcr2/
-  didpkg drl @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
+  didpkg drl @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht, did:webvh, did:plc and did:btcr2),
@@ -70,7 +72,7 @@ else from the terminal. The shim reads $DIDPKG_HOME/config.json if it exists: th
 APIs ("esplora") and the Sidecar Data mirrors ("sidecar") for did:btcr2. The shim and "drl" read it. The --cas and
 --sidecar options replace the lists of the file.
 
-The grammar is draft 1 and can change before 1.0. See
+The grammar is draft 2 and can change before 1.0. See
 https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md
 `;
 
@@ -298,16 +300,16 @@ async function run(argv: string[]): Promise<string> {
   if (args.includes('-h') || args.includes('--help')) return HELP;
   switch (cmd) {
     case 'name': {
-      if (args.length !== 2) throw new UsageError(`"name" needs 2 arguments: <did> <pkg-name> (got ${args.length})`);
-      const [did, pkgName] = args as [string, string];
-      return `${format(did, pkgName)}\n`;
+      if (args.length !== 2) throw new UsageError(`"name" needs 2 arguments: <did|xid> <pkg-name> (got ${args.length})`);
+      const [id, pkgName] = args as [string, string];
+      return `${format(id, pkgName)}\n`;
     }
     case 'parse': {
       if (args.length !== 1) throw new UsageError(`"parse" needs 1 argument: <install-name> (got ${args.length})`);
       const p = parse(args[0] as string);
-      const out = p.form === 'direct'
-        ? { form: p.form, name: p.name, did: p.did }
-        : { form: p.form, name: p.name, hash: p.hash };
+      const out = p.kind === 'xid' ? { kind: p.kind, form: p.form, name: p.name, xid: p.xid }
+        : p.form === 'direct' ? { kind: p.kind, form: p.form, name: p.name, did: p.did }
+        : { kind: p.kind, form: p.form, name: p.name, hash: p.hash };
       return `${JSON.stringify(out)}\n`;
     }
     case 'id':

@@ -107,7 +107,7 @@ describe('id create --webvh', async () => {
     });
     expect(out.relays).toEqual([]);
     expect(out.targets).toEqual([{ url: `dir:${site}`, ok: true }]);
-    expect(out.installName).toStartWith('@didpkg/hello_webvh.');
+    expect(out.installName).toStartWith('@didpkg/hello_did_webvh.');
     const [release] = await Array.fromAsync(new DirWriter(site).read({ kind: 'release', name: 'hello', version: '1.0.0' }, { signal: AbortSignal.timeout(5000), maxBytes: 1 << 20 }));
     expect((await verifyProof(JSON.parse(new TextDecoder().decode(release)), resolved.didDocument!)).verificationMethod).toBe(r.keyId);
   });

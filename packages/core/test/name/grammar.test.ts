@@ -10,8 +10,12 @@ import * as trust from '../../src/trust/index.ts';
 import * as source from '../../src/source/index.ts';
 
 const vectors: { method: string; did: string }[] = await Bun.file(new URL('./vectors.json', import.meta.url)).json();
-// golden.json: format(did, name) from an earlier codec. The current codec must give the same names.
+// golden.json: format(did, name) from an earlier codec, changed to draft 2 by a fixed rule (add "did_" after the
+// pkg-name; the hash form if the result is longer than 214). The current codec must give the same names.
 const golden: { did: string; name: string; installName: string }[] = await Bun.file(new URL('./golden.json', import.meta.url)).json();
+
+// BCR-2024-010 example XID.
+const XID = '71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c';
 
 const code = (f: () => unknown) => { try { f(); return 'OK'; } catch (e) { return (e as GrammarError).code ?? String(e); } };
 
@@ -27,6 +31,7 @@ test.each(vectors.map((v) => [`${v.method} ${v.did.slice(0, 48)}`, v.did] as con
       expect(s.length).toBeLessThanOrEqual(MAX_NPM_NAME);
       expect(validate(s).validForNewPackages).toBe(true);
       const p = parse(s);
+      if (p.kind === 'xid') throw new Error(`expected kind did: ${s}`);
       if (p.form === 'direct') expect([p.did, p.name]).toEqual([did, name]);
       else expect(bindHash(p, did)).toBe(did);
     }
@@ -42,7 +47,7 @@ test('golden: format() output is byte-for-byte the research codec output', () =>
 test('name/index and the core index export the public API', () => {
   expect(Object.keys(pkg).sort()).toEqual(['GrammarError', 'bindHash', 'didHash', 'format', 'formatDirect', 'parse', 'route']);
   expect(Object.keys(core).sort()).toEqual([...Object.keys(pkg), ...Object.keys(did), ...Object.keys(trust), ...Object.keys(source)].sort());
-  expect(pkg.format('did:web:nonni.org', 'hello')).toBe('@didpkg/hello_web_nonni.org');
+  expect(pkg.format('did:web:nonni.org', 'hello')).toBe('@didpkg/hello_did_web_nonni.org');
   const e = code(() => pkg.parse('@other/x'));
   expect(e).toBe('E_SCOPE');
   try { pkg.parse('@other/x'); } catch (err) { expect(err).toBeInstanceOf(pkg.GrammarError); }
@@ -91,6 +96,7 @@ test('fuzz: 200000 random ABNF DIDs round trip losslessly and canonically', () =
     const s = format(did, 'pkg');
     expect(validate(s).validForNewPackages).toBe(true);
     const p = parse(s);
+    if (p.kind === 'xid') throw new Error(`expected kind did: ${s}`);
     if (p.form === 'direct') { direct++; expect(p.did).toBe(did); }
     else { hashed++; expect(bindHash(p, did)).toBe(did); }
   }
@@ -115,28 +121,64 @@ test('fuzz: two different DIDs never give the same name', () => {
 }, FUZZ_TIMEOUT_MS);
 
 test('rejections: each bad name fails with a stable code', () => {
-  const dht = '@didpkg/hello_dht_i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y';
+  const dht = '@didpkg/hello_did_dht_i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y';
   const cases: [string, string][] = [
     [dht, 'OK'],
-    ['@didpkg/hello_dht.a_i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y', 'E_MASK'],     // zero mask must be omitted
-    ['@didpkg/hello_web.abqa_localhost.3a8443', 'E_MASK'],                                          // trailing zero group
-    ['@didpkg/hello_web.abq7_localhost.3a8443', 'E_MASK'],                                          // bits past the end
-    ['@didpkg/hello_web.b_localhost.3a8443', 'OK'],                                                 // grammar OK (did:web:locaLhost.3a8443); the did:web method check rejects the uppercase host
+    ['@didpkg/hello_did_dht.a_i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y', 'E_MASK'], // zero mask must be omitted
+    ['@didpkg/hello_did_web.abqa_localhost.3a8443', 'E_MASK'],                                      // trailing zero group
+    ['@didpkg/hello_did_web.abq7_localhost.3a8443', 'E_MASK'],                                      // bits past the end
+    ['@didpkg/hello_did_web.b_localhost.3a8443', 'OK'],                                             // grammar OK (did:web:locaLhost.3a8443); the did:web method check rejects the uppercase host
     ['@didpkg/hello~dht~i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y', 'E_SHAPE'],         // legacy tilde
-    ['@didpkg/Hello_dht_abc', 'E_NAME'],
-    ['@didpkg/my_lib_dht_abc', 'OK'],                                                               // parses as name "my" and did:lib:dht:abc; the resolver rejects method lib
-    ['@didpkg/hello_DHT_abc', 'E_METHOD'],
-    ['@didpkg/hello_dht_', 'E_ENC_CHAR'],
+    ['@didpkg/Hello_did_dht_abc', 'E_NAME'],
+    ['@didpkg/my_lib_did_dht_abc', 'E_KIND'],                                                       // pkg-name "my", then the kind "lib"
+    ['@didpkg/my_did_lib_dht_abc', 'OK'],                                                           // parses as name "my" and did:lib:dht:abc; the resolver rejects method lib
+    ['@didpkg/hello_did_DHT_abc', 'E_METHOD'],
+    ['@didpkg/hello_did_dht_', 'E_ENC_CHAR'],
+    ['@didpkg/hello_did_dht', 'E_SHAPE'],                                                           // no "_" after the method tag
     ['@didpkg/hello__abc', 'E_HASH'],
-    ['@didpkg%2fhello_dht_abc', 'E_SCOPE'],
-    ['@other/hello_dht_abc', 'E_SCOPE'],
-    ['@didpkg/hello_web_localhost%3A8443', 'E_ENC_CHAR'],
-    ['@didpkg/hello_web_a..b', 'OK'],                                                               // valid ABNF, method rules reject later
-    ['@didpkg/hello_web_.%2e', 'E_ENC_CHAR'],
-    ['@didpkg/' + 'h_web_' + 'a'.repeat(209), 'E_LEN'],
+    ['@didpkg%2fhello_did_dht_abc', 'E_SCOPE'],
+    ['@other/hello_did_dht_abc', 'E_SCOPE'],
+    ['@didpkg/hello_did_web_localhost%3A8443', 'E_ENC_CHAR'],
+    ['@didpkg/hello_did_web_a..b', 'OK'],                                                           // valid ABNF, method rules reject later
+    ['@didpkg/hello_did_web_.%2e', 'E_ENC_CHAR'],
+    ['@didpkg/' + 'h_did_web_' + 'a'.repeat(205), 'E_LEN'],
+    ['@didpkg/hello_did', 'E_SHAPE'],                                                               // no "_" after the kind
+    ['@didpkg/hello_DID_dht_abc', 'E_KIND'],
+    ['@didpkg/hello_xid_' + XID, 'OK'],
+    ['@didpkg/hello_xid_' + XID.toUpperCase(), 'E_XID'],
+    ['@didpkg/hello_xid_' + XID.slice(0, 63), 'E_XID'],
+    ['@didpkg/hello_xid_' + XID + '0', 'E_XID'],
+    ['@didpkg/hello_xid_ur.xid', 'E_XID'],
+    ['@didpkg/hello_XID_' + XID, 'E_KIND'],
   ];
   const got = cases.map(([s]) => code(() => parse(s)));
   expect(got).toEqual(cases.map(([, c]) => c));
+});
+
+// Draft 1 names had no kind segment. Each one must fail with E_KIND, and never parse as another DID.
+test('draft 1 names give E_KIND', () => {
+  for (const g of golden) {
+    if (g.installName.includes('__')) continue; // the hash form did not change
+    const draft1 = g.installName.replace(`@didpkg/${g.name}_did_`, `@didpkg/${g.name}_`);
+    expect(code(() => parse(draft1))).toBe('E_KIND');
+  }
+  expect(code(() => parse('@didpkg/hello_dht_abc'))).toBe('E_KIND');
+  expect(code(() => parse('@didpkg/hello_web.b_nonni.org'))).toBe('E_KIND');
+});
+
+test('XID names: format and parse, 141 characters or fewer, npm-valid', () => {
+  for (const name of ['hello', 'a', 'my-lib.core', 'x'.repeat(64)]) {
+    const s = format(XID, name);
+    expect(s).toBe(`@didpkg/${name}_xid_${XID}`);
+    expect(s.length).toBeLessThanOrEqual(141);
+    expect(validate(s).validForNewPackages).toBe(true);
+    expect(parse(s)).toEqual({ kind: 'xid', form: 'direct', name, xid: XID });
+  }
+  expect(format('f'.repeat(64), 'hello')).toBe(`@didpkg/hello_xid_${'f'.repeat(64)}`);
+  expect(code(() => format(XID.toUpperCase(), 'hello'))).toBe('E_XID');
+  expect(code(() => format(XID, 'Hello'))).toBe('E_NAME');
+  expect(code(() => format(XID.slice(0, 62), 'hello'))).toBe('E_DID'); // not 64 hex characters, so not a XID
+  expect(code(() => format(`ur:xid/${XID}`, 'hello'))).toBe('E_DID');
 });
 
 test('hash form: only when the direct form is too long; a wrong DID fails', () => {
@@ -155,5 +197,5 @@ test('hash form: only when the direct form is too long; a wrong DID fails', () =
 
 test('formatDirect length: did:dht with pkg-name of 64 chars', () => {
   const s = formatDirect('did:dht:i9xkp8ddcbcg8jwq54ox699wuzxyifsqx4jru45zodqu453ksz6y', 'x'.repeat(64));
-  expect(s.length).toBe(8 + 64 + 1 + 3 + 1 + 52);
+  expect(s.length).toBe(8 + 64 + 5 + 3 + 1 + 52);
 });

@@ -33,6 +33,7 @@ export async function drl(o: DrlOptions): Promise<Drl> {
   // An install name has no "@" after the scope, so the last "@" after index 0 starts the version.
   const at = o.spec.lastIndexOf('@');
   const p = parse(at > 0 ? o.spec.slice(0, at) : o.spec);
+  if (p.kind === 'xid') throw new Error('KIND_NOT_SUPPORTED: a XID publisher has no release source yet');
   if (p.form !== 'direct') throw new Error('a hash-form name needs a DID binding');
   const { did, name } = p;
   if (DENYLIST.includes(did) || o.denylist?.includes(did)) throw new Error(`DID_RESOLUTION: ${did} is on the denylist (SECURITY.md)`);

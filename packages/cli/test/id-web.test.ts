@@ -73,7 +73,7 @@ describe('id create --web', async () => {
     });
     expect(out.relays).toEqual([]);
     expect(out.targets).toEqual([{ url: `dir:${site}`, ok: true }]);
-    expect(out.installName).toBe('@didpkg/hello_web_example.com_pkgs');
+    expect(out.installName).toBe('@didpkg/hello_did_web_example.com_pkgs');
 
     const fetchStub = async (url: string) => (url === r.documentUrl ? Response.json(hosted) : new Response('not found', { status: 404 }));
     const resolver = new DidResolver({ drivers: [webDriver({ fetch: fetchStub })] });

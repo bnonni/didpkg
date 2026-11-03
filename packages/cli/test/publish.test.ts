@@ -91,7 +91,7 @@ describe('publish', () => {
     expect(r.err).toBe('');
     expect(r.code).toBe(0);
     const out = JSON.parse(r.out);
-    expect(out).toMatchObject({ did, name: 'hello', version: '1.0.0', sequence: 1, installName: `@didpkg/hello_dht_${did.slice(8)}` });
+    expect(out).toMatchObject({ did, name: 'hello', version: '1.0.0', sequence: 1, installName: `@didpkg/hello_did_dht_${did.slice(8)}` });
     expect(out.relays).toEqual([{ url: relay.url, ok: true }]);
     expect(out.targets).toEqual([{ url: dwn.url, ok: true }, { url: `dir:${site}`, ok: true }]);
     expect(existsSync(idPaths('pub', { DIDPKG_HOME: home }).updateKey)).toBe(false);

@@ -106,7 +106,8 @@ describe('tarball route', () => {
 
 describe('HTTP results', () => {
   test('400: the name fails parse()', async () => {
-    expect((await get('/@didpkg/HELLO_web_example.com')).status).toBe(400);
+    expect((await get('/@didpkg/HELLO_did_web_example.com')).status).toBe(400);
+    expect((await get('/@didpkg/hello_web_example.com')).status).toBe(400);
   });
 
   test('403: a denylisted DID, also before resolution', async () => {
@@ -125,7 +126,7 @@ describe('HTTP results', () => {
     expect(await error(await get(`/${INSTALL}`))).toStartWith('INDEX_SIGNATURE:');
   });
 
-  test('404: unknown DID, package and version, a hash-form name, a non-didpkg path and attestations', async () => {
+  test('404: unknown DID, package and version, a hash-form name, a XID name, a non-didpkg path and attestations', async () => {
     expect((await get(`/${format('did:web:example.org', NAME)}`)).status).toBe(404);
     expect(await error(await get(`/${format(DID, 'nope')}`))).toStartWith('INDEX_MISSING:');
     const unlisted = await get(tarballPath('9.9.9'));
@@ -136,6 +137,9 @@ describe('HTTP results', () => {
     expect(lost.status).toBe(404);
     expect(await error(lost)).toStartWith('TARBALL_MISSING:');
     expect(await error(await get(`/@didpkg/hello__${'a'.repeat(51)}q`))).toBe('a hash-form name needs a DID binding');
+    const xid = await get(`/${format('71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c', NAME)}`);
+    expect(xid.status).toBe(404);
+    expect(await error(xid)).toStartWith('KIND_NOT_SUPPORTED:');
     expect((await get('/left-pad')).status).toBe(404);
     expect((await get(`/-/npm/v1/attestations/${INSTALL}@1.0.0`)).status).toBe(404);
   });

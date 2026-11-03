@@ -6,18 +6,19 @@ const spec = await Bun.file(new URL('../../../../docs/spec/install-names.md', im
 const rows = (re: RegExp) => spec.split('\n').flatMap((line) => { const m = re.exec(line); return m ? [m.slice(1)] : []; });
 const code = (f: () => unknown) => { try { f(); return 'OK'; } catch (e) { return (e as GrammarError).code ?? String(e); } };
 
-const formatRows = rows(/^\| `(did:[^`]+)` \| `([^`]+)` \| `(@didpkg\/[^`]+)` \|$/);
+const formatRows = rows(/^\| `(did:[^`]+|[0-9a-f]{64})` \| `([^`]+)` \| `(@didpkg\/[^`]+)` \|$/);
 const parseRows = rows(/^\| `([^`]+)` \| `(OK|E_[A-Z_]+)` \|/);
 
 test('the spec has the 2 vector tables', () => {
-  expect(formatRows.length).toBe(12);
-  expect(parseRows.length).toBe(16);
+  expect(formatRows.length).toBe(13);
+  expect(parseRows.length).toBe(22);
 });
 
-test.each(formatRows)('format(%s, %s)', (did, name, installName) => {
-  expect(format(did!, name!)).toBe(installName!);
+test.each(formatRows)('format(%s, %s)', (id, name, installName) => {
+  expect(format(id!, name!)).toBe(installName!);
   const p = parse(installName!);
-  if (p.form === 'direct') expect([p.did, p.name]).toEqual([did, name]);
+  if (p.kind === 'xid') expect([p.xid, p.name]).toEqual([id, name]);
+  else if (p.form === 'direct') expect([p.did, p.name]).toEqual([id, name]);
   else expect(installName!.length).toBe(8 + name!.length + 2 + 52);
 });
 
@@ -26,6 +27,6 @@ test.each(parseRows)('parse(%s) gives %s', (name, result) => {
 });
 
 test('the worked example of section 3', () => {
-  expect(spec).toContain('The install name is `@didpkg/hello_web.aam_example.com.3a3000_user_alice`.');
-  expect(format('did:web:example.com%3A3000:user:alice', 'hello')).toBe('@didpkg/hello_web.aam_example.com.3a3000_user_alice');
+  expect(spec).toContain('The install name is `@didpkg/hello_did_web.aam_example.com.3a3000_user_alice`.');
+  expect(format('did:web:example.com%3A3000:user:alice', 'hello')).toBe('@didpkg/hello_did_web.aam_example.com.3a3000_user_alice');
 });

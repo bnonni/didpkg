@@ -15,7 +15,7 @@ test('every canonical name routes the same for npm (%2f), pnpm (%2F), bun (%2f) 
         expect(r.kind).toBe('packument');
         if (r.kind === 'packument') {
           expect(r.name).toBe(name);
-          if (r.parsed.form === 'direct') expect(r.parsed.did).toBe(v.did);
+          if (r.parsed.kind === 'did' && r.parsed.form === 'direct') expect(r.parsed.did).toBe(v.did);
         }
       }
       const t = route('GET', `/@didpkg/${body}/-/${body}-1.2.3-beta.1+b7.tgz?did=x`);
@@ -31,20 +31,31 @@ test('the drpm.tools misparse cannot happen: legacy and hostile paths are reject
   const cases: [string, string, string][] = [
     ['GET', '/@didpkg%2freact~web~nonni.org', 'reject'],             // legacy "~method~": no guessing
     ['GET', '/@drpm%2freact~web~nonni.org', 'reject'],               // other scope
-    ['GET', `/@didpkg%252fhello_dht_${dht}`, 'reject'],              // double encoding
-    ['GET', `/@didpkg%2fhello_dht_${dht}%2f..`, 'reject'],
-    ['GET', `/@didpkg%2f..%2fhello_dht_${dht}`, 'reject'],
-    ['GET', '/@didpkg%2fhello_web_localhost%253A8443', 'reject'],
-    ['GET', '/@didpkg%2fhello_web_localhost%3A8443', 'reject'],     // raw percent in the body
-    ['GET', `/@didpkg%2fHello_dht_${dht}`, 'reject'],                // uppercase
-    ['GET', `/@didpkg%2fhello_dht.a_${dht}`, 'reject'],              // non-canonical mask
-    ['GET', `/@didpkg/hello_dht_${dht}/-/other_dht_${dht}-1.0.0.tgz`, 'reject'], // file for another name
-    ['GET', `/@didpkg/hello_dht_${dht}/-/hello_dht_${dht}-latest.tgz`, 'reject'],
-    ['DELETE', `/@didpkg%2fhello_dht_${dht}`, 'reject'],
-    ['GET', `/@didpkg%2fhello_dht_${dht}`, 'packument'],
+    ['GET', `/@didpkg%252fhello_did_dht_${dht}`, 'reject'],          // double encoding
+    ['GET', `/@didpkg%2fhello_did_dht_${dht}%2f..`, 'reject'],
+    ['GET', `/@didpkg%2f..%2fhello_did_dht_${dht}`, 'reject'],
+    ['GET', '/@didpkg%2fhello_did_web_localhost%253A8443', 'reject'],
+    ['GET', '/@didpkg%2fhello_did_web_localhost%3A8443', 'reject'], // raw percent in the body
+    ['GET', `/@didpkg%2fHello_did_dht_${dht}`, 'reject'],            // uppercase
+    ['GET', `/@didpkg%2fhello_did_dht.a_${dht}`, 'reject'],          // non-canonical mask
+    ['GET', `/@didpkg/hello_did_dht_${dht}/-/other_did_dht_${dht}-1.0.0.tgz`, 'reject'], // file for another name
+    ['GET', `/@didpkg/hello_did_dht_${dht}/-/hello_did_dht_${dht}-latest.tgz`, 'reject'],
+    ['DELETE', `/@didpkg%2fhello_did_dht_${dht}`, 'reject'],
+    ['GET', `/@didpkg%2fhello_dht_${dht}`, 'reject'],                // draft 1 name: no kind segment
+    ['GET', `/@didpkg%2fhello_did_dht_${dht}`, 'packument'],
   ];
   const got = cases.map(([m, p]) => route(m, p));
   expect(got.map((r): string => r.kind)).toEqual(cases.map((c) => c[2]));
+});
+
+test('a XID name routes with kind xid; the router does not decide if the shim serves it', () => {
+  const xid = '71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c';
+  const r = route('GET', `/@didpkg%2fhello_xid_${xid}`);
+  expect(r).toEqual({ kind: 'packument', name: `@didpkg/hello_xid_${xid}`, parsed: { kind: 'xid', form: 'direct', name: 'hello', xid } });
+  const t = route('GET', `/@didpkg/hello_xid_${xid}/-/hello_xid_${xid}-1.0.0.tgz`);
+  expect(t.kind).toBe('tarball');
+  const bad = route('GET', `/@didpkg%2fhello_xid_${xid.toUpperCase()}`);
+  expect(bad.kind === 'reject' && bad.status).toBe(400);
 });
 
 // Regression test for the drpm.tools route bug.

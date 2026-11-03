@@ -151,7 +151,7 @@ describe('id create --btcr2', async () => {
     const out = await publish({ identity, tarball: npmTgz({ name: 'hello', version: '1.0.0' }), to: [`dir:${site}`], passphrase: async () => PASS });
     expect(out.relays).toEqual([]);
     expect(out.targets).toEqual([{ url: `dir:${site}`, ok: true }]);
-    expect(out.installName).toBe(`@didpkg/hello_btcr2_${r.did.slice('did:btcr2:'.length)}`);
+    expect(out.installName).toBe(`@didpkg/hello_did_btcr2_${r.did.slice('did:btcr2:'.length)}`);
     const [release] = await Array.fromAsync(new DirWriter(site).read({ kind: 'release', name: 'hello', version: '1.0.0' }, { signal: AbortSignal.timeout(5000), maxBytes: 1 << 20 }));
     expect((await verifyProof(JSON.parse(new TextDecoder().decode(release)), resolved.didDocument!)).verificationMethod).toBe(r.keyId);
   });

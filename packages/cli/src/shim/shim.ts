@@ -68,6 +68,7 @@ export function shimHandler(o: ShimOptions): (req: Request) => Promise<Response>
       const r = route(req.method, url.pathname);
       if (r.kind === 'reject') throw new HttpError(r.status, r.reason);
       if (r.kind === 'publish') throw new HttpError(405, 'the shim does not publish');
+      if (r.parsed.kind === 'xid') throw new HttpError(404, 'KIND_NOT_SUPPORTED: a XID publisher has no release source yet');
       if (r.parsed.form !== 'direct') throw new HttpError(404, 'a hash-form name needs a DID binding');
       const { did, name } = r.parsed;
       if (denied.has(did)) throw new PolicyError('DID_RESOLUTION', `${did} is on the denylist (SECURITY.md)`);
