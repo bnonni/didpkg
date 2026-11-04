@@ -74,6 +74,12 @@ npm test
 npm run typecheck
 ```
 
+The test `packages/cli/test/interop-xid.test.ts` reads the XID documents, release records and SSKR shares of didpkg with `envelope`, the Rust reference tool of Gordian Envelope. The test needs Docker and a local image of the tool. If the image is absent, the test skips. Build the image before you run the test:
+
+```sh
+docker build -t didpkg-envelope-cli:0.35.0 packages/cli/test/interop
+```
+
 The `allowScripts` field in the root `package.json` lets the `bun` package run its install script, which gets the Bun binary. If you install with `--ignore-scripts`, run `npm rebuild bun` after the install.
 
 The landing page for `didpkg.dev` is in `site/`: 1 HTML page, the CSS and the DWN protocol v1 definition. The build writes `site/dist`. The link check reads the site, the Markdown files and the GitHub URLs in the source. Each relative link and each anchor must have a target.
