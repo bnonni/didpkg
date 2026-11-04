@@ -26,6 +26,8 @@ A DWN is optional. With only a mirror, the shim reads each package from the mirr
 
 A did:web install name is short and easy to read. A did:dht DID needs no host and no DNS name.
 
+To publish with a XID in place of a DID, read [A XID publisher](#a-xid-publisher).
+
 ## 2. Prepare the passphrases
 
 didpkg encrypts each private key with a passphrase. A passphrase must have 12 or more characters. In a terminal, didpkg asks for each new passphrase 2 times.
@@ -207,6 +209,34 @@ Use the `installName` from step 6 in [Quickstart](quickstart.md), steps 2 to 4:
 ```sh
 npm install @didpkg/hello_did_web_me.github.io_pkgs
 ```
+
+## A XID publisher
+
+A XID publisher uses a XID ([BCR-2024-010](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-010-xid.md)) in place of a DID. The steps above apply, with these changes:
+
+1. Make the identity with `--xid`. The command does no network write.
+
+   ```sh
+   didpkg id create gordian --xid --dwn https://dwn.example.com --repo https://pkgs.example.com/
+   ```
+
+2. Keep the key files safe. `DIDPKG_PASSPHRASE` locks the release key and the DWN key. `DIDPKG_UPDATE_PASSPHRASE` locks the inception key in `gordian.update-key.envelope`. Move that file offline. For a backup of all keys, use [`didpkg id backup gordian --sskr 2-of-3`](cli.md#didpkg-id-backup).
+3. Register on the DWN: `didpkg id register gordian`. The tenant is the `did:key` of the DWN key, not the XID.
+4. Publish to the DWN and to the mirror folder:
+
+   ```sh
+   didpkg publish gordian hello-1.0.0.tgz --to dwn --to dir:../pkgs
+   ```
+
+5. Push the mirror. The folder gets `xid/<hex>.envelope` (the XID document), `hello/index.envelope`, `hello/1.0.0.envelope` and `hello/1.0.0.tgz`. The DWN does not hold the XID document. Thus a XID publisher must have a static mirror, also with a DWN.
+6. Check the install. A XID name has no host, so the shim must get the mirror URL as a XID resolver:
+
+   ```sh
+   didpkg shim start --xid-resolver https://pkgs.example.com/
+   npm install @didpkg/hello_xid_<hex>
+   ```
+
+Tell your users the mirror URL. They can also put it in the `xid-resolver` list of the [config file](cli.md#config-file). After each [`didpkg id update`](cli.md#didpkg-id-update), copy the new `gordian.xid.envelope` to `xid/<hex>.envelope` in the mirror. A publish to the folder also writes it. Then push the mirror again.
 
 ## Publish from CI
 

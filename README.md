@@ -33,15 +33,18 @@ echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
 npm install @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
-The install name holds the package name, the identifier kind `did`, the DID method and the DID. The demo has the package `hello` from 5 publishers:
+The install name holds the package name, the identifier kind (`did` or `xid`) and the identifier. A DID name also holds the DID method. The demo has the package `hello` from 6 publishers:
 
-| DID method | Install name |
+| Identifier | Install name |
 |---|---|
 | did:dht | `@didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` |
 | did:web | `@didpkg/hello_did_web_bnonni.github.io_didpkg-demo` |
 | did:webvh | `@didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs` |
 | did:plc | `@didpkg/hello_did_plc_3zo7womke3qzjadke2q4lukr` |
 | did:btcr2 | `@didpkg/hello_did_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6` |
+| XID | `@didpkg/hello_xid_816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967` |
+
+A XID name has no host. Thus the shim needs a XID resolver for it: start it with `didpkg shim start --xid-resolver https://nonni.org/pkgs/xid/`.
 
 The [quickstart](docs/quickstart.md) gives each step and the HTTP errors. For one install with no shim, `didpkg drl` prints a verified tarball URL ([one-off install](docs/quickstart.md#one-off-install-with-no-shim)).
 
@@ -59,9 +62,9 @@ The [docs index](docs/README.md) lists all documents. Start with these:
 
 | Path | npm name | Role |
 |---|---|---|
-| `packages/core` | `@didpkg/core` | `name/`: the install-name grammar and the shim request router. `did/`: the DID resolver and the did:key, did:jwk, did:dht, did:web, did:webvh, did:plc and did:btcr2 drivers. `trust/`: the release proofs and the release verifier. `source/`: the storage contract and the npm packument. |
+| `packages/core` | `@didpkg/core` | `name/`: the install-name grammar and the shim request router. `did/`: the DID resolver and the did:key, did:jwk, did:dht, did:web, did:webvh, did:plc and did:btcr2 drivers. `xid/`: the XID document reader and the XID resolver. `trust/`: the release proofs and the release verifier. `source/`: the storage contract and the npm packument. |
 | `packages/adapter-https` | `@didpkg/adapter-https` | The static HTTPS mirror (`DIDPackageRepository`): the reader `httpsAdapter` and the `dir:` writer `DirWriter`, which also reads its folder back (ADR 0003 section 7). |
-| `packages/adapter-dwn` | `@didpkg/adapter-dwn` | The publisher DWN (`DecentralizedWebNode`): the protocol v1, the reader `dwnAdapter` (with a rate limit per DWN origin) and the writer `DwnWriter` (ADR 0003 section 6). |
+| `packages/adapter-dwn` | `@didpkg/adapter-dwn` | The publisher DWN (`DecentralizedWebNode`): the protocols v1 and v2, the reader `dwnAdapter` (with a rate limit per DWN origin) and the writer `DwnWriter` (ADR 0003 section 6). |
 | `packages/cli` | `didpkg` | `didpkg name` and `didpkg parse` (from `didpkg@0.0.1`). `didpkg id create\|show`: a did:dht publisher DID, with the encrypted release key `#didpkg-1` and a separate update key file (`#0`). `didpkg id register`: accepts the terms of a DWN, then registers the DID there with a proof of work. `didpkg publish`: signs an `npm pack` tarball with `#didpkg-1` and writes the same bytes to the DWN and to `dir:` folders. `didpkg shim start`: the npm shim on 127.0.0.1, which verifies each packument and tarball before it serves them. `didpkg drl`: verifies one version as the shim does, then prints the tarball URL for a one-off install with no shim. |
 
 ## Develop
@@ -107,18 +110,19 @@ The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dw
 npm run stack
 ```
 
-The live demo has 5 publishers. Each publisher publishes `hello@1.0.0`:
+The live demo has 6 publishers. Each publisher publishes `hello@1.0.0`:
 
 - `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` publishes to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)).
 - `did:web:bnonni.github.io:didpkg-demo` publishes to `dwn.didpkg.dev` and to the `web/` folder of the same mirror.
 - `did:webvh:QmYpG6W1WsQVeXs8eJ2z4NMAaRFr4EkUe3vyKJMMdHxUiJ:nonni.org:pkgs` publishes only to a static mirror at `https://nonni.org/pkgs/`.
 - `did:plc:3zo7womke3qzjadke2q4lukr` publishes only to a static mirror at `https://nonni.org/pkgs/plc/`.
 - `did:btcr2:x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6` publishes only to a static mirror at `https://nonni.org/pkgs/btcr2/`. Its genesis document is a raw block in IPFS.
+- The XID `816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967` publishes to `dwn.didpkg.dev` and to a static mirror at `https://nonni.org/pkgs/xid/`. The mirror also holds its XID document.
 
-This command starts a shim with the public Pkarr relays. Then it installs the 5 packages with npm, pnpm and bun:
+This command starts a shim with the public Pkarr relays. Then it installs the 6 packages with npm, pnpm and bun:
 
 ```sh
-npm run live -- @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_did_web_bnonni.github.io_didpkg-demo @didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_did_plc_3zo7womke3qzjadke2q4lukr @didpkg/hello_did_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6
+npm run live -- --xid-resolver https://nonni.org/pkgs/xid/ @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_did_web_bnonni.github.io_didpkg-demo @didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_did_plc_3zo7womke3qzjadke2q4lukr @didpkg/hello_did_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6 @didpkg/hello_xid_816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967
 ```
 
 ## Old drpm code

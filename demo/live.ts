@@ -1,8 +1,8 @@
 // The install check against the live demo DWN and the live mirrors. User B has no keys.
 // B starts `didpkg shim start` with the default public Pkarr relays. Then npm, pnpm and bun install each name
 // with a cold cache, and Node loads it. Run it with the DWN up, then stop the DWN (docs/deploy.md) and run it
-// again with --dwn-down: the installs then come from the mirrors.
-// Usage, from the repo root: npm run live -- [--dwn-down] <install-name>...
+// again with --dwn-down: the installs then come from the mirrors. A XID name needs a XID resolver: give it with --xid-resolver.
+// Usage, from the repo root: npm run live -- [--dwn-down] [--xid-resolver <url>]... <install-name>...
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,7 +13,12 @@ const EXPECTED = 'hello from didpkg';
 const cli = fileURLToPath(new URL('../packages/cli/src/cli.ts', import.meta.url));
 const args = process.argv.slice(2);
 const dwnDown = args.includes('--dwn-down');
-const names = args.filter((a) => a !== '--dwn-down');
+const xidResolvers: string[] = [];
+const names: string[] = [];
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--xid-resolver') xidResolvers.push(args[++i] ?? '');
+  else if (args[i] !== '--dwn-down') names.push(args[i]!);
+}
 const tmp = mkdtempSync(join(tmpdir(), 'didpkg-live-'));
 const t0 = performance.now();
 let stopShim = async () => {};
@@ -51,7 +56,9 @@ async function install(home: string, shimUrl: string, cmd: string[]) {
 }
 
 try {
-  if (names.length === 0) throw new Error('usage: npm run live -- [--dwn-down] <install-name>...');
+  if (names.length === 0 || xidResolvers.includes('')) {
+    throw new Error('usage: npm run live -- [--dwn-down] [--xid-resolver <url>]... <install-name>...');
+  }
   await step(`${DWN}/health ${dwnDown ? 'fails' : 'is ok'}`, async () => {
     const up = await fetch(`${DWN}/health`, { signal: AbortSignal.timeout(10_000) }).then((r) => r.ok, () => false);
     if (up === dwnDown) throw new Error(dwnDown ? 'the DWN is up: stop it first' : 'the DWN is down');
@@ -60,7 +67,8 @@ try {
   const home = newHome('home-b');
   const log = join(home, 'shim.log');
   const shimUrl = await (async () => {
-    const p = Bun.spawn([process.execPath, cli, 'shim', 'start', '--port', '0'], {
+    const xidFlags = xidResolvers.flatMap((url) => ['--xid-resolver', url]);
+    const p = Bun.spawn([process.execPath, cli, 'shim', 'start', '--port', '0', ...xidFlags], {
       env: { PATH: process.env.PATH!, HOME: home }, stdin: 'ignore', stdout: 'pipe', stderr: Bun.file(log),
     });
     stopShim = async () => {
@@ -71,7 +79,7 @@ try {
     if (!first.value) throw new Error(`the shim did not start: ${readFileSync(log, 'utf8').trim()}`);
     return (JSON.parse(new TextDecoder().decode(first.value)) as { url: string }).url;
   })();
-  console.log(`     shim ${shimUrl} (default relays)`);
+  console.log(`     shim ${shimUrl} (default relays${xidResolvers.length ? `, XID resolvers ${xidResolvers.join(' ')}` : ''})`);
 
   const npmFlags = ['--no-audit', '--no-fund', '--no-update-notifier', '--fetch-retries', '0'];
   for (const [i, name] of names.entries()) {
