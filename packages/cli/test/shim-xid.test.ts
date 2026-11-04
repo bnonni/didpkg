@@ -1,5 +1,5 @@
 // A XID publisher end to end: `didpkg publish` to a folder, a static server on the folder as the mirror and
-// the XID resolver, then `npm install` through `didpkg shim start`. Then a key rotation with a TOFU pin.
+// the XID resolver, then `npm install` through `didpkg shim start` and `didpkg drl`. Then a key rotation with a TOFU pin.
 // Each lock and each open of a key costs one Argon2id run (about 0.5 s).
 import { afterAll, beforeAll, expect, setDefaultTimeout, test } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { sri, type Pin } from '@didpkg/core/trust';
 import { startDwn, startRelay } from '../../adapter-dwn/test/server.ts';
 import { serveDir, type StaticServer } from '../../adapter-https/test/serve.ts';
+import { drl, type DrlOptions } from '../src/drl.ts';
 import { createXid, updateXid } from '../src/id/xid.ts';
 import { shimHandler } from '../src/shim/shim.ts';
 import { readSide } from '../src/shim/start.ts';
@@ -97,6 +98,26 @@ test('npm install through the shim gets the signed integrity', async () => {
   expect(JSON.parse(readFileSync(join(app, 'node_modules', ...installName.split('/'), 'package.json'), 'utf8')).version).toBe('1.0.0');
   // The shim keeps the newest XID document in its home.
   expect(readFileSync(join(home, 'xid', `${xid}.envelope`)).equals(readFileSync(join(site, 'xid', `${xid}.envelope`)))).toBe(true);
+});
+
+test('drl gives the mirror URL and the signed sha512 of a XID release', async () => {
+  const r = await run([process.execPath, cli, 'drl', installName, '--xid-resolver', mirror.base, '--allow-loopback']);
+  expect(r.code, r.err).toBe(0);
+  expect(JSON.parse(r.out)).toEqual({
+    xid, name: 'hello', version: '1.0.0',
+    url: `${mirror.base}hello/1.0.0.tgz`,
+    endpoint: mirror.base,
+    integrity: await sri('sha512', new Uint8Array(readFileSync(join(site, 'hello/1.0.0.tgz')))),
+  });
+
+  // A read side with no XID resolver and no cached XID document.
+  const failure = (o: Partial<DrlOptions>) => drl({ spec: `${installName}@1.0.0`, ...readSide({ allowLoopback: true }), ...o }).then(
+    () => 'no error',
+    (e: Error) => e.message,
+  );
+  expect(await failure({})).toStartWith('XID_NOT_FOUND: no source has the XID document: no XID resolver is set');
+  expect(await failure({ xidResolver: undefined })).toBe('KIND_NOT_SUPPORTED: "drl" has no XID resolver');
+  expect(await failure({ denylist: [xid] })).toBe(`${xid} is on the denylist (SECURITY.md)`);
 });
 
 test('after a release key rotation, the index has both signatures, and a client with a pin on the old key accepts it', async () => {

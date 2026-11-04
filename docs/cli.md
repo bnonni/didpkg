@@ -42,7 +42,7 @@ didpkg name ur:xid/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbint
 @didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
 ```
 
-The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. A bad `ur:xid` gives `XID_INVALID`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services. A XID name installs through the shim with a XID resolver ([`--xid-resolver`](#didpkg-shim-start)). `didpkg drl` refuses a XID name with `KIND_NOT_SUPPORTED`.
+The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. A bad `ur:xid` gives `XID_INVALID`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services. A XID name installs through the shim with a XID resolver ([`--xid-resolver`](#didpkg-shim-start)). `didpkg drl` takes a XID name with the same option.
 
 ## didpkg parse
 
@@ -426,7 +426,7 @@ An unknown key or a bad value stops the shim before it starts, with exit code 1.
 ## didpkg drl
 
 ```text
-didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--allow-loopback]
+didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--allow-loopback]
 ```
 
 Does the checks of the shim for one version. Then it prints the plain HTTPS URL of the signed tarball. npm, pnpm and bun can install the package from this URL with no shim and no `.npmrc` line. For the trade-off, read [Quickstart](quickstart.md#one-off-install-with-no-shim).
@@ -435,7 +435,7 @@ If you give no version, the command uses the `latest` dist-tag of the signed ind
 
 The URL comes from the first endpoint that gives the signed tarball. The DWN endpoints come first:
 
-- For a DWN, the URL is a DRL (Decentralized Resource Locator): `<dwn>/<did>/read/protocols/<protocol>/package/release/tarball?filter.contextId=<id>&filter.tags.version=<version>`. `<protocol>` is the base64url form of `https://didpkg.dev/protocols/repository/v1`. `<id>` is the `contextId` of the package record.
+- For a DWN, the URL is a DRL (Decentralized Resource Locator): `<dwn>/<did>/read/protocols/<protocol>/package/release/tarball?filter.contextId=<id>&filter.tags.version=<version>`. `<protocol>` is the base64url form of `https://didpkg.dev/protocols/repository/v1`. `<id>` is the `contextId` of the package record. For a XID publisher, `<did>` is the did:key of the DWN key, and the protocol is `https://didpkg.dev/protocols/repository/v2`.
 - For a static mirror, the URL is `<repo>/<name>/<version>.tgz`.
 
 The command prints JSON to stdout:
@@ -451,7 +451,7 @@ The command prints JSON to stdout:
 }
 ```
 
-`endpoint` is the service of the DID document that gave the tarball. `integrity` is the sha512 of the signed release. Each policy warning goes to stderr. If a check fails, the command stops with exit code 1. The error gives the code of the check, for example `YANKED` or `INTEGRITY`. Thus a yanked version gives no URL.
+`endpoint` is the service of the DID document that gave the tarball. For a XID name, the JSON has `xid` (64 hex characters) in place of `did`, and `endpoint` is the URI of the XID service. `integrity` is the sha512 of the signed release. Each policy warning goes to stderr. If a check fails, the command stops with exit code 1. The error gives the code of the check, for example `YANKED` or `INTEGRITY`. Thus a yanked version gives no URL.
 
 ## didpkg --help
 

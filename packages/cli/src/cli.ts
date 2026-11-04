@@ -59,7 +59,8 @@ Usage:
   didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--mode enforce|warn]
                     [--allow-loopback]
                                   Serve verified @didpkg packages to npm on 127.0.0.1 (default port 2092)
-  didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--allow-loopback]
+  didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]...
+                    [--allow-loopback]
                                   Verify one version as the shim does, then print the tarball URL and the signed sha512
   didpkg --help                   Print this help
   didpkg --version                Print the version
@@ -402,7 +403,7 @@ async function shimCommand(args: string[]): Promise<string> {
 /** Prints the tarball URL and the signed sha512 as JSON on stdout, and each warning on stderr. */
 async function drlCommand(args: string[]): Promise<string> {
   const loopback = args.includes('--allow-loopback');
-  const { positional, values } = options(args.filter((a) => a !== '--allow-loopback'), ['--relay', '--cas', '--sidecar']);
+  const { positional, values } = options(args.filter((a) => a !== '--allow-loopback'), ['--relay', '--cas', '--sidecar', '--xid-resolver']);
   if (positional.length !== 1) throw new UsageError(`"drl" needs 1 argument: <install-name>[@<version>] (got ${positional.length})`);
   const o = readOptions(values, loopback);
   const { warnings, ...out } = await drl({ spec: positional[0]!, ...readSide(o) });
