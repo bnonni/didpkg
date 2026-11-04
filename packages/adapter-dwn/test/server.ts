@@ -32,10 +32,11 @@ function freePort(): number {
 }
 
 /** Starts the dwn-server in open mode (no tenant allowlist) with a new LevelDB folder. The rate limits are off.
- * `env` adds variables, for example a proxy and a CA for did:web. `dir` is the working folder of the server. */
-export async function startDwn(o: { relayUrl: string; env?: Record<string, string> }) {
+ * `env` adds variables, for example a proxy and a CA for did:web. `dir` is the working folder of the server.
+ * `main` is the start script; the default is the main.js of dwn-server. */
+export async function startDwn(o: { relayUrl: string; env?: Record<string, string>; main?: string }) {
   const pkgJson = fileURLToPath(import.meta.resolve('@enbox/dwn-server/package.json'));
-  const main = join(pkgJson, '..', 'dist', 'esm', 'src', 'main.js');
+  const main = o.main ?? join(pkgJson, '..', 'dist', 'esm', 'src', 'main.js');
   const dir = mkdtempSync(join(tmpdir(), 'didpkg-dwn-'));
   const port = freePort();
   const url = `http://127.0.0.1:${port}`;

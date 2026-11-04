@@ -85,7 +85,8 @@ export async function webvhFixture(address = 'pkg.example.com', paths?: string[]
       return { proofValue: 'z' + base58.encode(await ed.signAsync(data, update.secretKey)) };
     },
   };
-  const releaseKey = toMultikey({ alg: 'Ed25519', bytes: (await ed.keygenAsync()).publicKey });
+  const release = await ed.keygenAsync();
+  const releaseKey = toMultikey({ alg: 'Ed25519', bytes: release.publicKey });
   const document = (endpoint: string): DIDDocument => ({
     '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/multikey/v1'],
     id: '{DID}',
@@ -104,7 +105,7 @@ export async function webvhFixture(address = 'pkg.example.com', paths?: string[]
   };
   const deactivate = async (log: DIDLog) => (await deactivateDID({ log, signer, verifier })).log;
   const jsonl = (log: DIDLog) => log.map((e) => JSON.stringify(e)).join('\n') + '\n';
-  return { did, log: created.log, doc: created.doc, releaseKey, url: `${base}/did.jsonl`, update: update2, deactivate, jsonl };
+  return { did, log: created.log, doc: created.doc, releaseKey, releaseSecret: release.secretKey, url: `${base}/did.jsonl`, update: update2, deactivate, jsonl };
 }
 
 export const textResponse = (body: string, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/jsonl' } });
