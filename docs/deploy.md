@@ -6,7 +6,7 @@ This runbook puts the demo DWN `dwn.didpkg.dev` on one VPS. The files are in `de
 
 | Part | Version | Task |
 |---|---|---|
-| `dwn` | `@enbox/dwn-server` 0.1.45 on Bun 1.4.4 (`deploy/dwn/`, built on the VPS) | The DWN, with registration (terms of service and proof of work) and a quota for each tenant. Its port is not published. |
+| `dwn` | `@enbox/dwn-server` 0.1.45 on Bun 1.4.4 (`deploy/dwn/`, built on the VPS), started by `deploy/dwn/start.ts` | The DWN, with registration (terms of service and proof of work) and a quota for each tenant. Its port is not published. |
 | `traefik` | Traefik v3.7.16 | TLS from Let's Encrypt (TLS-ALPN challenge), the route allowlist, the limits. |
 | `didpkg-dwn-backup.timer` | systemd on the host | One backup each day at 03:30 UTC (plus a random delay of up to 15 min). |
 
@@ -19,6 +19,7 @@ Rules of the stack:
 5. A request body can be 17 MiB at most. A DWN record can be 16 MiB at most.
 6. The data is in the Docker volume `didpkg-dwn_dwn-sqlite`, in 2 SQLite files: `dwn.db` (the DWN records) and `registration.db` (the tenants and the quotas). The certificate is in `didpkg-dwn_acme`.
 7. Each tenant can store 50 MiB of record data and 10,000 DWN messages. A write over the quota fails with HTTP 500 and `TenantStorageQuotaExceeded` or `TenantMessageQuotaExceeded`.
+8. The DWN resolves did:dht, did:jwk, did:key, did:web and did:webvh. The stock dwn-server does not resolve did:webvh, so the image runs `deploy/dwn/start.ts` in place of the `main.js` of dwn-server. The start script adds the did:webvh driver of `packages/core/src` (`deploy/dwn/resolver.ts`). The image build copies that folder (`additional_contexts` in `compose.yaml`), thus the VPS needs the full repository.
 
 The only secret is `deploy/.env` (the admin token). The DWN data and the backups hold only public data: packages and tenant DIDs.
 

@@ -86,7 +86,7 @@ jobs:
       - name: Run the demo with the installed bin
         run: DIDPKG_BIN="$RUNNER_TEMP/global/bin/didpkg" npm run demo
 
-  # The deploy files of the demo DWN (deploy/), with a demo CA and a local relay in place of the public services.
+  # The deploy files of the demo DWN (deploy/), with a demo CA, a local relay and a local did:webvh host in place of the public services.
   deploy:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

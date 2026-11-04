@@ -2,7 +2,10 @@
   "name": "didpkg-dwn",
   "private": true,
   "dependencies": {
-    "@enbox/dwn-server": "0.1.45"
+    "@enbox/dwn-server": "0.1.45",
+    "@noble/hashes": "2.4.0",
+    "@scure/base": "2.4.0",
+    "didwebvh-ts": "3.0.0"
   },
   "overrides": {
     "cborg": "6.1.5"

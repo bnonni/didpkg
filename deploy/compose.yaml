@@ -10,8 +10,13 @@ x-logging: &logging
 
 services:
   dwn:
-    build: ./dwn
-    image: didpkg-dwn:0.1.45
+    build:
+      context: ./dwn
+      # The image copies only this folder of the repo: the did:webvh driver of resolver.ts and its imports.
+      additional_contexts:
+        core: ../packages/core/src
+    # dwn-server 0.1.45 with the start script of deploy/dwn.
+    image: didpkg-dwn:0.1.45-didpkg.1
     restart: unless-stopped
     init: true
     security_opt: [no-new-privileges:true]

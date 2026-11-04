@@ -1,13 +1,15 @@
-// The deploy stack test. It starts deploy/compose.yaml with two local changes: a demo CA in place of
-// Let's Encrypt, and a did:dht relay container in place of relay.pkarr.org. Then it proves, through Traefik:
+// The deploy stack test. It starts deploy/compose.yaml with three local changes: a demo CA in place of
+// Let's Encrypt, a did:dht relay container in place of relay.pkarr.org, and a web container that is the host of a did:webvh DID.
+// Then it proves, through Traefik:
 // the route allowlist (check.sh), the registration (terms and proof of work), a write and a read with the didpkg DWN adapter,
+// a write and a read of a did:webvh publisher (the DWN resolves did:webvh with deploy/dwn/resolver.ts),
 // the body limit, backup.sh and restore.sh, the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.
 // Needs Docker with Compose 2.24 or later, openssl and curl. Run: npm run stack
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { makeCerts } from '../../demo/tls.ts';
-import { dhtFixture } from '../../packages/core/test/did/helpers.ts';
+import { makeCerts, WEB_HOST } from '../../demo/tls.ts';
+import { dhtFixture, webvhFixture } from '../../packages/core/test/did/helpers.ts';
 import { DwnWriter, ed25519MessageSigner } from '../../packages/adapter-dwn/src/writer.ts';
 import { getTerms, register } from '../../packages/adapter-dwn/src/registration.ts';
 import { dwnAdapter } from '../../packages/adapter-dwn/src/index.ts';
@@ -19,6 +21,10 @@ const BUN_IMAGE = 'oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bd
 const RELAY = `Bun.serve({ port: 8080, async fetch(req) {
   const f = Bun.file('/relay/' + new URL(req.url).pathname.slice(1).replace(/[^a-z0-9]/g, ''));
   return (await f.exists()) ? new Response(f, { headers: { 'content-type': 'application/pkarr.org/relays#payload' } }) : new Response('not found', { status: 404 });
+} });`;
+// GET /pkgs/did.jsonl over TLS gives the log of the did:webvh publisher. The network alias of the container is WEB_HOST.
+const WEB = `Bun.serve({ port: 443, tls: { cert: Bun.file('/web/site.pem'), key: Bun.file('/web/site.key') }, fetch(req) {
+  return new URL(req.url).pathname === '/pkgs/did.jsonl' ? new Response(Bun.file('/web/did.jsonl')) : new Response('not found', { status: 404 });
 } });`;
 
 // The CA must be in NODE_EXTRA_CA_CERTS when Bun starts, so the test makes the CA and runs itself again.
@@ -100,6 +106,10 @@ tls:
         keyFile: /test/site.key
 `);
   mkdirSync(join(dir, 'relay'));
+  // The web container has its own demo CA. Only the dwn container trusts it.
+  const web = join(dir, 'web');
+  mkdirSync(web);
+  await makeCerts(web, WEB_HOST);
   writeFileSync(join(dir, 'override.yaml'), `services:
   dwn:
     environment:
@@ -107,6 +117,16 @@ tls:
       DID_DHT_ALLOW_PRIVATE_GATEWAY: "1"
       # About 2^16 hashes for each registration, not 2^24: the test stays fast.
       DWN_REGISTRATION_PROOF_OF_WORK_INITIAL_MAX_HASH: 0000${'F'.repeat(60)}
+      NODE_EXTRA_CA_CERTS: /web/ca.pem
+    volumes:
+      - "${web}:/web:ro"
+  web:
+    image: ${BUN_IMAGE}
+    entrypoint: ["bun", "-e", ${JSON.stringify(WEB)}]
+    volumes: ["${web}:/web:ro"]
+    networks:
+      default:
+        aliases: [${WEB_HOST}]
   relay:
     image: ${BUN_IMAGE}
     entrypoint: ["bun", "-e", ${JSON.stringify(RELAY)}]
@@ -161,6 +181,17 @@ tls:
     ];
     const same = (got: Uint8Array[]) => [files.index, files.release, files.tarball].every((want, i) => Buffer.compare(want, got[i]!) === 0);
     check(same(await readAll()), 'the reader gets the same index, release and tarball bytes through Traefik');
+
+    // dwn-server 0.1.45 alone does not resolve did:webvh. The release key is an Ed25519 Multikey method.
+    const vh = await webvhFixture(WEB_HOST, ['pkgs']);
+    writeFileSync(join(web, 'did.jsonl'), vh.jsonl(vh.log));
+    const vhWriter = new DwnWriter({ dwnUrl: base, did: vh.did, signer: ed25519MessageSigner(vh.releaseSecret, `${vh.did}#didpkg-1`) });
+    await register(base, vh.did, { terms });
+    await vhWriter.installProtocol();
+    await vhWriter.publish({ name: 'hello', version: '1.0.0', ...files });
+    const vhReader = dwnAdapter({ allowLoopback: true }).reader({ did: vh.did, serviceId: `${vh.did}#dwn`, type: 'DecentralizedWebNode', url: base }, { fetch });
+    const vhTarball = await all(vhReader, { kind: 'tarball', name: 'hello', version: '1.0.0' });
+    check(Buffer.compare(vhTarball, files.tarball) === 0, 'a did:webvh publisher registers, writes a release and reads it through Traefik');
 
     const big = await fetch(`${base}/`, { method: 'POST', body: new Uint8Array(18 * 1024 * 1024) });
     check(big.status === 413, `Traefik refuses an 18 MiB body (${big.status})`);
