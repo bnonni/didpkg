@@ -104,7 +104,7 @@ didpkg is experimental. It had no security audit. These limits apply:
 2. Only the `@didpkg` packages go through the shim. The dependencies of a `@didpkg` package come from your usual registry, and didpkg does not check them.
 3. The shim does not find 2 valid index copies with the same `sequence` and different content at read time. The pin finds them later (`EQUIVOCATION`).
 4. A cold DWN read of a packument with more than about 110 versions fails with 502. The cause is the request rate limit of the DWN reader.
-5. A hash-form install name does not install, because didpkg has no DID binding for it. The [install-name grammar](spec/install-names.md) is draft 1 and can change before 1.0.
+5. A hash-form install name does not install, because didpkg has no DID binding for it. The [install-name grammar](spec/install-names.md) is draft 2 and can change before 1.0.
 
 ## More
 

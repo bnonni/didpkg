@@ -77,21 +77,21 @@ npm sends only the `@didpkg` packages to the shim. All other packages come from 
 ## 4. Install a package by DID
 
 ```sh
-npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
-node -e "console.log(require('@didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy'))"
+npm install @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
+node -e "console.log(require('@didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy'))"
 ```
 
 The second command prints `hello from didpkg`. The publisher of this package is `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy`. The same package from a did:web publisher is:
 
 ```sh
-npm install @didpkg/hello_web_bnonni.github.io_didpkg-demo
+npm install @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
 ```
 
 pnpm and bun read the same `.npmrc` line. The demo tests pnpm 11 and Bun 1.4.4.
 
 ```sh
-pnpm add @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
-bun add @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
+pnpm add @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
+bun add @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
 ## 5. Read an install name
@@ -99,7 +99,7 @@ bun add @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 An install name holds the package name and the DID of the publisher:
 
 ```sh
-didpkg parse @didpkg/hello_web_bnonni.github.io_didpkg-demo
+didpkg parse @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
 ```
 
 ```json
@@ -112,14 +112,14 @@ This command gives the install name for a DID and a package name:
 didpkg name did:web:bnonni.github.io:didpkg-demo hello
 ```
 
-The [install-name grammar](spec/install-names.md) is draft 1 and can change before 1.0.
+The [install-name grammar](spec/install-names.md) is draft 2 and can change before 1.0.
 
 ## Lockfiles and CI
 
 The lockfile holds the shim URL of each `@didpkg` tarball, for example:
 
 ```text
-http://127.0.0.1:2092/@didpkg/hello_web_bnonni.github.io_didpkg-demo/-/hello_web_bnonni.github.io_didpkg-demo-1.0.0.tgz?rec=sha256-Dd0%2BYq5r...&vm=did%3Aweb%3Abnonni.github.io%3Adidpkg-demo%23didpkg-1
+http://127.0.0.1:2092/@didpkg/hello_did_web_bnonni.github.io_didpkg-demo/-/hello_did_web_bnonni.github.io_didpkg-demo-1.0.0.tgz?rec=sha256-Dd0%2BYq5r...&vm=did%3Aweb%3Abnonni.github.io%3Adidpkg-demo%23didpkg-1
 ```
 
 1. Start the shim on the same port before each install from the lockfile, also before `npm ci` in CI.
@@ -130,7 +130,7 @@ http://127.0.0.1:2092/@didpkg/hello_web_bnonni.github.io_didpkg-demo/-/hello_web
 `didpkg drl` verifies one version as the shim does. Then it prints the HTTPS URL of the signed tarball and its sha512:
 
 ```sh
-didpkg drl @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
+didpkg drl @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
 ```
 
 Install from the `url` value. The URL has `&`, so put it in single quotes:
@@ -161,7 +161,7 @@ npm error 404 Not Found - GET http://127.0.0.1:2092/@didpkg%2fnope_web_bnonni.gi
 |---|---|---|
 | 400 | The install name does not follow the grammar, or the path has a bad character. Also: a request target that is not a path (`bad request target`), for example from a proxy client. | Check the name with `didpkg parse`. Use the shim only as a registry URL, not as a proxy. |
 | 403 | A signature, a digest or the release history does not verify. The reason gives the code, for example `INDEX_SIGNATURE`, `INTEGRITY`, `KEY_CHANGED` or `ROLLBACK`. A DID on the denylist in [SECURITY.md](../SECURITY.md) also gives 403. | Do not install the package. Ask the publisher. For `KEY_CHANGED` and `HISTORY_CHANGED`, read [Pins](how-it-works.md#pins). |
-| 404 | The DID, the package or the version is not found. Codes: `INDEX_MISSING`, `NOT_LISTED`, `MANIFEST_MISSING`, `TARBALL_MISSING`, `NOT_FOUND`, `METHOD_NOT_SUPPORTED`. A hash-form install name also gives 404, because didpkg has no DID binding for it. | Check the install name with `didpkg parse`. Ask the publisher for the correct name. |
+| 404 | The DID, the package or the version is not found. Codes: `INDEX_MISSING`, `NOT_LISTED`, `MANIFEST_MISSING`, `TARBALL_MISSING`, `NOT_FOUND`, `METHOD_NOT_SUPPORTED`. A hash-form install name also gives 404, because didpkg has no DID binding for it. A XID install name gives 404 with `KIND_NOT_SUPPORTED`, because a XID publisher has no release source yet. | Check the install name with `didpkg parse`. Ask the publisher for the correct name. |
 | 405 | A method other than `GET` or `HEAD`, for example `npm publish`. The shim does not publish. | Publish with `didpkg publish`. |
 | 421 | The `Host` header is not `127.0.0.1:<port>` or `localhost:<port>` (`bad host`). | Use `127.0.0.1` or `localhost` in `.npmrc`. Do not use a LAN address or another host name. |
 | 502 | The DID did not resolve, no endpoint gave a usable copy (`UNAVAILABLE`), or no copy has the signed digest (`MISMATCH`). npm tries again before it stops. | Try again later. Make sure that the network is up. For did:dht, make sure that the `--relay` URLs work. |

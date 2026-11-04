@@ -22,7 +22,7 @@ A DWN is optional. With only a mirror, the shim reads each package from the mirr
 | Control of the DID | The holder of the update key `#0` | The owner of the host and its DNS name |
 | Keys that didpkg makes | The release key `#didpkg-1` and the update key `#0` | The release key `#didpkg-1` |
 | Network write at `id create` | The DID record to the relays | None |
-| Install name | `@didpkg/hello_dht_<52 characters>` | `@didpkg/hello_web_<host>_<path>` |
+| Install name | `@didpkg/hello_did_dht_<52 characters>` | `@didpkg/hello_did_web_<host>_<path>` |
 
 A did:web install name is short and easy to read. A did:dht DID needs no host and no DNS name.
 
@@ -170,7 +170,7 @@ The output is JSON:
   "did": "did:web:me.github.io:pkgs",
   "name": "hello",
   "version": "1.0.0",
-  "installName": "@didpkg/hello_web_me.github.io_pkgs",
+  "installName": "@didpkg/hello_did_web_me.github.io_pkgs",
   "release": "sha256-adMqTpthgOM5QTg3UJsm7evplCFRKSemqfh3zfeh6nM=",
   "sequence": 1,
   "relays": [],
@@ -205,7 +205,7 @@ Push the folder to the site at the `--repo` URL. Do not edit the files: the sign
 Use the `installName` from step 6 in [Quickstart](quickstart.md), steps 2 to 4:
 
 ```sh
-npm install @didpkg/hello_web_me.github.io_pkgs
+npm install @didpkg/hello_did_web_me.github.io_pkgs
 ```
 
 ## Publish from CI

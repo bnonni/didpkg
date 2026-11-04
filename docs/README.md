@@ -8,7 +8,7 @@
 | [Publish a package](publish.md) | Publisher | Make a did:dht or did:web identity, sign a package, write it to a DWN and a mirror. |
 | [CLI reference](cli.md) | User, publisher | Each command, with its options, its output and its exit code. |
 | [CLI package](../packages/cli/README.md) | User | The npm page of `didpkg`. |
-| [Install names](spec/install-names.md) | Contributor, client author | The install-name grammar draft 1, the codec, the shim routes and the test vectors. |
+| [Install names](spec/install-names.md) | Contributor, client author | The install-name grammar draft 2, the codec, the shim routes and the test vectors. |
 | [Release records](spec/release-records.md) | Contributor, client author | The release record, the index, the digests, the proofs, the static layout v1 and the DWN paths. |
 | [Deploy a DWN](deploy.md) | Operator | The runbook of the demo DWN `dwn.didpkg.dev`. |
 | [ADR 0003](adr/0003-storage-contract.md) | Contributor | The storage contract, the DWN protocol v1, the static layout v1 and the packument rules. |

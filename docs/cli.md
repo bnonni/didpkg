@@ -25,20 +25,22 @@ A new passphrase must have 12 or more characters. Without a terminal and without
 ## didpkg name
 
 ```text
-didpkg name <did> <pkg-name>
+didpkg name <did|xid> <pkg-name>
 ```
 
-Prints the install name for the DID and the package name.
+Prints the install name for the DID or the XID and the package name. A XID is 64 lowercase hex characters.
 
 ```sh
 didpkg name did:web:bnonni.github.io:didpkg-demo hello
+didpkg name 71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c hello
 ```
 
 ```text
-@didpkg/hello_web_bnonni.github.io_didpkg-demo
+@didpkg/hello_did_web_bnonni.github.io_didpkg-demo
+@didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
 ```
 
-The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services.
+The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services. A XID name does not install yet: the install shim and `didpkg drl` refuse it with `KIND_NOT_SUPPORTED`.
 
 ## didpkg parse
 
@@ -49,14 +51,14 @@ didpkg parse <install-name>
 Prints the parts of an install name as one line of JSON.
 
 ```sh
-didpkg parse @didpkg/hello_web_bnonni.github.io_didpkg-demo
+didpkg parse @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
 ```
 
 ```json
-{"form":"direct","name":"hello","did":"did:web:bnonni.github.io:didpkg-demo"}
+{"kind":"did","form":"direct","name":"hello","did":"did:web:bnonni.github.io:didpkg-demo"}
 ```
 
-A hash-form name gives `{"form":"hash","name":...,"hash":...}`. A bad name gives a grammar error code, for example `E_SHAPE: no "_" separator` or `E_CANONICAL: name is not in canonical form`. The codes are in [Install names](spec/install-names.md) section 6. The grammar is draft 1 and can change before 1.0.
+A hash-form name gives `{"kind":"did","form":"hash","name":...,"hash":...}`. A XID name gives `{"kind":"xid","form":"direct","name":...,"xid":...}`. A bad name gives a grammar error code, for example `E_SHAPE: no "_" separator` or `E_CANONICAL: name is not in canonical form`. A name without a kind segment `did` or `xid` gives `E_KIND`, for example `@didpkg/hello_dht_abc`. The codes are in [Install names](spec/install-names.md) section 6. The grammar is draft 2 and can change before 1.0.
 
 ## didpkg id create (did:dht)
 

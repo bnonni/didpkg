@@ -30,18 +30,18 @@ In a second terminal, in your project folder, add 1 line to `.npmrc` and install
 
 ```sh
 echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
-npm install @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
+npm install @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
-The install name holds the package name, the DID method and the DID. The demo has the package `hello` from 5 publishers:
+The install name holds the package name, the identifier kind `did`, the DID method and the DID. The demo has the package `hello` from 5 publishers:
 
 | DID method | Install name |
 |---|---|
-| did:dht | `@didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` |
-| did:web | `@didpkg/hello_web_bnonni.github.io_didpkg-demo` |
-| did:webvh | `@didpkg/hello_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs` |
-| did:plc | `@didpkg/hello_plc_3zo7womke3qzjadke2q4lukr` |
-| did:btcr2 | `@didpkg/hello_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6` |
+| did:dht | `@didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` |
+| did:web | `@didpkg/hello_did_web_bnonni.github.io_didpkg-demo` |
+| did:webvh | `@didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs` |
+| did:plc | `@didpkg/hello_did_plc_3zo7womke3qzjadke2q4lukr` |
+| did:btcr2 | `@didpkg/hello_did_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6` |
 
 The [quickstart](docs/quickstart.md) gives each step and the HTTP errors. For one install with no shim, `didpkg drl` prints a verified tarball URL ([one-off install](docs/quickstart.md#one-off-install-with-no-shim)).
 
@@ -112,7 +112,7 @@ The live demo has 5 publishers. Each publisher publishes `hello@1.0.0`:
 This command starts a shim with the public Pkarr relays. Then it installs the 5 packages with npm, pnpm and bun:
 
 ```sh
-npm run live -- @didpkg/hello_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_web_bnonni.github.io_didpkg-demo @didpkg/hello_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_plc_3zo7womke3qzjadke2q4lukr @didpkg/hello_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6
+npm run live -- @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_did_web_bnonni.github.io_didpkg-demo @didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_did_plc_3zo7womke3qzjadke2q4lukr @didpkg/hello_did_btcr2_x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6
 ```
 
 ## Old drpm code
