@@ -6,6 +6,10 @@
 //   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
 //   <alias>.sidecar.json     the Sidecar Data with the Genesis Document (did:btcr2 only, mode 0644).
 //   <alias>.genesis.json     the JCS bytes of the Genesis Document: the raw block to put in CAS (did:btcr2 only, mode 0644).
+// A XID publisher (xid.ts) has other files:
+//   <alias>.json                 the signed XID document and the locked release and DWN keys.
+//   <alias>.update-key.envelope  the XID document with the locked inception key and provenance generator. Move it offline.
+//   <alias>.xid.envelope         the signed XID document to host (mode 0644).
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -13,6 +17,8 @@ import type { DidDocument } from '@enbox/dids';
 import { KEY_FORMAT, type EncryptedKey } from './keyfile.ts';
 
 export const ID_FORMAT = 'didpkg-id-1';
+/** The format of the identity file of a XID publisher. */
+export const XID_ID_FORMAT = 'didpkg-xid-1';
 export const ALIAS_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 export interface Identity {
@@ -42,6 +48,7 @@ export function idPaths(alias: string, env: Record<string, string | undefined> =
   return {
     dir, identity: join(dir, `${alias}.json`), updateKey: join(dir, `${alias}.update-key.json`), document: join(dir, `${alias}.did.json`),
     log: join(dir, `${alias}.did.jsonl`), sidecar: join(dir, `${alias}.sidecar.json`), genesis: join(dir, `${alias}.genesis.json`),
+    xidUpdate: join(dir, `${alias}.update-key.envelope`), xidDocument: join(dir, `${alias}.xid.envelope`),
   };
 }
 
@@ -71,13 +78,18 @@ export function writeIdentity(
   for (const f of files) writeFileSync(f.file, f.body, { mode: f.mode, flag: 'wx' });
 }
 
-export function readIdentity(paths: Paths): Identity {
-  let id: Identity;
+/** The parsed JSON of the identity file, with no check. */
+export function readIdentityFile(paths: Paths): { format?: unknown } & Record<string, unknown> {
   try {
-    id = JSON.parse(readFileSync(paths.identity, 'utf8'));
+    return JSON.parse(readFileSync(paths.identity, 'utf8'));
   } catch (e) {
     throw new Error(`cannot read ${paths.identity}: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+export function readIdentity(paths: Paths): Identity {
+  const id = readIdentityFile(paths) as unknown as Identity;
+  if ((id?.format as string) === XID_ID_FORMAT) throw new Error(`${paths.identity} is a XID identity: this command takes only a DID identity`);
   if (id?.format !== ID_FORMAT) throw new Error(`${paths.identity}: the format is not ${ID_FORMAT}`);
   if (id.document?.id !== id.did || id.releaseKey?.format !== KEY_FORMAT || id.releaseKey.did !== id.did) {
     throw new Error(`${paths.identity}: the DID, the document and the release key do not agree`);

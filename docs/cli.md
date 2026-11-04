@@ -15,8 +15,8 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 | Variable | Use |
 |---|---|
 | `DIDPKG_HOME` | The config folder. The identity files are in `$DIDPKG_HOME/ids`. The [config file](#config-file) is `$DIDPKG_HOME/config.json`. Default: `$XDG_CONFIG_HOME/didpkg`, else `~/.config/didpkg`. |
-| `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`. If it is not set, didpkg asks in the terminal. |
-| `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key (did:dht, did:webvh and did:plc). If it is not set, didpkg asks in the terminal. |
+| `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`, and of the release key and the DWN key of a XID publisher. If it is not set, didpkg asks in the terminal. |
+| `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key (did:dht, did:webvh, did:plc and did:btcr2), and of the inception key of a XID publisher. If it is not set, didpkg asks in the terminal. |
 
 The install script has its own variables: see [Install didpkg](install.md#environment-variables).
 
@@ -187,6 +187,63 @@ The did:btcr2 specification recommends one of the two methods for the life of th
 
 stdout gets the JSON result: `alias`, `did`, `keyId`, `network`, `cid` and `files`. stderr tells you to move the update key file offline. It also gives the IPFS command and the name of the Sidecar Data file in the folder.
 
+## didpkg id create (XID)
+
+```text
+didpkg id create <alias> --xid [--dwn <url>] [--repo <url>]...
+```
+
+Makes a XID publisher ([BCR-2024-010](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-010-xid.md)). The XID document is a Gordian Envelope. The inception key signs it. The document has these items:
+
+- The inception key (nickname `inception`, `All`). The XID is the hash of this key. Only `didpkg id update` uses it.
+- The release key (nickname `release`, only `Sign`). It signs the release records and the indexes.
+- The DWN key (nickname `dwn`, only `Auth`), with `--dwn` only. It signs the DWN messages.
+- A provenance mark with `seq` 0. Each update adds the next mark.
+- A service for each URL: the capability `DecentralizedWebNode` with the DWN key, and the capability `DIDPackageRepository` with the release key.
+- A `dereferenceVia` URI for each `--repo` URL: `<url>/xid/<hex>.envelope`.
+
+| Option | Default | Use |
+|---|---|---|
+| `--xid` | None | Make a XID publisher, not a DID. |
+| `--dwn <url>` | None | A DWN endpoint. One time only. |
+| `--repo <url>` | None | A mirror URL. Repeatable. |
+
+`--relay`, `--web`, `--webvh`, `--plc` and `--btcr2` are not permitted with `--xid`. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`. Each key and the provenance generator are locked with Argon2id, as bc-xid does it. The command does no network write. `didpkg publish` and `didpkg id register` do not take a XID identity.
+
+The command writes 3 files in `$DIDPKG_HOME/ids`:
+
+| File | Mode | Content |
+|---|---|---|
+| `<alias>.json` | 0600 | The signed XID document, and the release key and the DWN key, locked with `DIDPKG_PASSPHRASE`. |
+| `<alias>.update-key.envelope` | 0600 | The XID document with the inception key and the provenance generator, locked with `DIDPKG_UPDATE_PASSPHRASE`. Move it offline. |
+| `<alias>.xid.envelope` | 0644 | The signed XID document (tagged CBOR). Host it at each `dereferenceVia` URI. |
+
+stdout gets the JSON result: `alias`, `xid` (64 hex characters), `ur` (the `ur:xid`), `seq`, `keys`, `documentUrls` and `files`.
+
+```text
+$ didpkg id create gordian --xid --repo https://pkgs.example.com/
+$ didpkg name <xid> hello
+@didpkg/hello_xid_<xid>
+```
+
+## didpkg id update
+
+```text
+didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
+```
+
+Changes the XID document of a XID publisher. The command adds the next provenance mark, and the inception key signs the new document. It replaces the 3 files of [`id create --xid`](#didpkg-id-create-xid). The command takes only a XID identity.
+
+| Option | Use |
+|---|---|
+| `--rotate release` | Make a new release key, and remove the old key from the document. The identity file keeps the old key as `previousRelease`: on a key change, the index needs a signature by the old key too. |
+| `--rotate dwn` | Make a new DWN key, and remove the old key. The DWN service gets the new key. |
+| `--dwn <url>` | Set the DWN endpoint. If the document has no DWN key, add one. One time only. |
+| `--remove dwn` | Remove the DWN service and the DWN key. |
+| `--repo <url>` | Replace the mirror URLs and their `dereferenceVia` URIs. Repeatable. |
+
+The command asks for `DIDPKG_UPDATE_PASSPHRASE`. A new key also needs `DIDPKG_PASSPHRASE`: the new key gets the passphrase of the release key. A wrong passphrase changes no file. stdout gets the same JSON result as `id create --xid`. Host the new `<alias>.xid.envelope` at each `dereferenceVia` URI.
+
 ## didpkg id register
 
 ```text
@@ -230,6 +287,8 @@ didpkg id show <alias>
 ```
 
 Prints the public data of an identity as JSON: `alias`, `did`, `keyId`, `created`, `assertionMethod`, `service` and `files`. `files.updateKey` is `null` if the update key file is not in the folder. The command asks for no passphrase.
+
+For a XID publisher, the JSON has `alias`, `kind` (`xid`), `xid`, `ur`, `created` and `provenance` (`seq`, `date`, `chainId`). It also has `keys` (`reference`, `nickname`, `allow`, `deny`, `inception`), `services`, `dereferenceVia` and `files`.
 
 ## didpkg publish
 

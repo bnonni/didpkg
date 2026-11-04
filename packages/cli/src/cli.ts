@@ -12,9 +12,10 @@ import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
 import { createPlc, registerPlc } from './id/plc.ts';
 import { registerIdentity } from './id/register.ts';
-import { configDir, idPaths, readIdentity } from './id/store.ts';
+import { configDir, idPaths, readIdentity, readIdentityFile, XID_ID_FORMAT } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
 import { createWebvh, logUrl } from './id/webvh.ts';
+import { createXid, showXid, updateXid, type XidRole } from './id/xid.ts';
 import { publish } from './publish/publish.ts';
 import { startShim, readSide, type ReadSideOptions } from './shim/start.ts';
 import pkg from '../package.json' with { type: 'json' };
@@ -37,6 +38,10 @@ Usage:
                                   Make a did:plc publisher DID and send it to the directory
   didpkg id create <alias> --btcr2 <network> --repo <url>...
                                   Make a did:btcr2 publisher DID and its genesis file to put in IPFS
+  didpkg id create <alias> --xid [--dwn <url>] [--repo <url>]...
+                                  Make a XID publisher: a XID document with a release key (Sign) and a DWN key (Auth)
+  didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
+                                  Change the keys or the services of a XID publisher, with the next provenance mark
   didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
                                   Accept the terms of the DWN, then register the DID there (proof of work).
                                   For did:plc: send the DID to the directory again
@@ -60,6 +65,8 @@ Examples:
   didpkg id create vh --webvh pkgs.example.com:vh --repo https://pkgs.example.com/vh/
   didpkg id create plc --plc https://plc.directory --repo https://pkgs.example.com/plc/
   didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
+  didpkg id create gordian --xid --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
+  didpkg id update gordian --rotate release
   didpkg id register main
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
@@ -68,8 +75,8 @@ Examples:
   didpkg drl @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
-DIDPKG_PASSPHRASE (the release key) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht, did:webvh, did:plc and did:btcr2),
-else from the terminal. The shim reads $DIDPKG_HOME/config.json if it exists: the IPFS gateways ("cas"), the Esplora
+DIDPKG_PASSPHRASE (the release key, and the DWN key of a XID) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht,
+did:webvh, did:plc and did:btcr2, and the inception key of a XID), else from the terminal. The shim reads $DIDPKG_HOME/config.json if it exists: the IPFS gateways ("cas"), the Esplora
 APIs ("esplora") and the Sidecar Data mirrors ("sidecar") for did:btcr2. The shim and "drl" read it. The --cas and
 --sidecar options replace the lists of the file.
 
@@ -101,7 +108,8 @@ function options(args: string[], flags: string[]) {
 async function id(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub === 'create') {
-    const { positional, values } = options(rest, ['--dwn', '--repo', '--relay', '--web', '--webvh', '--plc', '--btcr2']);
+    const xid = rest.includes('--xid');
+    const { positional, values } = options(rest.filter((a) => a !== '--xid'), ['--dwn', '--repo', '--relay', '--web', '--webvh', '--plc', '--btcr2']);
     if (positional.length !== 1) throw new UsageError(`"id create" needs 1 argument: <alias> (got ${positional.length})`);
     for (const f of ['--dwn', '--web', '--webvh', '--plc', '--btcr2']) if (values[f]!.length > 1) throw new UsageError(`use ${f} one time`);
     const alias = positional[0]!;
@@ -114,6 +122,19 @@ async function id(args: string[]): Promise<string> {
     if (plc !== undefined && (web ?? webvh) !== undefined) throw new UsageError('use --plc without --web and --webvh');
     if (btcr2 !== undefined && (web ?? webvh ?? plc) !== undefined) throw new UsageError('use --btcr2 without --web, --webvh and --plc');
     if ((web ?? webvh ?? plc ?? btcr2) !== undefined && values['--relay']!.length) throw new UsageError('--relay is for did:dht only');
+    if (xid) {
+      if ((web ?? webvh ?? plc ?? btcr2) !== undefined || values['--relay']!.length) throw new UsageError('use --xid without --web, --webvh, --plc, --btcr2 and --relay');
+      const r = await createXid({
+        alias, dwn: values['--dwn']![0], repos: values['--repo'],
+        passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key and the DWN key', confirm: true }),
+        updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the inception key', confirm: true }),
+      });
+      process.stderr.write(
+        `Move ${r.files.updateKey} offline. Only "didpkg id update" needs it.\n`
+        + (r.documentUrls.length ? `Host ${r.files.document} at ${r.documentUrls.join(' and ')}.\n` : ''),
+      );
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
     if (btcr2 !== undefined) {
       if (values['--dwn']!.length) throw new UsageError('--dwn is not for did:btcr2: the DWN server does not resolve did:btcr2');
       if (values['--repo']!.length === 0) throw new UsageError('--btcr2 needs --repo <url>');
@@ -211,9 +232,31 @@ async function id(args: string[]): Promise<string> {
     const r = await registerIdentity({ identity, dwn: values['--dwn']![0], acceptTerms: acceptTerms?.toLowerCase() });
     return `${JSON.stringify(r, null, 2)}\n`;
   }
+  if (sub === 'update') {
+    const { positional, values } = options(rest, ['--rotate', '--dwn', '--remove', '--repo']);
+    if (positional.length !== 1) throw new UsageError(`"id update" needs 1 argument: <alias> (got ${positional.length})`);
+    if (values['--dwn']!.length > 1 || values['--remove']!.length > 1) throw new UsageError('use --dwn and --remove one time');
+    for (const r of values['--rotate']!) if (r !== 'release' && r !== 'dwn') throw new UsageError(`--rotate: ${r} is not release or dwn`);
+    const remove = values['--remove']![0];
+    if (remove !== undefined && remove !== 'dwn') throw new UsageError(`--remove: ${remove} is not dwn`);
+    if (!values['--rotate']!.length && !values['--dwn']!.length && remove === undefined && !values['--repo']!.length) {
+      throw new UsageError('"id update" needs --rotate, --dwn, --remove or --repo');
+    }
+    const paths = idPaths(positional[0]!);
+    if (readIdentityFile(paths).format !== XID_ID_FORMAT) throw new Error(`${paths.identity}: "id update" takes only a XID identity`);
+    const r = await updateXid({
+      alias: positional[0]!, rotate: values['--rotate'] as XidRole[], dwn: values['--dwn']![0], removeDwn: remove === 'dwn',
+      repos: values['--repo']!.length ? values['--repo'] : undefined,
+      updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the inception key' }),
+      passphrase: () => passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'Passphrase for the release key' }),
+    });
+    process.stderr.write(`Host ${r.files.document} again${r.documentUrls.length ? ` at ${r.documentUrls.join(' and ')}` : ''}: it has seq ${r.seq}.\n`);
+    return `${JSON.stringify(r, null, 2)}\n`;
+  }
   if (sub === 'show') {
     if (rest.length !== 1) throw new UsageError(`"id show" needs 1 argument: <alias> (got ${rest.length})`);
     const paths = idPaths(rest[0]!);
+    if (readIdentityFile(paths).format === XID_ID_FORMAT) return `${JSON.stringify(showXid(rest[0]!), null, 2)}\n`;
     const i = readIdentity(paths);
     const out = {
       alias: i.alias, did: i.did, keyId: i.releaseKey.keyId, created: i.created,
@@ -222,7 +265,7 @@ async function id(args: string[]): Promise<string> {
     };
     return `${JSON.stringify(out, null, 2)}\n`;
   }
-  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create, register or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
+  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create, update, register or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
 }
 
 async function publishCommand(args: string[]): Promise<string> {

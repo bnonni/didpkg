@@ -150,6 +150,10 @@ Reference code: [`packages/core/src/xid/`](../../packages/core/src/xid/) (`docum
 3. The document must have a provenance mark. Without a mark, no rule can order two copies of a document.
 4. Permissions are deny-first. A `deny` of a privilege, or of `All`, removes the privilege, also if an `allow` gives it. Note: the delegate example in BCR-2024-010 uses `deny All` with `allow Sign` to mean "only Sign". didpkg follows the rule text, not the example.
 5. A text XID is 64 lowercase hex characters. `didpkg name` also takes a `ur:xid` that holds a bare XID or a XID document. It does not verify that document.
+6. `didpkg id create --xid` makes a document with the inception key (nickname `inception`) and one release key (nickname `release`, only `Sign`). It can also have one DWN key (nickname `dwn`, only `Auth`). A verifier uses the privileges, not the nicknames.
+7. A DWN is a service with the capability `DecentralizedWebNode`, a reference to a key with `Auth`, and the permission `Auth`. A static mirror is a service with the capability `DIDPackageRepository`, a reference to a release key, and the permission `Sign`. A service has one URI, thus each mirror has its own service.
+8. Each mirror has a `dereferenceVia` URI: `<mirror>/xid/<hex>.envelope`.
+9. Each change of the document adds the next provenance mark (`seq` + 1), and the inception key signs the new document.
 
 ### Resolution
 
