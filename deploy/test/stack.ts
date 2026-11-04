@@ -1,15 +1,20 @@
-// The deploy stack test. It starts deploy/compose.yaml with three local changes: a demo CA in place of
-// Let's Encrypt, a did:dht relay container in place of relay.pkarr.org, and a web container that is the host of a did:webvh DID.
-// Then it proves, through Traefik:
-// the route allowlist (check.sh), the registration (terms and proof of work), a write and a read with the didpkg DWN adapter,
-// a write and a read of a did:webvh publisher (the DWN resolves did:webvh with deploy/dwn/resolver.ts),
-// the body limit, backup.sh and restore.sh, the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.
+// The deploy stack test. It starts deploy/compose.yaml with three local changes:
+// - a demo CA in place of Let's Encrypt;
+// - a did:dht relay container in place of relay.pkarr.org;
+// - a web container with the did:webvh log and the did:plc audit log (network aliases web.didpkg.test and plc.directory).
+// Then it proves these items through Traefik:
+// - the route allowlist (check.sh) and the registration (terms and proof of work);
+// - a write and a read with the didpkg DWN adapter;
+// - a write and a read of a did:webvh publisher and of a did:plc publisher (deploy/dwn/resolver.ts resolves them);
+// - the body limit, backup.sh and restore.sh;
+// - the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.
 // Needs Docker with Compose 2.24 or later, openssl and curl. Run: npm run stack
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeCerts, WEB_HOST } from '../../demo/tls.ts';
-import { dhtFixture, webvhFixture } from '../../packages/core/test/did/helpers.ts';
+import { dhtFixture, plcFixture, webvhFixture } from '../../packages/core/test/did/helpers.ts';
+import { PLC_DIRECTORY } from '../../packages/core/src/did/drivers/plc.ts';
 import { DwnWriter, ed25519MessageSigner } from '../../packages/adapter-dwn/src/writer.ts';
 import { getTerms, register } from '../../packages/adapter-dwn/src/registration.ts';
 import { dwnAdapter } from '../../packages/adapter-dwn/src/index.ts';
@@ -22,10 +27,14 @@ const RELAY = `Bun.serve({ port: 8080, async fetch(req) {
   const f = Bun.file('/relay/' + new URL(req.url).pathname.slice(1).replace(/[^a-z0-9]/g, ''));
   return (await f.exists()) ? new Response(f, { headers: { 'content-type': 'application/pkarr.org/relays#payload' } }) : new Response('not found', { status: 404 });
 } });`;
-// GET /pkgs/did.jsonl over TLS gives the log of the did:webvh publisher. The network alias of the container is WEB_HOST.
+// GET /pkgs/did.jsonl over TLS gives the log of the did:webvh publisher. GET /<did:plc>/log/audit gives the audit log
+// of the did:plc publisher. The network aliases of the container are WEB_HOST and PLC_HOST.
 const WEB = `Bun.serve({ port: 443, tls: { cert: Bun.file('/web/site.pem'), key: Bun.file('/web/site.key') }, fetch(req) {
-  return new URL(req.url).pathname === '/pkgs/did.jsonl' ? new Response(Bun.file('/web/did.jsonl')) : new Response('not found', { status: 404 });
+  const path = new URL(req.url).pathname;
+  const file = path === '/pkgs/did.jsonl' ? 'did.jsonl' : path.startsWith('/did:plc:') && path.endsWith('/log/audit') ? 'plc.json' : '';
+  return file ? new Response(Bun.file('/web/' + file)) : new Response('not found', { status: 404 });
 } });`;
+const PLC_HOST = new URL(PLC_DIRECTORY).host;
 
 // The CA must be in NODE_EXTRA_CA_CERTS when Bun starts, so the test makes the CA and runs itself again.
 if (!process.env.DIDPKG_STACK_DIR) {
@@ -109,7 +118,7 @@ tls:
   // The web container has its own demo CA. Only the dwn container trusts it.
   const web = join(dir, 'web');
   mkdirSync(web);
-  await makeCerts(web, WEB_HOST);
+  await makeCerts(web, [WEB_HOST, PLC_HOST]);
   writeFileSync(join(dir, 'override.yaml'), `services:
   dwn:
     environment:
@@ -126,7 +135,7 @@ tls:
     volumes: ["${web}:/web:ro"]
     networks:
       default:
-        aliases: [${WEB_HOST}]
+        aliases: [${WEB_HOST}, ${PLC_HOST}]
   relay:
     image: ${BUN_IMAGE}
     entrypoint: ["bun", "-e", ${JSON.stringify(RELAY)}]
@@ -192,6 +201,17 @@ tls:
     const vhReader = dwnAdapter({ allowLoopback: true }).reader({ did: vh.did, serviceId: `${vh.did}#dwn`, type: 'DecentralizedWebNode', url: base }, { fetch });
     const vhTarball = await all(vhReader, { kind: 'tarball', name: 'hello', version: '1.0.0' });
     check(Buffer.compare(vhTarball, files.tarball) === 0, 'a did:webvh publisher registers, writes a release and reads it through Traefik');
+
+    // dwn-server 0.1.45 alone does not resolve did:plc. The DWN reads the audit log from the web container.
+    const plc = await plcFixture();
+    writeFileSync(join(web, 'plc.json'), JSON.stringify(plc.log));
+    const plcWriter = new DwnWriter({ dwnUrl: base, did: plc.did, signer: ed25519MessageSigner(plc.releaseSecret, `${plc.did}#didpkg-1`) });
+    await register(base, plc.did, { terms });
+    await plcWriter.installProtocol();
+    await plcWriter.publish({ name: 'hello', version: '1.0.0', ...files });
+    const plcReader = dwnAdapter({ allowLoopback: true }).reader({ did: plc.did, serviceId: `${plc.did}#dwn`, type: 'DecentralizedWebNode', url: base }, { fetch });
+    const plcTarball = await all(plcReader, { kind: 'tarball', name: 'hello', version: '1.0.0' });
+    check(Buffer.compare(plcTarball, files.tarball) === 0, 'a did:plc publisher registers, writes a release and reads it through Traefik');
 
     const big = await fetch(`${base}/`, { method: 'POST', body: new Uint8Array(18 * 1024 * 1024) });
     check(big.status === 413, `Traefik refuses an 18 MiB body (${big.status})`);

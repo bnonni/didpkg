@@ -123,7 +123,8 @@ export async function plcFixture() {
     other: { curve: secp256k1, prefix: [0xe7, 0x01], secret: secp256k1.utils.randomSecretKey() },
   };
   const didKey = (k: (typeof keys)['rotation']) => `did:key:z${base58.encode(Uint8Array.of(...k.prefix, ...k.curve.getPublicKey(k.secret)))}`;
-  const releaseKey = toMultikey({ alg: 'Ed25519', bytes: (await ed.keygenAsync()).publicKey });
+  const release = await ed.keygenAsync();
+  const releaseKey = toMultikey({ alg: 'Ed25519', bytes: release.publicKey });
   /** DAG-CBOR without sig, ECDSA-SHA256 with low S, base64url with no padding. */
   const sign = (op: PlcOp, key: keyof typeof keys = 'rotation'): PlcOp => {
     const { sig: _, ...unsigned } = op;
@@ -153,7 +154,7 @@ export async function plcFixture() {
   /** Adds an operation that moves the #pkg service to `endpoint`. */
   const update = (log: Entry[], endpoint: string, key: keyof typeof keys = 'rotation') => [...log, entry(sign(operation(endpoint, head(log)), key))];
   const tombstone = (log: Entry[]) => [...log, entry(sign({ type: 'plc_tombstone', prev: head(log) }))];
-  return { did, log: [entry(genesis)], releaseKey, url: `https://plc.directory/${did}/log/audit`, sign, operation, entry, update, tombstone };
+  return { did, log: [entry(genesis)], releaseKey, releaseSecret: release.secretKey, url: `https://plc.directory/${did}/log/audit`, sign, operation, entry, update, tombstone };
 }
 
 export const BTCR2_ESPLORA = 'https://mempool.space/testnet4/api';

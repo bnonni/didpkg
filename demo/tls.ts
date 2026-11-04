@@ -14,18 +14,20 @@ async function openssl(args: string[], cwd: string): Promise<void> {
   if (code !== 0) throw new Error(`openssl ${args[0]} (exit ${code}): ${err.trim()}`);
 }
 
-/** A demo CA and a site certificate for `host`, valid for 1 day. */
-export async function makeCerts(dir: string, host: string) {
+/** A demo CA and a site certificate for each name in `hosts`, valid for 1 day. */
+export async function makeCerts(dir: string, hosts: string | string[]) {
+  const names = [hosts].flat();
   const ec = ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256', '-nodes'];
   await openssl(['req', '-x509', ...ec, '-keyout', 'ca.key', '-out', 'ca.pem', '-days', '1', '-subj', '/CN=didpkg demo CA'], dir);
-  await openssl(['req', ...ec, '-keyout', 'site.key', '-out', 'site.csr', '-subj', `/CN=${host}`], dir);
-  await Bun.write(join(dir, 'site.ext'), `subjectAltName=DNS:${host}\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n`);
+  await openssl(['req', ...ec, '-keyout', 'site.key', '-out', 'site.csr', '-subj', `/CN=${names[0]}`], dir);
+  await Bun.write(join(dir, 'site.ext'), `subjectAltName=${names.map((n) => `DNS:${n}`).join(',')}\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n`);
   await openssl(['x509', '-req', '-in', 'site.csr', '-CA', 'ca.pem', '-CAkey', 'ca.key', '-CAcreateserial', '-days', '1', '-extfile', 'site.ext', '-out', 'site.pem'], dir);
   return { ca: join(dir, 'ca.pem'), cert: join(dir, 'site.pem'), key: join(dir, 'site.key') };
 }
 
-/** An HTTPS proxy on 127.0.0.1. It accepts only `CONNECT <host>:443` and connects the tunnel to the TLS site port. */
-export async function startProxy(host: string, sitePort: number) {
+/** An HTTPS proxy on 127.0.0.1. It accepts only `CONNECT <host>:443` for a name in `hosts` and connects the tunnel to the TLS site port. */
+export async function startProxy(hosts: string | string[], sitePort: number) {
+  const allowed = new Set([hosts].flat().map((h) => `${h}:443`));
   const sockets = new Set<Socket>();
   const track = (s: Socket) => {
     sockets.add(s);
@@ -45,7 +47,7 @@ export async function startProxy(host: string, sitePort: number) {
       client.off('data', onData);
       client.pause();
       const [method, authority] = head.subarray(0, end).toString('latin1').split(' ');
-      if (method !== 'CONNECT' || authority !== `${host}:443`) {
+      if (method !== 'CONNECT' || !allowed.has(authority!)) {
         client.end('HTTP/1.1 403 Forbidden\r\n\r\n');
         return;
       }

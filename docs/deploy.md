@@ -19,7 +19,7 @@ Rules of the stack:
 5. A request body can be 17 MiB at most. A DWN record can be 16 MiB at most.
 6. The data is in the Docker volume `didpkg-dwn_dwn-sqlite`, in 2 SQLite files: `dwn.db` (the DWN records) and `registration.db` (the tenants and the quotas). The certificate is in `didpkg-dwn_acme`.
 7. Each tenant can store 50 MiB of record data and 10,000 DWN messages. A write over the quota fails with HTTP 500 and `TenantStorageQuotaExceeded` or `TenantMessageQuotaExceeded`.
-8. The DWN resolves did:dht, did:jwk, did:key, did:web and did:webvh. The stock dwn-server does not resolve did:webvh, so the image runs `deploy/dwn/start.ts` in place of the `main.js` of dwn-server. The start script adds the did:webvh driver of `packages/core/src` (`deploy/dwn/resolver.ts`). The image build copies that folder (`additional_contexts` in `compose.yaml`), thus the VPS needs the full repository.
+8. The DWN resolves did:dht, did:jwk, did:key, did:web, did:webvh and did:plc. The stock dwn-server does not resolve did:webvh and did:plc, so the image runs `deploy/dwn/start.ts` in place of the `main.js` of dwn-server. The start script adds the did:webvh and did:plc drivers of `packages/core/src` (`deploy/dwn/resolver.ts`). The did:plc driver reads `https://plc.directory`. The image build copies that folder (`additional_contexts` in `compose.yaml`), thus the VPS needs the full repository.
 
 The only secret is `deploy/.env` (the admin token). The DWN data and the backups hold only public data: packages and tenant DIDs.
 

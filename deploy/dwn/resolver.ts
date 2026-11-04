@@ -1,5 +1,6 @@
 // The DID resolver of the didpkg DWN. dwn-server 0.1.45 resolves only did:dht, did:jwk, did:key and did:web.
-// This resolver keeps those 4 resolvers and adds did:webvh through the driver of @didpkg/core.
+// This resolver keeps those 4 resolvers and adds did:webvh and did:plc through the drivers of @didpkg/core.
+// The did:plc driver reads the audit log from https://plc.directory and checks each operation.
 // dwn-sdk-js accepts a signature only from a verification method of type JsonWebKey or JsonWebKey2020
 // with publicKeyJwk and no other member. Thus each Ed25519 Multikey method becomes a JsonWebKey method.
 // The key bytes do not change, so the trust does not change.
@@ -7,15 +8,17 @@ import { DidDht, DidJwk, DidKey, DidResolverCacheMemory, DidWeb, UniversalResolv
 import { base58, base64urlnopad } from '@scure/base';
 import { DidResolver } from '../../packages/core/src/did/resolver.ts';
 import { errorCode } from '../../packages/core/src/did/errors.ts';
+import { plcDriver } from '../../packages/core/src/did/drivers/plc.ts';
 import { webvhDriver } from '../../packages/core/src/did/drivers/webvh.ts';
 import type { DidDocument, DidResolutionResult, VerificationMethod } from '../../packages/core/src/did/types.ts';
 
 export function dwnDidResolver(): UniversalResolver {
-  const core = new DidResolver({ drivers: [webvhDriver()] });
-  const webvh = { methodName: 'webvh', resolve: async (did: string) => toEnbox(await core.resolve(did)) };
+  const core = new DidResolver({ drivers: [webvhDriver(), plcDriver()] });
+  const resolve = async (did: string) => toEnbox(await core.resolve(did));
+  // The type of didResolvers wants a class. UniversalResolver reads only methodName and resolve.
+  const methods = ['webvh', 'plc'].map((methodName) => ({ methodName, resolve }) as unknown as typeof DidKey);
   return new UniversalResolver({
-    // The type of didResolvers wants a class. UniversalResolver reads only methodName and resolve.
-    didResolvers: [DidDht, DidJwk, DidKey, DidWeb, webvh as unknown as typeof DidKey],
+    didResolvers: [DidDht, DidJwk, DidKey, DidWeb, ...methods],
     cache: new DidResolverCacheMemory(),
   });
 }
