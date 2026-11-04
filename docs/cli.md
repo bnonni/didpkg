@@ -195,7 +195,7 @@ didpkg id create <alias> --xid [--dwn <url>] [--repo <url>]...
 
 Makes a XID publisher ([BCR-2024-010](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-010-xid.md)). The XID document is a Gordian Envelope. The inception key signs it. The document has these items:
 
-- The inception key (nickname `inception`, `All`). The XID is the hash of this key. Only `didpkg id update` uses it.
+- The inception key (nickname `inception`, `All`). The XID is the hash of this key. Only `didpkg id update` and `didpkg id backup` use it.
 - The release key (nickname `release`, only `Sign`). It signs the release records and the indexes.
 - The DWN key (nickname `dwn`, only `Auth`), with `--dwn` only. It signs the DWN messages.
 - A provenance mark with `seq` 0. Each update adds the next mark.
@@ -243,6 +243,36 @@ Changes the XID document of a XID publisher. The command adds the next provenanc
 | `--repo <url>` | Replace the mirror URLs and their `dereferenceVia` URIs. Repeatable. |
 
 The command asks for `DIDPKG_UPDATE_PASSPHRASE`. A new key also needs `DIDPKG_PASSPHRASE`: the new key gets the passphrase of the release key. A wrong passphrase changes no file. stdout gets the same JSON result as `id create --xid`. Host the new `<alias>.xid.envelope` at each `dereferenceVia` URI.
+
+## didpkg id backup
+
+```text
+didpkg id backup <alias> --sskr <m>-of-<n>
+```
+
+Splits the private keys of a XID publisher into `n` shares with SSKR (Sharded Secret Key Reconstruction). Any `m` shares restore the identity; fewer shares tell nothing about the keys. `m` and `n` are 1 to 16, and `m` is not more than `n`. The command takes only a XID identity, and it asks for `DIDPKG_UPDATE_PASSPHRASE` and `DIDPKG_PASSPHRASE`.
+
+The shares use Gordian Envelope SSKR. The backup is an envelope with the subject `didpkg-xid-backup` and these assertions:
+
+| Predicate | Object |
+|---|---|
+| `created` | The `created` time of the identity file. |
+| `document` | The XID document with the inception key and the provenance generator, not locked, signed by the inception key. |
+| `release`, `dwn`, `previousRelease` | The envelope of each key that the identity has, with its private keys, not locked. |
+
+A random symmetric key encrypts the wrapped backup. SSKR splits the symmetric key into one group of `m`-of-`n`. Each share is the encrypted backup with one `sskrShare` assertion. stdout gets one `ur:envelope` for each share, one share on each line.
+
+Give each share to a different holder. A share holds the encrypted keys, thus keep each share as secret as a passphrase. The backup holds the document with its `seq` at backup time. Make a new backup after each [`didpkg id update`](#didpkg-id-update).
+
+## didpkg id restore
+
+```text
+didpkg id restore <alias> <file>...
+```
+
+Makes the 3 files of [`id create --xid`](#didpkg-id-create-xid) again from the shares of [`id backup`](#didpkg-id-backup). Each file can hold one or more shares: each word that starts with `ur:envelope/` is a share. The command asks for 2 new passphrases, `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`, and locks the keys with them. It never replaces a file. stdout gets the same JSON result as `id create --xid`.
+
+If a hosted XID document has a higher `seq` than the restored document, the backup is old. Do not run `didpkg id update` with an old backup: the next mark gets a `seq` that a hosted document has, and clients refuse the 2 documents (`XID_FORK`).
 
 ## didpkg id register
 

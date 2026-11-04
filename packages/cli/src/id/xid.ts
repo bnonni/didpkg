@@ -4,9 +4,12 @@
 // messages. The provenance mark chain orders the documents. Its generator is in the update key file, next to the
 // inception key. bc-xid locks each private key and the generator with a passphrase (Argon2id).
 // This command does no network write. Any static https host can serve the document at <repo>/xid/<hex>.envelope.
+// `didpkg id backup` and `didpkg id restore` use Gordian Envelope SSKR: each share is a `ur:envelope`.
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { PrivateKeyBase, type PrivateKeys } from '@blockchaincommons/components';
+import { PrivateKeyBase, SymmetricKey, type PrivateKeys } from '@blockchaincommons/components';
 import { Envelope } from '@blockchaincommons/envelope';
+import { sskrJoin, sskrSplit } from '@blockchaincommons/envelope/sskr';
+import { GroupSpec, Spec } from '@blockchaincommons/sskr';
 import { UR } from '@blockchaincommons/uniform-resources';
 import { Key, Permissions, Service, XIDDocument, type Privilege } from '@blockchaincommons/xid';
 import { grants, readXidDocument, xidDocumentUrl, type XidDocumentInfo } from '@didpkg/core/xid';
@@ -96,13 +99,28 @@ function makeKey(role: XidRole, passphrase: string): { key: Key; locked: string 
 /** The key of a locked key envelope, with no passphrase: the public keys only. */
 const publicKeyOf = (locked: string): Key => Key.fromEnvelope(Envelope.fromBytes(base64urlnopad.decode(locked)));
 
-/** The private keys of a role, for a Gordian signer. A wrong passphrase gives an error. */
-export function openXidKey(identity: XidIdentity, role: XidRole | 'previousRelease', passphrase: string): PrivateKeys {
+/** The key of a role with its private keys open. A wrong passphrase gives an error. */
+function openKey(identity: XidIdentity, role: XidRole | 'previousRelease', passphrase: string): Key {
   const locked = identity.keys[role];
   if (locked === undefined) throw new Error(`the identity ${identity.alias} has no ${role} key`);
   const key = Key.fromEnvelope(Envelope.fromBytes(base64urlnopad.decode(locked)), { password: passphrase });
   if (!key.privateKeys) throw new Error(`the ${role} key of ${identity.alias}: wrong passphrase, or the file changed`);
-  return key.privateKeys;
+  return key;
+}
+
+/** The private keys of a role, for a Gordian signer. A wrong passphrase gives an error. */
+export const openXidKey = (identity: XidIdentity, role: XidRole | 'previousRelease', passphrase: string): PrivateKeys =>
+  openKey(identity, role, passphrase).privateKeys!;
+
+/** Each role key must be a key of the document with the privilege of its role, and not the inception key. */
+function checkKeys(where: string, keys: XidIdentity['keys'], info: XidDocumentInfo): void {
+  for (const role of ['release', 'dwn'] as const) {
+    const locked = keys[role];
+    if (locked === undefined) continue;
+    const ref = publicKeyOf(locked).reference.toHex();
+    const k = info.keys.find((x) => x.reference === ref);
+    if (!k || k.inception || !grants(k, PRIVILEGE[role])) throw new Error(`${where}: the ${role} key is not a ${PRIVILEGE[role]} key of the document`);
+  }
 }
 
 function addService(doc: XIDDocument, role: XidRole, uri: string, key: Key): void {
@@ -194,13 +212,7 @@ export function readXidIdentity(paths: Paths): { identity: XidIdentity; info: Xi
   } catch (e) {
     throw new Error(`${paths.identity}: ${e instanceof Error ? e.message : String(e)}`);
   }
-  for (const role of ['release', 'dwn'] as const) {
-    const locked = id.keys[role];
-    if (locked === undefined) continue;
-    const ref = publicKeyOf(locked).reference.toHex();
-    const k = info.keys.find((x) => x.reference === ref);
-    if (!k || k.inception || !grants(k, PRIVILEGE[role])) throw new Error(`${paths.identity}: the ${role} key is not a ${PRIVILEGE[role]} key of the document`);
-  }
+  checkKeys(paths.identity, id.keys, info);
   return { identity: id, info };
 }
 
@@ -291,4 +303,106 @@ export function showXid(alias: string, env?: Env) {
       updateKey: existsSync(paths.xidUpdate) ? paths.xidUpdate : null,
     },
   };
+}
+
+/** The subject of a backup envelope. */
+const BACKUP_TYPE = 'didpkg-xid-backup';
+const BACKUP_ROLES = ['release', 'dwn', 'previousRelease'] as const;
+
+export interface XidBackupOptions {
+  alias: string;
+  /** `<m>-of-<n>`: the backup has n shares, and m shares restore it. */
+  sskr: string;
+  passphrase: string;
+  updatePassphrase: string;
+  env?: Env;
+}
+
+export interface XidBackup {
+  alias: string;
+  xid: string;
+  /** The seq of the document in the backup. */
+  seq: number;
+  sskr: string;
+  /** One `ur:envelope` for each share. */
+  shares: string[];
+}
+
+/** One group of m-of-n (1 <= m <= n <= 16). */
+function sskrSpec(text: string): { spec: Spec; text: string } {
+  const m = /^([0-9]+)-of-([0-9]+)$/.exec(text);
+  const [t, n] = m ? [Number(m[1]), Number(m[2])] : [0, 0];
+  if (t < 1 || t > n || n > 16) throw new Error(`--sskr: ${text} is not <m>-of-<n> with 1 <= m <= n <= 16`);
+  return { spec: Spec.from({ groupThreshold: 1, groups: [GroupSpec.from({ memberThreshold: t, memberCount: n })] }), text: `${t}-of-${n}` };
+}
+
+/**
+ * The SSKR shares of a XID identity. The backup envelope holds the document with the inception key and the provenance
+ * mark generator, and each role key, all open. A random content key encrypts the backup, and SSKR splits the content
+ * key. Each share holds the encrypted backup and one part of the content key.
+ */
+export function backupXid(o: XidBackupOptions): XidBackup {
+  const paths = idPaths(o.alias, o.env);
+  const { spec, text } = sskrSpec(o.sskr);
+  const { identity, info } = readXidIdentity(paths);
+  const doc = openUpdate(paths, identity, info.provenance.seq, o.updatePassphrase);
+  let backup = Envelope.from(BACKUP_TYPE)
+    .addAssertion('created', identity.created)
+    .addAssertion('document', doc.toEnvelope({ privateKeys: 'include', generator: 'include', sign: 'inception' }));
+  for (const role of BACKUP_ROLES) {
+    if (identity.keys[role] !== undefined) backup = backup.addAssertion(role, openKey(identity, role, o.passphrase).toEnvelope({ privateKeys: 'include' }));
+  }
+  const contentKey = SymmetricKey.random();
+  const groups = sskrSplit(backup.wrap().encryptSubject(contentKey), spec, contentKey);
+  return { alias: o.alias, xid: info.xid, seq: info.provenance.seq, sskr: text, shares: groups[0]!.map((e) => e.toUR().toString()) };
+}
+
+export interface XidRestoreOptions {
+  alias: string;
+  /** The `ur:envelope` text of each share. */
+  shares: string[];
+  passphrase: string;
+  updatePassphrase: string;
+  env?: Env;
+}
+
+function shareOf(text: string, n: number): Envelope {
+  try {
+    const ur = UR.parse(text);
+    ur.expectType('envelope');
+    return Envelope.fromUntaggedCbor(ur.cbor);
+  } catch {
+    throw new Error(`share ${n}: not a ur:envelope`);
+  }
+}
+
+/** Make the 3 files of a XID identity from the shares. The passphrases lock the keys again. No file is replaced. */
+export function restoreXid(o: XidRestoreOptions): XidResult {
+  const paths = idPaths(o.alias, o.env);
+  if (o.passphrase === o.updatePassphrase) throw new Error('the update key passphrase must not be the release key passphrase');
+  if (o.shares.length === 0) throw new Error('no shares');
+  let backup: Envelope;
+  try {
+    backup = sskrJoin(o.shares.map((s, i) => shareOf(s, i + 1))).unwrap();
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('share ')) throw e;
+    throw new Error('the shares do not restore a backup: give more shares, or only shares of one backup');
+  }
+  const value = (predicate: string) => backup.optionalObjectForPredicate(predicate);
+  if (backup.subject().asText() !== BACKUP_TYPE || !value('document') || !value('release')) throw new Error('the shares do not hold a didpkg XID backup');
+  const doc = XIDDocument.fromEnvelope(value('document')!, { verify: 'inception' });
+  if (!doc.inceptionPrivateKeys || !doc.provenanceGenerator) throw new Error('the backup has no inception key or no provenance mark generator');
+  const keys = {} as XidIdentity['keys'];
+  for (const role of BACKUP_ROLES) {
+    const env = value(role);
+    if (env === undefined) continue;
+    const key = Key.fromEnvelope(env);
+    if (!key.privateKeys) throw new Error(`the ${role} key of the backup has no private keys`);
+    keys[role] = b64(bytesOf(key.toEnvelope({ privateKeys: { encrypt: o.passphrase } })));
+  }
+  const xid = doc.xid.toHex();
+  checkKeys('the backup', keys, readXidDocument(bytesOf(doc.toEnvelope({ sign: 'inception' })), xid));
+  const created = value('created')?.asText() ?? new Date().toISOString();
+  const info = save(paths, doc, { format: XID_ID_FORMAT, alias: o.alias, xid, created, keys }, o.updatePassphrase, false);
+  return result(o.alias, paths, info);
 }

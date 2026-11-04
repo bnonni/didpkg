@@ -16,7 +16,7 @@ import { registerIdentity } from './id/register.ts';
 import { configDir, idPaths, readIdentity, readIdentityFile, XID_ID_FORMAT } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
 import { createWebvh, logUrl } from './id/webvh.ts';
-import { createXid, readXidIdentity, showXid, updateXid, type XidRole } from './id/xid.ts';
+import { backupXid, createXid, readXidIdentity, restoreXid, showXid, updateXid, type XidRole } from './id/xid.ts';
 import { publish } from './publish/publish.ts';
 import { publishXid } from './publish/xid.ts';
 import { startShim, readSide, type ReadSideOptions } from './shim/start.ts';
@@ -44,6 +44,11 @@ Usage:
                                   Make a XID publisher: a XID document with a release key (Sign) and a DWN key (Auth)
   didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
                                   Change the keys or the services of a XID publisher, with the next provenance mark
+  didpkg id backup <alias> --sskr <m>-of-<n>
+                                  Split the private keys of a XID publisher into n SSKR shares (ur:envelope, one a line);
+                                  m shares restore them
+  didpkg id restore <alias> <file>...
+                                  Make the identity files of a XID publisher again from SSKR shares in the files
   didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
                                   Accept the terms of the DWN, then register the DID there (proof of work).
                                   For did:plc: send the DID to the directory again
@@ -71,6 +76,7 @@ Examples:
   didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
   didpkg id create gordian --xid --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id update gordian --rotate release
+  didpkg id backup gordian --sskr 2-of-3
   didpkg id register main
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
@@ -269,6 +275,38 @@ async function id(args: string[]): Promise<string> {
     process.stderr.write(`Host ${r.files.document} again${r.documentUrls.length ? ` at ${r.documentUrls.join(' and ')}` : ''}: it has seq ${r.seq}.\n`);
     return `${JSON.stringify(r, null, 2)}\n`;
   }
+  if (sub === 'backup') {
+    const { positional, values } = options(rest, ['--sskr']);
+    if (positional.length !== 1) throw new UsageError(`"id backup" needs 1 argument: <alias> (got ${positional.length})`);
+    if (values['--sskr']!.length !== 1) throw new UsageError('"id backup" needs --sskr <m>-of-<n> one time');
+    const paths = idPaths(positional[0]!);
+    if (readIdentityFile(paths).format !== XID_ID_FORMAT) throw new Error(`${paths.identity}: "id backup" takes only a XID identity`);
+    const r = backupXid({
+      alias: positional[0]!, sskr: values['--sskr']![0]!,
+      updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the inception key' }),
+      passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'Passphrase for the release key' }),
+    });
+    const [m, n] = r.sskr.split('-of-');
+    process.stderr.write(`Each line is a share of seq ${r.seq}. Give each share to a different holder: ${m} of the ${n} shares restore all the private keys.
+`
+      + `Make a new backup after each "didpkg id update".
+`);
+    return `${r.shares.join('\n')}\n`;
+  }
+  if (sub === 'restore') {
+    if (rest.length < 2) throw new UsageError(`"id restore" needs 2 or more arguments: <alias> <file>... (got ${rest.length})`);
+    const alias = rest[0]!;
+    idPaths(alias); // a bad alias fails before the passphrase prompt
+    const shares = rest.slice(1).flatMap((f) => readFileSync(f, 'utf8').split(/\s+/).filter((l) => /^ur:envelope\//i.test(l)));
+    const r = restoreXid({
+      alias, shares,
+      passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key and the DWN key', confirm: true }),
+      updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the inception key', confirm: true }),
+    });
+    process.stderr.write(`Restored seq ${r.seq}. If a hosted document has a higher seq, the backup is old: do not run "didpkg id update".
+`);
+    return `${JSON.stringify(r, null, 2)}\n`;
+  }
   if (sub === 'show') {
     if (rest.length !== 1) throw new UsageError(`"id show" needs 1 argument: <alias> (got ${rest.length})`);
     const paths = idPaths(rest[0]!);
@@ -281,7 +319,7 @@ async function id(args: string[]): Promise<string> {
     };
     return `${JSON.stringify(out, null, 2)}\n`;
   }
-  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create, update, register or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
+  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create, update, backup, restore, register or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
 }
 
 async function publishCommand(args: string[]): Promise<string> {
