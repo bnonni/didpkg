@@ -114,7 +114,7 @@ The live demo has 6 publishers. Each publisher publishes `hello@1.0.0`:
 
 - `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` publishes to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)).
 - `did:web:bnonni.github.io:didpkg-demo` publishes to `dwn.didpkg.dev` and to the `web/` folder of the same mirror.
-- `did:webvh:QmYpG6W1WsQVeXs8eJ2z4NMAaRFr4EkUe3vyKJMMdHxUiJ:nonni.org:pkgs` publishes only to a static mirror at `https://nonni.org/pkgs/`.
+- `did:webvh:QmYpG6W1WsQVeXs8eJ2z4NMAaRFr4EkUe3vyKJMMdHxUiJ:nonni.org:pkgs` publishes to `dwn.didpkg.dev` and to a static mirror at `https://nonni.org/pkgs/`.
 - `did:plc:3zo7womke3qzjadke2q4lukr` publishes only to a static mirror at `https://nonni.org/pkgs/plc/`.
 - `did:btcr2:x1qp5faqx3505grw9ttmcp5uczlscchjtr08ucpdy6e0xkmj4hljl2zup6jx6` publishes only to a static mirror at `https://nonni.org/pkgs/btcr2/`. Its genesis document is a raw block in IPFS.
 - The XID `816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967` publishes to `dwn.didpkg.dev` and to a static mirror at `https://nonni.org/pkgs/xid/`. The mirror also holds its XID document.

@@ -124,7 +124,7 @@ The did.json is the parallel did:web DID that the did:webvh specification descri
 
 The host must send the header `Access-Control-Allow-Origin: *` with `did.jsonl`. The did:webvh specification makes this a requirement, so that a resolver in a web browser can read the log. The specification also recommends the content type `text/jsonl` for `did.jsonl`. The did:web specification recommends the same `Access-Control-Allow-Origin` header for `did.json`. Set these headers in the configuration of your static host.
 
-A DWN accepts the writes of a did:webvh publisher only if it resolves did:webvh. `dwn-server` 0.1.45 resolves only did:dht, did:jwk, did:key and did:web. Use `didpkg publish --to dir:<path>` and a static host for a did:webvh publisher.
+A DWN accepts the writes of a did:webvh publisher only if the DWN resolves did:webvh. The stock `dwn-server` 0.1.45 resolves only did:dht, did:jwk, did:key and did:web. The didpkg DWN image also resolves did:webvh (see [deploy](deploy.md)), and `https://dwn.didpkg.dev` runs this image. If your DWN runs the stock `dwn-server`, use `didpkg publish --to dir:<path>` and a static host. To add a DWN to a did:webvh DID later, use [`didpkg id update`](#a-didwebvh-publisher).
 
 ## didpkg id create (did:plc)
 

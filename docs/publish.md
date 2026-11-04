@@ -144,7 +144,7 @@ If the operator changes the terms, the DWN refuses your writes and the reads of 
 
 A DWN with a tenant allowlist and no registration accepts only the DIDs that its operator adds. Give the `did` value of `didpkg id show main` to the operator.
 
-For did:web, host `did.json` before the publish, because the DWN resolves the DID before it accepts a write.
+For did:web, host `did.json` before the publish, because the DWN resolves the DID before it accepts a write. For did:webvh, host `did.jsonl` and `did.json` before the publish for the same reason.
 
 ## 6. Pack and publish
 
