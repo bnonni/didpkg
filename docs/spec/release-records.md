@@ -136,3 +136,26 @@ The protocol URI is `https://didpkg.dev/protocols/repository/v1`. The full proto
 2. A reader uses the anonymous HTTP routes of `dwn-server` and needs no keys ([ADR 0003](../adr/0003-storage-contract.md) section 6 item 2).
 3. A DWN can have more than one `package` record with one name. A reader tries each of them.
 4. The CLI writes the release record, then the tarball, then the index. It signs each DWN message with `#didpkg-1`. The DWN signature is not a trust input.
+
+## 6. XID publishers
+
+A XID publisher has a XID ([BCR-2024-010](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-010-xid.md)) in place of a DID. Its keys are in a XID document: a Gordian Envelope ([draft-mcnally-envelope-12](https://datatracker.ietf.org/doc/draft-mcnally-envelope/)). The XID spec has no resolution method and no recency rule. Thus didpkg sets the rules in this section.
+
+Reference code: [`packages/core/src/xid/`](../../packages/core/src/xid/) (`document.ts`, `resolve.ts`).
+
+### The XID document
+
+1. The document is the tagged CBOR bytes (tag 200) of the envelope. The proposed media type is `application/envelope+cbor` (draft-mcnally-envelope-12 section 8.2).
+2. The inception key must sign the wrapped document. The XID must be the XID of the inception key.
+3. The document must have a provenance mark. Without a mark, no rule can order two copies of a document.
+4. Permissions are deny-first. A `deny` of a privilege, or of `All`, removes the privilege, also if an `allow` gives it. Note: the delegate example in BCR-2024-010 uses `deny All` with `allow Sign` to mean "only Sign". didpkg follows the rule text, not the example.
+5. A text XID is 64 lowercase hex characters. `didpkg name` also takes a `ur:xid` that holds a bare XID or a XID document. It does not verify that document.
+
+### Resolution
+
+1. The sources are the `http:` and `https:` `dereferenceVia` URIs of the cached document, then the resolvers. The document URL at a resolver is `<base>/xid/<hex>.envelope`.
+2. A reader gets the document from each source in parallel, with the network limits of the DID drivers (5 s, https only, no private host). The limit for a document is 64 KB.
+3. The valid document with the highest provenance `seq` wins.
+4. A client cache keeps the newest document for each XID. A new document must have the same chain id and a `seq` that is not lower. The same `seq` needs the same mark. The next `seq` must follow the hash chain of the mark. A gap in `seq` checks only the chain id and the order.
+5. If no source gives a valid document, the cached document is the result.
+6. Errors: `XID_INVALID`, `XID_MISMATCH`, `XID_NO_PROVENANCE`, `XID_CHAIN`, `XID_ROLLBACK`, `XID_FORK`, `XID_NOT_FOUND`, `XID_UNAVAILABLE`.

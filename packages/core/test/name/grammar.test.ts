@@ -8,6 +8,7 @@ import * as core from '../../src/index.ts';
 import * as did from '../../src/did/index.ts';
 import * as trust from '../../src/trust/index.ts';
 import * as source from '../../src/source/index.ts';
+import * as xid from '../../src/xid/index.ts';
 
 const vectors: { method: string; did: string }[] = await Bun.file(new URL('./vectors.json', import.meta.url)).json();
 // golden.json: format(did, name) from an earlier codec, changed to draft 2 by a fixed rule (add "did_" after the
@@ -46,7 +47,7 @@ test('golden: format() output is byte-for-byte the research codec output', () =>
 
 test('name/index and the core index export the public API', () => {
   expect(Object.keys(pkg).sort()).toEqual(['GrammarError', 'bindHash', 'didHash', 'format', 'formatDirect', 'parse', 'route']);
-  expect(Object.keys(core).sort()).toEqual([...Object.keys(pkg), ...Object.keys(did), ...Object.keys(trust), ...Object.keys(source)].sort());
+  expect(Object.keys(core).sort()).toEqual([...Object.keys(pkg), ...Object.keys(did), ...Object.keys(trust), ...Object.keys(source), ...Object.keys(xid)].sort());
   expect(pkg.format('did:web:nonni.org', 'hello')).toBe('@didpkg/hello_did_web_nonni.org');
   const e = code(() => pkg.parse('@other/x'));
   expect(e).toBe('E_SCOPE');

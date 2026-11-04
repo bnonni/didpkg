@@ -28,19 +28,21 @@ A new passphrase must have 12 or more characters. Without a terminal and without
 didpkg name <did|xid> <pkg-name>
 ```
 
-Prints the install name for the DID or the XID and the package name. A XID is 64 lowercase hex characters.
+Prints the install name for the DID or the XID and the package name. A XID is 64 lowercase hex characters, or a `ur:xid`. The `ur:xid` can hold a bare XID or a XID document, and the command does not verify the document.
 
 ```sh
 didpkg name did:web:bnonni.github.io:didpkg-demo hello
 didpkg name 71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c hello
+didpkg name ur:xid/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbintyjkrhfnvsbyrdfw hello
 ```
 
 ```text
 @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
 @didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
+@didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
 ```
 
-The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services. A XID name does not install yet: the install shim and `didpkg drl` refuse it with `KIND_NOT_SUPPORTED`.
+The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. A bad `ur:xid` gives `XID_INVALID`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services. A XID name does not install yet: the install shim and `didpkg drl` refuse it with `KIND_NOT_SUPPORTED`.
 
 ## didpkg parse
 

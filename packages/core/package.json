@@ -18,12 +18,18 @@
     "./did/conformance": "./src/did/conformance.ts",
     "./trust": "./src/trust/index.ts",
     "./source": "./src/source/index.ts",
+    "./xid": "./src/xid/index.ts",
     "./package.json": "./package.json"
   },
   "devDependencies": {
+    "@blockchaincommons/components": "1.0.0-beta.5",
     "validate-npm-package-name": "8.0.0"
   },
   "dependencies": {
+    "@blockchaincommons/envelope": "1.0.0-beta.5",
+    "@blockchaincommons/provenance-mark": "1.0.0-beta.5",
+    "@blockchaincommons/uniform-resources": "1.0.0-beta.5",
+    "@blockchaincommons/xid": "1.0.0-beta.5",
     "@did-btcr2/bitcoin": "0.12.0",
     "@did-btcr2/method": "0.75.1",
     "@enbox/dids": "0.1.14",

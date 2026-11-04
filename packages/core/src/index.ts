@@ -3,3 +3,4 @@ export * from './name/index.ts';
 export * from './did/index.ts';
 export * from './trust/index.ts';
 export * from './source/index.ts';
+export * from './xid/index.ts';

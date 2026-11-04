@@ -26,6 +26,13 @@ const NAMES: [string, string, string][] = [
   ['xid', '71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c', '@didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c'],
 ];
 
+// BCR-2024-010: a ur:xid holds a bare XID or a XID document. Both give the XID of the NAMES row "xid".
+const UR_XIDS: [string, string][] = [
+  ['bare XID', 'ur:xid/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbintyjkrhfnvsbyrdfw'],
+  ['XID document', 'ur:xid/tpsplstpsotanshdhdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbintyjkrhfnoyastpsotpcxksceisjyjyjojkftdldljpihjkjljzkoihjpdmihkshsjnjojzihdmiajljnoyastpsotpcxjnidjyiajpftdyeheyeoeeecenemmtcwrogm'],
+  ['uppercase', 'UR:XID/HDCXJSDIGTWNEOCMNYBADPDLZOBYSBSTMEKTEYPSPEOTCFLDYNLPSFOLSBINTYJKRHFNVSBYRDFW'],
+];
+
 // [label, args, text that stderr must contain]
 const ERRORS: [string, string[], string][] = [
   ['no arguments', [], 'no command'],
@@ -44,6 +51,8 @@ const ERRORS: [string, string[], string][] = [
   ['parse: no kind (draft 1 name)', ['parse', '@didpkg/hello_web_nonni.org'], 'E_KIND'],
   ['parse: uppercase XID', ['parse', '@didpkg/hello_xid_71274DF133169A0E2D2FFB11CBC7917732ACAFA31989F685CCA6CB69D473B93C'], 'E_XID'],
   ['name: uppercase XID', ['name', '71274DF133169A0E2D2FFB11CBC7917732ACAFA31989F685CCA6CB69D473B93C', 'hello'], 'E_XID'],
+  ['name: ur:xid with a bad checksum', ['name', 'ur:xid/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbintyjkrhfnvsbyrdaa', 'hello'], 'XID_INVALID'],
+  ['name: ur of another type', ['name', 'ur:seed/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbintyjkrhfnvsbyrdfw', 'hello'], 'E_DID'],
   ['parse: legacy tilde', ['parse', '@didpkg/hello~web~nonni.org'], 'E_SHAPE'],
   ['parse: short hash', ['parse', '@didpkg/hello__abc'], 'E_HASH'],
   ['drl: no argument', ['drl'], '"drl" needs 1 argument'],
@@ -56,6 +65,11 @@ describe('CLI on bun', () => {
   test.each(NAMES)('name: %s', (_l, did, want) => {
     const r = run(['name', did, 'hello']);
     expect(r).toEqual({ code: 0, out: `${want}\n`, err: '' });
+  });
+
+  test.each(UR_XIDS)('name: ur:xid, %s', (_l, ur) => {
+    const r = run(['name', ur, 'hello']);
+    expect(r).toEqual({ code: 0, out: `${NAMES.find(([l]) => l === 'xid')![2]}\n`, err: '' });
   });
 
   test.each(NAMES)('parse: %s', (_l, id, name) => {

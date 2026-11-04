@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { sidecarFile } from '@didpkg/core/did/btcr2';
 import { format, parse, GrammarError } from '@didpkg/core/name';
+import { xidFromUr } from '@didpkg/core/xid';
 import { readConfig } from './config.ts';
 import { drl } from './drl.ts';
 import { createBtcr2, network } from './id/btcr2.ts';
@@ -24,7 +25,7 @@ const HELP = `didpkg ${VERSION}: install names and publisher identities for pack
 
 Usage:
   didpkg name <did|xid> <pkg-name>
-                                  Print the install name for the DID or the XID (64 hex characters) and the package name
+                                  Print the install name for the DID or the XID (64 hex characters or a ur:xid) and the package name
   didpkg parse <install-name>     Print the parts of an install name as JSON
   didpkg id create <alias> [--dwn <url>] [--repo <url>]... [--relay <url>]...
                                   Make a did:dht publisher DID with the release key #didpkg-1
@@ -302,7 +303,7 @@ async function run(argv: string[]): Promise<string> {
     case 'name': {
       if (args.length !== 2) throw new UsageError(`"name" needs 2 arguments: <did|xid> <pkg-name> (got ${args.length})`);
       const [id, pkgName] = args as [string, string];
-      return `${format(id, pkgName)}\n`;
+      return `${format(/^ur:xid\//i.test(id) ? xidFromUr(id) : id, pkgName)}\n`;
     }
     case 'parse': {
       if (args.length !== 1) throw new UsageError(`"parse" needs 1 argument: <install-name> (got ${args.length})`);

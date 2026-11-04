@@ -22,6 +22,7 @@ test('core src imports no node: module and uses no Bun global', async () => {
 
 // Only did/drivers/*.ts import a DID method library, one file per library.
 // trust/*.ts imports only @noble/ed25519, @noble/curves, @noble/hashes, @scure/base and canonicalize.
+// Only xid/document.ts imports a Gordian library.
 test('import borders: each library has only the expected importers', async () => {
   const importers: Record<string, string[]> = {};
   for (const [file, text] of await sources()) {
@@ -45,12 +46,17 @@ test('import borders: each library has only the expected importers', async () =>
     '@ipld/dag-cbor': ['did/drivers/plc.ts'],
     '@did-btcr2/method': ['did/drivers/btcr2.ts', 'did/drivers/btcr2.ts'],
     '@did-btcr2/bitcoin': ['did/drivers/btcr2.ts'],
+    '@blockchaincommons/envelope': ['xid/document.ts'],
+    '@blockchaincommons/provenance-mark': ['xid/document.ts'],
+    '@blockchaincommons/uniform-resources': ['xid/document.ts'],
+    '@blockchaincommons/xid': ['xid/document.ts', 'xid/document.ts'],
   });
 });
 
+// An exact version can have a pre-release tag (the Gordian libraries are 1.0.0-beta.5).
 test('dependencies have exact versions', () => {
   for (const [name, version] of Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })) {
-    expect([name, /^\d+\.\d+\.\d+$/.test(version)]).toEqual([name, true]);
+    expect([name, /^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version)]).toEqual([name, true]);
   }
 });
 
