@@ -2,7 +2,9 @@
 // test/trust/sim.ts moved here for `didpkg publish`.
 import { contentDigest, sri } from './digest.ts';
 import type { Signer } from './proof.ts';
-import { compareVersions, SEMVER, signObject, type DidPkgIndex, type DidPkgRelease, type IndexEntry } from './release.ts';
+import {
+  compareVersions, SEMVER, signObject, type DidPkgIndex, type DidPkgRelease, type IndexEntry, type IndexFields, type ReleaseFields,
+} from './release.ts';
 
 // The same form as the default proof `created`: no fraction of a second.
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -27,22 +29,27 @@ export interface ReleaseInput {
   /** The packument fields: dependencies, bin, engines, hasInstallScript. */
   npm: Record<string, unknown>;
   /** The head index before this release, or null. Its last release is `previous`. */
-  head: DidPkgIndex | null;
+  head: IndexFields | null;
   /** The publish time and the proof time. Default: now. */
   published?: string;
 }
 
 /** A new signed release manifest. */
 export async function signRelease(o: ReleaseInput, signers: Signer[]): Promise<DidPkgRelease> {
+  const fields = await releaseFields(o);
+  return (await signObject(fields, signers, fields.published)) as DidPkgRelease;
+}
+
+/** The members of a new release record, with no signature. */
+export async function releaseFields(o: ReleaseInput): Promise<ReleaseFields> {
   // The index lists the releases in publish order, and a version key is never an array index.
   const last = o.head ? Object.keys(o.head.releases).at(-1) : undefined;
-  const published = o.published ?? now();
-  return (await signObject({
-    type: 'DidPkgRelease', specVersion: '1', publisher: o.publisher, name: o.name, version: o.version, published,
+  return {
+    type: 'DidPkgRelease', specVersion: '1', publisher: o.publisher, name: o.name, version: o.version, published: o.published ?? now(),
     dist: { integrity: await sri('sha512', o.tarball), size: o.tarball.length },
     npm: o.npm,
     previous: o.head && last ? { version: last, digest: o.head.releases[last]!.digest } : null,
-  }, signers, published)) as DidPkgRelease;
+  };
 }
 
 const LIVE: readonly string[] = ['active', 'deprecated'];
@@ -57,7 +64,7 @@ export interface IndexInput {
   publisher: string;
   name: string;
   /** The head index, or null for the first index. */
-  head: DidPkgIndex | null;
+  head: IndexFields | null;
   /** The release list. Default: the list of the head. */
   releases?: Record<string, IndexEntry>;
   /** Default: the dist-tags of the head, with `latest` from latestOf. */
@@ -69,15 +76,19 @@ export interface IndexInput {
 }
 
 /** The next signed index head. `previous` is the contentDigest of the head. */
-export async function signIndex(o: IndexInput, signers: Signer[]): Promise<DidPkgIndex> {
+export async function signIndex(o: IndexInput & { head: DidPkgIndex | null }, signers: Signer[]): Promise<DidPkgIndex> {
+  const fields = indexFields(o, o.head ? contentDigest(o.head) : null);
+  return (await signObject(fields, signers, fields.updated)) as DidPkgIndex;
+}
+
+/** The members of the next index head, with no signature. `previous` is the digest of the head. */
+export function indexFields(o: IndexInput, previous: string | null): IndexFields {
   const releases = o.releases ?? o.head?.releases ?? {};
   const latest = latestOf(releases);
   const { latest: _old, ...tags } = o.head?.distTags ?? {};
-  const updated = o.updated ?? now();
-  return (await signObject({
+  return {
     type: 'DidPkgIndex', specVersion: '1', publisher: o.publisher, name: o.name,
-    sequence: o.sequence ?? (o.head?.sequence ?? 0) + 1, updated,
-    previous: o.head ? contentDigest(o.head) : null,
-    distTags: o.distTags ?? (latest ? { ...tags, latest } : tags), releases,
-  }, signers, updated)) as DidPkgIndex;
+    sequence: o.sequence ?? (o.head?.sequence ?? 0) + 1, updated: o.updated ?? now(),
+    previous, distTags: o.distTags ?? (latest ? { ...tags, latest } : tags), releases,
+  };
 }

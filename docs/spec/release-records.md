@@ -141,7 +141,7 @@ The protocol URI is `https://didpkg.dev/protocols/repository/v1`. The full proto
 
 A XID publisher has a XID ([BCR-2024-010](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-010-xid.md)) in place of a DID. Its keys are in a XID document: a Gordian Envelope ([draft-mcnally-envelope-12](https://datatracker.ietf.org/doc/draft-mcnally-envelope/)). The XID spec has no resolution method and no recency rule. Thus didpkg sets the rules in this section.
 
-Reference code: [`packages/core/src/xid/`](../../packages/core/src/xid/) (`document.ts`, `resolve.ts`).
+Reference code: [`packages/core/src/xid/`](../../packages/core/src/xid/) (`document.ts`, `resolve.ts`, `release.ts`).
 
 ### The XID document
 
@@ -159,3 +159,31 @@ Reference code: [`packages/core/src/xid/`](../../packages/core/src/xid/) (`docum
 4. A client cache keeps the newest document for each XID. A new document must have the same chain id and a `seq` that is not lower. The same `seq` needs the same mark. The next `seq` must follow the hash chain of the mark. A gap in `seq` checks only the chain id and the order.
 5. If no source gives a valid document, the cached document is the result.
 6. Errors: `XID_INVALID`, `XID_MISMATCH`, `XID_NO_PROVENANCE`, `XID_CHAIN`, `XID_ROLLBACK`, `XID_FORK`, `XID_NOT_FOUND`, `XID_UNAVAILABLE`.
+
+### Release records and indexes
+
+A XID publisher signs the same 2 objects as a DID publisher (sections 1 and 2), but each object is a Gordian Envelope, not JSON. The verifier uses the same policy for the 2 kinds: the index sequence, the pins, the status, the digest match and the tarball check.
+
+The envelope of an object:
+
+1. The subject is the text of `type`: `"DidPkgRelease"` or `"DidPkgIndex"`.
+2. Each other member is one assertion. The predicate is the member name, as text. An object can have only one assertion for each predicate.
+3. The object of `publisher` is the XID (CBOR tag 40024). In the verifier, `publisher` is the XID in hex.
+4. The object of the index member `releases` is an array in publish order. Each item is a map with `version` and the members of the entry (`digest`, `status`, `message`).
+5. The object of each other member is the JSON value, as dCBOR ([draft-mcnally-deterministic-cbor](https://datatracker.ietf.org/doc/draft-mcnally-deterministic-cbor/)).
+6. The publisher wraps the envelope, then signs the wrapped envelope (draft-mcnally-envelope-12 `signed` assertions). On a key rotation, the index has 2 signatures: the new key and the old key.
+7. A host stores and serves the tagged CBOR bytes (tag 200) of the signed envelope.
+
+Digests and elision:
+
+1. The content digest is `sha256-` and the base64 of the envelope digest of the unsigned object (the envelope inside the wrapper). It has the same form as a JSON content digest (section 3), and it has the same uses.
+2. Elision does not change the envelope digest. Thus a publisher or a host can elide an assertion, and the digest and the signatures stay valid.
+3. The verifier ignores an elided or an obscured assertion. If the schema needs that member, the check fails (`MANIFEST_SCHEMA`, `INDEX_SCHEMA`).
+
+Keys:
+
+1. A release key is a key of the current XID document with the `Sign` privilege (permission rule 4 above). The inception key is not a release key.
+2. A signature by the inception key fails (`INDEX_SIGNATURE`, `MANIFEST_SIGNATURE`), also next to a valid signature. The inception key controls the XID document, as the did:dht key `#0` controls the DID (section 4 item 5).
+3. The index must have a signature by a release key. A release record with no signature by a current release key passes only if the current index gives its digest (section 4 item 7).
+4. A pin keeps each key as the hex of the tagged CBOR of its public keys. A key change needs a signature by a pinned key, as for a DID publisher.
+5. A resolution failure gives a XID error (`XID_NOT_FOUND`, `XID_MISMATCH`, and the other XID errors above). Each other failure gives the policy error of the DID verifier.

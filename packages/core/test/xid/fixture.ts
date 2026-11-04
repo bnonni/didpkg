@@ -11,6 +11,8 @@ export interface DocOptions {
   seq?: number;
   /** The seed byte of the inception key. Another byte gives another XID. */
   inception?: number;
+  /** The seed byte of the release key (Sign). Default: 2. */
+  release?: number;
   /** The seed byte of the provenance chain. Another byte gives another chain id. */
   chain?: number;
   /** The date of the last mark. */
@@ -26,7 +28,7 @@ export function publisherDoc(o: DocOptions = {}): XIDDocument {
   const inc = PrivateKeyBase.from(seed(o.inception ?? 1));
   const genesis = o.provenance === false ? undefined : { seed: seed(o.chain ?? 3), resolution: 'low' as const, date: GENESIS_DATE };
   const doc = XIDDocument.from({ inceptionKey: { publicKeys: inc.ed25519PublicKeys(), privateKeys: inc.ed25519PrivateKeys() }, genesis });
-  doc.addKey(Key.from(PrivateKeyBase.from(seed(2)).ed25519PublicKeys(), { nickname: 'release', permissions: Permissions.from({ allow: ['Sign'] }) }));
+  doc.addKey(Key.from(PrivateKeyBase.from(seed(o.release ?? 2)).ed25519PublicKeys(), { nickname: 'release', permissions: Permissions.from({ allow: ['Sign'] }) }));
   const dwn = Key.from(PrivateKeyBase.from(seed(4)).ed25519PublicKeys(), { nickname: 'dwn', permissions: Permissions.from({ allow: ['Auth'] }) });
   doc.addKey(dwn);
   doc.addResolutionMethod(`https://mirror.example/xid/${doc.xid.toHex()}.envelope`);
@@ -48,3 +50,6 @@ export function strayMark(last: ProvenanceMark): ProvenanceMark {
 }
 
 export const toHex = (b: Uint8Array): string => Buffer.from(b).toString('hex');
+
+/** The private keys of a seed byte: 1 = inception, 2 = release, 4 = DWN (Auth only). */
+export const privateKeys = (b: number) => PrivateKeyBase.from(seed(b)).ed25519PrivateKeys();

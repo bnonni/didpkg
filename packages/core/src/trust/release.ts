@@ -8,10 +8,11 @@ import { addProof, DATE_TIME_STAMP, type DataIntegrityProof, type Signer } from 
 export const RELEASE_STATUSES = ['active', 'deprecated', 'yanked', 'revoked'] as const;
 export type ReleaseStatus = (typeof RELEASE_STATUSES)[number];
 
-export interface DidPkgRelease {
+/** The members of a release record, with no signature. */
+export interface ReleaseFields {
   type: 'DidPkgRelease';
   specVersion: '1';
-  /** The publisher DID. It must be the DID in the install name. */
+  /** The publisher DID, or the XID in hex. It must be the publisher in the install name. */
   publisher: string;
   /** The package name, with no npm route scope. */
   name: string;
@@ -25,8 +26,11 @@ export interface DidPkgRelease {
   npm: Record<string, unknown>;
   /** The release before this one, in publish order (a hash chain). */
   previous: { version: string; digest: string } | null;
-  proof: DataIntegrityProof | DataIntegrityProof[];
   [property: string]: unknown;
+}
+
+export interface DidPkgRelease extends ReleaseFields {
+  proof: DataIntegrityProof | DataIntegrityProof[];
 }
 
 export interface IndexEntry {
@@ -36,7 +40,8 @@ export interface IndexEntry {
   message?: string;
 }
 
-export interface DidPkgIndex {
+/** The members of an index, with no signature. */
+export interface IndexFields {
   type: 'DidPkgIndex';
   specVersion: '1';
   publisher: string;
@@ -49,9 +54,12 @@ export interface DidPkgIndex {
   previous: string | null;
   distTags: Record<string, string>;
   releases: Record<string, IndexEntry>;
+  [property: string]: unknown;
+}
+
+export interface DidPkgIndex extends IndexFields {
   /** A proof set on a key rotation: the new key and the old key. */
   proof: DataIntegrityProof | DataIntegrityProof[];
-  [property: string]: unknown;
 }
 
 const SHA512_SRI = /^sha512-[A-Za-z0-9+/]{86}==$/;
@@ -111,14 +119,23 @@ function checker(code: PolicyCode, object: string) {
   };
 }
 
+const isDid = (v: unknown) => isText(v) && v.startsWith('did:');
+
 /** The value as a DidPkgRelease. It is the same object, so contentDigest covers each member. */
 export function parseRelease(value: unknown): DidPkgRelease {
+  const m = checkReleaseFields(value, isDid);
+  checker('MANIFEST_SCHEMA', 'DidPkgRelease')(isProof(m.proof), 'proof');
+  return m as DidPkgRelease;
+}
+
+/** The members of a release record, with a publisher that `isPublisher` accepts. The signature is not checked. */
+export function checkReleaseFields(value: unknown, isPublisher: (v: unknown) => boolean): ReleaseFields {
   const check = checker('MANIFEST_SCHEMA', 'DidPkgRelease');
   check(isObject(value), 'the manifest');
   const m = value as Json;
   check(m.type === 'DidPkgRelease', 'type');
   check(m.specVersion === '1', 'specVersion');
-  check(isText(m.publisher) && m.publisher.startsWith('did:'), 'publisher');
+  check(isPublisher(m.publisher), 'publisher');
   check(isText(m.name), 'name');
   check(isVersion(m.version), 'version');
   check(isTime(m.published), 'published');
@@ -128,18 +145,24 @@ export function parseRelease(value: unknown): DidPkgRelease {
   check(isObject(m.npm), 'npm');
   const previous = m.previous as Json | null;
   check(previous === null || (isObject(previous) && isVersion(previous.version) && isDigest(previous.digest)), 'previous');
-  check(isProof(m.proof), 'proof');
-  return value as DidPkgRelease;
+  return value as ReleaseFields;
 }
 
 /** The value as a DidPkgIndex. It is the same object, so contentDigest covers each member. */
 export function parseIndex(value: unknown): DidPkgIndex {
+  const ix = checkIndexFields(value, isDid);
+  checker('INDEX_SCHEMA', 'DidPkgIndex')(isProof(ix.proof), 'proof');
+  return ix as DidPkgIndex;
+}
+
+/** The members of an index, with a publisher that `isPublisher` accepts. The signature is not checked. */
+export function checkIndexFields(value: unknown, isPublisher: (v: unknown) => boolean): IndexFields {
   const check = checker('INDEX_SCHEMA', 'DidPkgIndex');
   check(isObject(value), 'the index');
   const ix = value as Json;
   check(ix.type === 'DidPkgIndex', 'type');
   check(ix.specVersion === '1', 'specVersion');
-  check(isText(ix.publisher) && ix.publisher.startsWith('did:'), 'publisher');
+  check(isPublisher(ix.publisher), 'publisher');
   check(isText(ix.name), 'name');
   check(Number.isSafeInteger(ix.sequence) && (ix.sequence as number) >= 1, 'sequence');
   check(isTime(ix.updated), 'updated');
@@ -156,8 +179,7 @@ export function parseIndex(value: unknown): DidPkgIndex {
   for (const [tag, version] of Object.entries(ix.distTags as Json)) {
     check(isText(tag) && typeof version === 'string' && Object.hasOwn(ix.releases as Json, version), `distTags.${tag}`);
   }
-  check(isProof(ix.proof), 'proof');
-  return value as DidPkgIndex;
+  return value as IndexFields;
 }
 
 /** The proofs of a signed object, as a list. */

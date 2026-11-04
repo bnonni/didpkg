@@ -1,5 +1,11 @@
-// XID documents (BCR-2024-010): read, verify and resolve.
+// XID documents (BCR-2024-010): read, verify and resolve. The release records and indexes of a XID publisher.
 export { checkProvenance, grants, keysWith, readXidDocument, xidFromUr, XidError } from './document.ts';
 export type { XidDocumentInfo, XidErrorCode, XidKeyInfo, XidPrivilege, XidProvenanceInfo, XidServiceInfo } from './document.ts';
 export { DEFAULT_XID_RESOLVERS, ENVELOPE_MEDIA_TYPE, memoryXidCache, resolveXid, xidDocumentUrl } from './resolve.ts';
 export type { ResolveXidOptions, XidCache, XidResolution } from './resolve.ts';
+export {
+  checkXidRelease, envelopeBytes, parseXidIndex, parseXidRelease, signXidIndex, signXidObject, signXidRelease, verifyXidIndex, verifyXidRelease, xidContentDigest,
+} from './release.ts';
+export type {
+  GordianSigner, VerifiedXidIndex, VerifiedXidRelease, VerifyXidIndexOptions, VerifyXidReleaseOptions, XidDocumentResolver, XidPkgIndex, XidPkgRelease,
+} from './release.ts';

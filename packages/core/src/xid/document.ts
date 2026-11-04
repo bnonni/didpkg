@@ -1,4 +1,4 @@
-// XID documents (BCR-2024-010). This is the only file that imports a Gordian library.
+// XID documents (BCR-2024-010). Only this file and release.ts import a Gordian library.
 // A XID document is a Gordian Envelope (draft-mcnally-envelope-12) that the inception key signs.
 // didpkg rules where the XID spec has no rule: docs/spec/release-records.md section 6.
 import { Envelope } from '@blockchaincommons/envelope';
