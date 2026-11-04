@@ -4,10 +4,10 @@
 import { createInterface } from 'node:readline/promises';
 import { getTerms, register, type Terms } from '@didpkg/adapter-dwn/registration';
 import { endpoint } from './dht.ts';
-import type { Identity } from './store.ts';
 
 export interface RegisterResult {
   alias: string;
+  /** The tenant: the DID, or the did:key of the DWN key of a XID publisher. */
   did: string;
   dwn: string;
   /** The hash of the terms that the user accepted, or null if the DWN has no terms. */
@@ -17,10 +17,9 @@ export interface RegisterResult {
 const say = (text: string) => process.stderr.write(text);
 
 /** `--dwn`, else the one URL of the DecentralizedWebNode services of the identity. */
-function dwnOf(identity: Identity, dwn?: string): string {
+function dwnOf(services: readonly string[], dwn?: string): string {
   if (dwn !== undefined) return endpoint(dwn, '--dwn');
-  const urls = [...new Set((identity.document.service ?? []).filter((s) => s.type === 'DecentralizedWebNode')
-    .flatMap((s) => s.serviceEndpoint).filter((u): u is string => typeof u === 'string'))];
+  const urls = [...new Set(services)];
   if (urls.length === 0) throw new Error('the identity has no DecentralizedWebNode service: use --dwn <url>');
   if (urls.length > 1) throw new Error(`the identity has ${urls.length} DWN URLs: use --dwn <url> to select one`);
   return endpoint(urls[0]!, 'dwn');
@@ -77,9 +76,10 @@ function progress() {
   };
 }
 
-export async function registerIdentity(o: { identity: Identity; dwn?: string; acceptTerms?: string }): Promise<RegisterResult> {
-  const { alias, did } = o.identity;
-  const url = dwnOf(o.identity, o.dwn);
+/** `did` is the tenant. `services` are the DWN URLs of the identity. */
+export async function registerIdentity(o: { alias: string; did: string; services: readonly string[]; dwn?: string; acceptTerms?: string }): Promise<RegisterResult> {
+  const { alias, did } = o;
+  const url = dwnOf(o.services, o.dwn);
   const terms = await getTerms(url).catch((e: Error) => { throw new Error(`cannot get the terms of service of ${url}: ${e.message}`); });
   if (terms) await agree(url, terms, o.acceptTerms);
   else if (o.acceptTerms !== undefined) throw new Error(`${url} has no terms of service: remove --accept-terms`);

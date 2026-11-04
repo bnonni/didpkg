@@ -184,6 +184,6 @@ describe('the CLI', () => {
     expect(run(['id', 'update', 'cx', '--rotate', 'inception'], pass).err).toContain('is not release or dwn');
     expect(run(['id', 'update', 'cx', '--remove', 'release'], pass).err).toContain('is not dwn');
     const p = run(['id', 'register', 'cx'], pass);
-    expect([p.code, p.err.includes('is a XID identity')]).toEqual([1, true]);
+    expect([p.code, p.err.includes('the XID document has no DWN service')]).toEqual([1, true]);
   });
 });

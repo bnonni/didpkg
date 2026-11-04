@@ -5,13 +5,16 @@
 // 3. It signs a release with the release key, and the next index with the release key and the previous
 //    release key (after a rotation, a client with a pin on the old key accepts the new key). Or it uses the signed copies again.
 // 4. Each folder gets the XID document at xid/<hex>.envelope, then the tarball, the release and the index.
+// A DWN gets the protocol v2 first, and no XID document. The tenant is the did:key of the DWN key, and the DWN key signs.
 import type { PrivateKeys } from '@blockchaincommons/components';
 import { hasSignatureFrom } from '@blockchaincommons/envelope/signature';
+import { dwnAdapter } from '@didpkg/adapter-dwn';
+import { DwnWriter, ed25519MessageSigner } from '@didpkg/adapter-dwn/writer';
 import { format } from '@didpkg/core/name';
-import type { StoredFile } from '@didpkg/core/source';
+import { DWN_SERVICE_TYPE, xidEndpoints, type Endpoint, type StorageReader, type StoredFile } from '@didpkg/core/source';
 import { checkVersion, sri } from '@didpkg/core/trust';
 import {
-  envelopeBytes, parseXidIndex, parseXidRelease, signXidIndex, signXidRelease, xidContentDigest, type XidPkgIndex, type XidPkgRelease,
+  envelopeBytes, parseXidIndex, parseXidRelease, readXidDocument, signXidIndex, signXidRelease, xidContentDigest, type XidPkgIndex, type XidPkgRelease,
 } from '@didpkg/core/xid';
 import { DirWriter } from '@didpkg/adapter-https/dir';
 import type { StepResult } from '../id/dht.ts';
@@ -27,7 +30,7 @@ export interface PublishXidOptions {
   document: Uint8Array;
   /** The exact `npm pack` bytes. */
   tarball: Uint8Array;
-  /** `dir:<path>` only. */
+  /** `dwn` (each DWN service of the XID document) or `dir:<path>`. */
   to: readonly string[];
   /** Gives the passphrase of the release key. It runs after the input checks. */
   passphrase: () => Promise<string>;
@@ -45,15 +48,23 @@ export interface PublishXidResult {
 }
 
 interface Signed<T> { value: T; bytes: Uint8Array }
+interface Target { url: string; reader: StorageReader; dir?: DirWriter; dwn?: DwnWriter }
 
-function dirsOf(to: readonly string[]): string[] {
+function targetsOf(to: readonly string[], endpoints: Endpoint[]): { dwn: Endpoint[]; dirs: string[] } {
+  const dwn: Endpoint[] = [];
   const dirs: string[] = [];
   for (const t of to) {
-    if (t === 'dwn') throw new Error('--to dwn: a XID publisher writes only to a folder (dir:<path>)');
-    if (!t.startsWith('dir:') || t.length === 4) throw new Error(`--to ${JSON.stringify(t)}: use "dir:<path>"`);
-    dirs.push(t.slice(4));
+    if (t === 'dwn') {
+      const found = endpoints.filter((e) => e.type === DWN_SERVICE_TYPE);
+      if (found.length === 0) throw new Error('--to dwn: the XID document has no DWN service with a DWN key');
+      dwn.push(...found.filter((e) => !dwn.some((d) => d.url === e.url)));
+    } else if (t.startsWith('dir:') && t.length > 4) {
+      dirs.push(t.slice(4));
+    } else {
+      throw new Error(`--to ${JSON.stringify(t)}: use "dwn" or "dir:<path>"`);
+    }
   }
-  return [...new Set(dirs)];
+  return { dwn, dirs: [...new Set(dirs)] };
 }
 
 export async function publishXid(o: PublishXidOptions): Promise<PublishXidResult> {
@@ -61,10 +72,26 @@ export async function publishXid(o: PublishXidOptions): Promise<PublishXidResult
   const { name, version, npm } = readTarball(o.tarball);
   checkVersion(version);
   const installName = format(xid, name);
-  const targets = dirsOf(o.to).map((dir) => ({ url: `dir:${dir}`, writer: new DirWriter(dir) }));
+  const { dwn, dirs } = targetsOf(o.to, xidEndpoints(readXidDocument(o.document, xid)));
+  if (dwn.length && !o.identity.keys.dwn) throw new Error(`--to dwn: the identity ${o.identity.alias} has no DWN key`);
 
   const pass = await o.passphrase();
   const signer = openXidKey(o.identity, 'release', pass);
+  const adapter = dwnAdapter({ allowLoopback: true });
+  // The DWN key signs as its did:key. The verification method id of a did:key is the DID and the key as a fragment.
+  const seed = dwn.length ? openXidKey(o.identity, 'dwn', pass).signingPrivateKey.asEd25519()?.bytes : undefined;
+  if (dwn.length && !seed) throw new Error('the DWN key is not an Ed25519 key');
+  const targets: Target[] = [
+    ...dwn.map((e) => {
+      const signer = ed25519MessageSigner(seed!, `${e.did}#${e.did.slice('did:key:'.length)}`);
+      return { url: e.url, reader: adapter.reader(e, { fetch }), dwn: new DwnWriter({ dwnUrl: e.url, did: e.did, signer, format: 'envelope' }) };
+    }),
+    ...dirs.map((dir) => {
+      const writer = new DirWriter(dir);
+      return { url: `dir:${dir}`, reader: writer, dir: writer };
+    }),
+  ];
+  for (const t of targets) await t.dwn?.installProtocol();
   const previous: PrivateKeys | undefined = o.identity.keys.previousRelease ? openXidKey(o.identity, 'previousRelease', pass) : undefined;
   const own = [signer, ...(previous ? [previous] : [])].map((k) => k.publicKeys());
 
@@ -72,7 +99,7 @@ export async function publishXid(o: PublishXidOptions): Promise<PublishXidResult
   const read = async <T extends XidPkgIndex | XidPkgRelease>(file: StoredFile, parse: (v: unknown) => T) => {
     const found: Signed<T>[] = [];
     for (const t of targets) {
-      for await (const bytes of t.writer.read(file, { signal: AbortSignal.timeout(READ_TIMEOUT_MS), maxBytes: MAX_RECORD_BYTES })) {
+      for await (const bytes of t.reader.read(file, { signal: AbortSignal.timeout(READ_TIMEOUT_MS), maxBytes: MAX_RECORD_BYTES })) {
         let value: T;
         try {
           value = parse(bytes);
@@ -118,8 +145,8 @@ export async function publishXid(o: PublishXidOptions): Promise<PublishXidResult
   const results: StepResult[] = [];
   for (const t of targets) {
     try {
-      await t.writer.writeXidDocument(xid, o.document);
-      await t.writer.publish({ name, version, release: release.bytes, tarball: o.tarball, index: index.bytes, format: 'envelope' });
+      await t.dir?.writeXidDocument(xid, o.document);
+      await (t.dir ?? t.dwn)!.publish({ name, version, release: release.bytes, tarball: o.tarball, index: index.bytes, format: 'envelope' });
       results.push({ url: t.url, ok: true });
     } catch (e) {
       results.push({ url: t.url, ok: false, error: e instanceof Error ? e.message : String(e) });

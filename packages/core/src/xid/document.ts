@@ -6,6 +6,7 @@ import type { ProvenanceMark } from '@blockchaincommons/provenance-mark';
 import { UR } from '@blockchaincommons/uniform-resources';
 import { XIDDocument, type Key, type Privilege, type Service } from '@blockchaincommons/xid';
 import { XID_RE } from '../name/grammar.ts';
+import { toMultikey } from '../trust/keys.ts';
 
 export type { Privilege as XidPrivilege } from '@blockchaincommons/xid';
 
@@ -36,6 +37,8 @@ export interface XidKeyInfo {
   inception: boolean;
   nickname: string;
   endpoints: readonly string[];
+  /** The did:key of an Ed25519 key (W3C CCG did:key v0.9). A DWN key gives the DWN tenant. */
+  didKey?: string;
   /** The library key. The release verifier checks signatures with it. */
   key: Key;
 }
@@ -103,6 +106,7 @@ export function readXidDocument(bytes: Uint8Array, expected?: string): XidDocume
 }
 
 function keyInfo(doc: XIDDocument, k: Key): XidKeyInfo {
+  const ed25519 = k.publicKeys.signingPublicKey.asEd25519();
   return {
     reference: k.reference.toHex(),
     allow: sorted(k.allow),
@@ -110,6 +114,7 @@ function keyInfo(doc: XIDDocument, k: Key): XidKeyInfo {
     inception: doc.isInceptionSigningKey(k.publicKeys.signingPublicKey),
     nickname: k.nickname,
     endpoints: [...k.endpoints].map(String),
+    ...(ed25519 ? { didKey: `did:key:${toMultikey({ alg: 'Ed25519', bytes: ed25519.bytes })}` } : {}),
     key: k,
   };
 }

@@ -208,7 +208,7 @@ Makes a XID publisher ([BCR-2024-010](https://github.com/BlockchainCommons/Resea
 | `--dwn <url>` | None | A DWN endpoint. One time only. |
 | `--repo <url>` | None | A mirror URL. Repeatable. |
 
-`--relay`, `--web`, `--webvh`, `--plc` and `--btcr2` are not permitted with `--xid`. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`. Each key and the provenance generator are locked with Argon2id, as bc-xid does it. The command does no network write. `didpkg publish` and `didpkg id register` do not take a XID identity.
+`--relay`, `--web`, `--webvh`, `--plc` and `--btcr2` are not permitted with `--xid`. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`. Each key and the provenance generator are locked with Argon2id, as bc-xid does it. The command does no network write.
 
 The command writes 3 files in `$DIDPKG_HOME/ids`:
 
@@ -251,6 +251,8 @@ didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
 ```
 
 Registers the DID of an identity as a tenant of a DWN. A DWN with registration accepts writes only from its tenants. `dwn.didpkg.dev` is a DWN with registration.
+
+For a XID identity, the tenant is the `did:key` of the DWN key, and the DWN URL is the DWN service of the XID document. The command refuses a XID identity with no DWN service: run [`didpkg id update <alias> --dwn <url>`](#didpkg-id-update) first.
 
 For a did:plc identity, the command sends the genesis operation to the directory again. Use it if the directory did not accept the DID at `didpkg id create`. The command succeeds if the operation log of the directory starts with this operation. `--dwn` and `--accept-terms` are not permitted for a did:plc identity.
 
@@ -300,7 +302,7 @@ Signs an `npm pack` tarball with the release key (`#didpkg-1` for a DID) and wri
 
 | Option | Default | Use |
 |---|---|---|
-| `--to dwn` | None | Write to each DWN URL in the `#dwn` service of the identity. |
+| `--to dwn` | None | Write to each DWN URL of the identity: the `#dwn` service of a DID, or the DWN service of a XID document. |
 | `--to dir:<path>` | None | Write the mirror files to a local folder. Repeatable. |
 | `--relay <url>` | `https://relay.pkarr.org`, `https://pkarr.pubky.org` | The Pkarr relays that get the stored DID record again (did:dht only). Repeatable. |
 
@@ -320,11 +322,12 @@ For the full steps and the errors, read [Publish a package](publish.md).
 
 For a XID identity, the release and the index are signed Gordian Envelopes. The command:
 
-- Takes only `--to dir:<path>`. It refuses `--to dwn` and `--relay`.
+- Refuses `--relay`.
 - Writes the XID document to `<path>/xid/<hex>.envelope`, then `<name>/<version>.tgz`, `<name>/<version>.envelope` and `<name>/index.envelope`.
+- With `--to dwn`, writes to the DWN service of the XID document. The tenant is the `did:key` of the DWN key, and the DWN key signs the DWN messages. The command installs the DWN protocol v2, then writes the tarball, the release and the index. The DWN does not get the XID document.
 - Signs the index with the release key. After [`id update --rotate release`](#didpkg-id-update), it also signs the index with the previous release key. Thus a client with a pin on the old key accepts the new key.
 
-Host the folder at a `--repo` URL of the identity. The XID document has a `dereferenceVia` URI for each `--repo` URL, so a shim with that URL in `--xid-resolver` finds the document. stdout gets `xid`, `name`, `version`, `installName`, `release`, `sequence` and `targets`.
+Host the folder at a `--repo` URL of the identity. The XID document has a `dereferenceVia` URI for each `--repo` URL, so a shim with that URL in `--xid-resolver` finds the document. A shim needs the XID document also for a DWN, so host the document file at `xid/<hex>.envelope` on a static host. stdout gets `xid`, `name`, `version`, `installName`, `release`, `sequence` and `targets`.
 
 ## didpkg shim start
 

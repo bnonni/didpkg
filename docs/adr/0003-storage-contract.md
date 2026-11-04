@@ -6,6 +6,7 @@
 - Code: `packages/core/src/source/`, the `ReleaseReader` change and `checkRelease` in `packages/core/src/trust/verify.ts`. Tests: `packages/core/test/source/`.
 - Amended: 2026-10-27, section 8 (the npm packument); section 7 items 1-5 (the static HTTPS adapter); section 6 items 5-9 (the DWN writer); section 5 item 4 and section 6 items 10-13 (the DWN reader and the caches). Code: `packages/adapter-https/`, `packages/adapter-dwn/`.
 - Amended: 2026-11-02, section 3 item 8 (`copies`, the URL of a stored copy, for `didpkg drl`).
+- Amended: 2026-11-04, section 9 (the DWN protocol v2 for XID publishers).
 
 ## Context
 
@@ -176,6 +177,135 @@ Layout v1 is final: `<name>/index.json`, `<name>/<version>.json`, `<name>/<versi
 4. Each version is the signed `npm` fields, plus `name` (the canonical install name), `version` and `dist` (`integrity` from the signed release, `tarball` from a function of the caller). The index owns the status: a `deprecated` member in `npm` does not count. A deprecated version with no message gets `deprecated: "deprecated"`, because npm ignores an empty string.
 5. `time` holds the `published` value of each listed version. It is a publisher claim. `npm install --before` reads it.
 6. A dist-tag of an omitted version is dropped. If no `latest` tag is left, `latest` is the highest listed version with no prerelease, else the highest listed version. If a stable version is listed, npm selects the same version when `latest` is absent. pnpm needs the tag (not verified in this repository).
+
+### 9. The DWN protocol v2 (XID publishers)
+
+A XID publisher (BCR-2024-010) signs Gordian Envelopes, not JSON. The protocol v2 `https://didpkg.dev/protocols/repository/v2` is the structure of v1. Only the `index` and the `release` types change: their schemas are `v2`, and they also accept `application/envelope+cbor` (the media type of draft-mcnally-envelope):
+
+```json
+{
+  "protocol": "https://didpkg.dev/protocols/repository/v2",
+  "published": true,
+  "types": {
+    "package": {
+      "schema": "https://didpkg.dev/schemas/package/v1",
+      "dataFormats": [
+        "application/json"
+      ]
+    },
+    "index": {
+      "schema": "https://didpkg.dev/schemas/index/v2",
+      "dataFormats": [
+        "application/json",
+        "application/envelope+cbor"
+      ]
+    },
+    "release": {
+      "schema": "https://didpkg.dev/schemas/release/v2",
+      "dataFormats": [
+        "application/json",
+        "application/envelope+cbor"
+      ]
+    },
+    "tarball": {
+      "dataFormats": [
+        "application/gzip"
+      ]
+    }
+  },
+  "structure": {
+    "package": {
+      "$actions": [
+        {
+          "who": "anyone",
+          "can": [
+            "read"
+          ]
+        }
+      ],
+      "$tags": {
+        "$requiredTags": [
+          "name"
+        ],
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "$size": {
+        "max": 4096
+      },
+      "index": {
+        "$actions": [
+          {
+            "who": "anyone",
+            "can": [
+              "read"
+            ]
+          }
+        ],
+        "$size": {
+          "max": 262144
+        }
+      },
+      "release": {
+        "$immutable": true,
+        "$actions": [
+          {
+            "who": "anyone",
+            "can": [
+              "read"
+            ]
+          }
+        ],
+        "$tags": {
+          "$requiredTags": [
+            "version"
+          ],
+          "version": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "$size": {
+          "max": 262144
+        },
+        "tarball": {
+          "$immutable": true,
+          "$actions": [
+            {
+              "who": "anyone",
+              "can": [
+                "read"
+              ]
+            }
+          ],
+          "$tags": {
+            "$requiredTags": [
+              "version"
+            ],
+            "version": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "$size": {
+            "max": 67108864
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+1. A XID publisher writes v2. A DID publisher writes v1, because the live records of the DID publishers are in v1. `StoredFile.format` selects the protocol: `envelope` gives v2, else v1. The tarball file also has the `format` of its publisher, because a DWN keeps the tarball in the protocol of its release.
+2. The tenant is the `did:key` (W3C CCG did:key v0.9) of the DWN key of the XID document. `xidEndpoints` gives each service with the capability `DecentralizedWebNode` first, then each `DIDPackageRepository` service. The tenant is the first key of the service that has the privilege `Auth` and an Ed25519 public key. A stock dwn-server resolves `did:key`, so the server needs no change.
+3. A `did:xid` tenant was rejected. `did:xid` is not in the DID method registry (w3c/did-extensions). A dwn-server needs a custom resolver for it. Also, each DRL with that DID is public.
+4. The writer (`DwnWriter` with `format: 'envelope'`) signs each message with the DWN key. It refuses a record of the other form, because a protocol holds one form. The DWN signature is not a trust input: the Envelope signatures inside the stored bytes are.
+5. The reader is the reader of section 6 items 10-13. The caches have the protocol in the key.
+6. v2 has no type for the XID document. A reader needs the XID document first, to find the DWN and the tenant. Thus the document comes from a XID resolver (`docs/spec/release-records.md` section 6).
 
 ## Consequences
 

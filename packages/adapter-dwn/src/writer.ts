@@ -1,5 +1,6 @@
-// The DWN writer (ADR 0003 sections 3 and 6). Entry point `@didpkg/adapter-dwn/writer`.
+// The DWN writer (ADR 0003 sections 3, 6 and 9). Entry point `@didpkg/adapter-dwn/writer`.
 // It signs each DWN message with a key of the publisher DID document, for example the release key #didpkg-1.
+// For a XID publisher, it signs with the DWN key of the XID document, and the tenant is the did:key of that key.
 // The DWN message signature is not a trust input. The Data Integrity proofs inside the stored bytes are.
 import * as ed from '@noble/ed25519';
 import { HttpDwnRpcClient } from '@enbox/dwn-clients';
@@ -7,10 +8,9 @@ import {
   DateSort, ProtocolsConfigure, RecordsQuery, RecordsWrite,
   type MessageSigner, type ProtocolDefinition, type RecordsFilter, type RecordsQueryReplyEntry, type RecordsWriteMessage,
 } from '@enbox/dwn-sdk-js';
-import type { PublishInput, StorageWriter } from '@didpkg/core/source';
-import { DIDPKG_PROTOCOL, protocolDefinition } from './protocol.ts';
+import type { PublishInput, RecordFormat, StorageWriter } from '@didpkg/core/source';
+import { ENVELOPE_DATA_FORMAT, definitionOf, protocolOf } from './protocol.ts';
 
-const definition = protocolDefinition as ProtocolDefinition;
 const te = new TextEncoder();
 
 /** A DWN message signer for an Ed25519 private key (the 32-byte seed). `keyId` is the verification method id. */
@@ -21,13 +21,15 @@ export function ed25519MessageSigner(seed: Uint8Array, keyId: string): MessageSi
 export interface DwnWriterOptions {
   /** The DWN endpoint, for example `https://dwn.example`. */
   dwnUrl: string;
-  /** The publisher DID. It is the DWN tenant. */
+  /** The DWN tenant: the publisher DID, or the did:key of the DWN key of a XID publisher. */
   did: string;
   /** Signs each message. The key must be in the DID document. Never use the did:dht update key `#0`. */
   signer: MessageSigner;
+  /** The form of the signed records. `envelope` (a XID publisher) uses the protocol v2. Default: json (v1). */
+  format?: RecordFormat;
 }
 
-type Write = { protocolPath: string; type: keyof typeof protocolDefinition.types; dataFormat: string; data: Uint8Array; tags?: Record<string, string>; parentContextId?: string };
+type Write = { protocolPath: string; type: 'package' | 'index' | 'release' | 'tarball'; dataFormat: string; data: Uint8Array; tags?: Record<string, string>; parentContextId?: string };
 
 /**
  * Writes to the publisher DWN in the order of ADR 0003 section 3 rule 4: the release, the tarball, then the index.
@@ -37,24 +39,42 @@ type Write = { protocolPath: string; type: keyof typeof protocolDefinition.types
  */
 export class DwnWriter implements StorageWriter {
   readonly #client = new HttpDwnRpcClient();
-  constructor(readonly options: DwnWriterOptions) {}
+  readonly #format: RecordFormat;
+  readonly #protocol: string;
+  readonly #definition: ProtocolDefinition;
+  /** The data format of the index and the release. */
+  readonly #dataFormat: string;
 
-  /** Installs (or installs again) the protocol v1. A publish needs it. */
+  constructor(readonly options: DwnWriterOptions) {
+    this.#format = options.format ?? 'json';
+    this.#protocol = protocolOf(this.#format);
+    this.#definition = definitionOf(this.#format) as ProtocolDefinition;
+    this.#dataFormat = this.#format === 'envelope' ? ENVELOPE_DATA_FORMAT : 'application/json';
+  }
+
+  /** Installs (or installs again) the protocol of the record form: v1, or v2 for `envelope`. A publish needs it. */
   async installProtocol(): Promise<void> {
-    const { message } = await ProtocolsConfigure.create({ definition, signer: this.options.signer });
+    const { message } = await ProtocolsConfigure.create({ definition: this.#definition, signer: this.options.signer });
     await this.#send('ProtocolsConfigure', message);
   }
 
-  async publish({ name, version, release, tarball, index }: PublishInput): Promise<void> {
+  async publish({ name, version, release, tarball, index, format }: PublishInput): Promise<void> {
+    this.#check(format);
     const pkg = await this.#package(name);
     const tags = { version };
-    const rel = await this.#immutable(`${name}@${version} release`, { protocolPath: 'package/release', type: 'release', dataFormat: 'application/json', data: release, tags, parentContextId: pkg.contextId });
+    const rel = await this.#immutable(`${name}@${version} release`, { protocolPath: 'package/release', type: 'release', dataFormat: this.#dataFormat, data: release, tags, parentContextId: pkg.contextId });
     await this.#immutable(`${name}@${version} tarball`, { protocolPath: 'package/release/tarball', type: 'tarball', dataFormat: 'application/gzip', data: tarball, tags, parentContextId: rel.contextId });
     await this.#index(name, pkg.contextId, index);
   }
 
-  async writeIndex({ name, index }: { name: string; index: Uint8Array }): Promise<void> {
+  async writeIndex({ name, index, format }: { name: string; index: Uint8Array; format?: RecordFormat }): Promise<void> {
+    this.#check(format);
     await this.#index(name, (await this.#package(name)).contextId, index);
+  }
+
+  /** A protocol holds one record form, so a writer writes one form. */
+  #check(format: RecordFormat = 'json'): void {
+    if (format !== this.#format) throw new Error(`this DWN writer writes ${this.#format} records, not ${format}`);
   }
 
   /** The `package` record of a name. It holds no trust input: only the tag `name` matters, for the reader query. */
@@ -85,7 +105,7 @@ export class DwnWriter implements StorageWriter {
     // After a race, the newest index record is the one that a reader reads. Update that one.
     const previous = (await this.#query({ protocolPath: 'package/index', contextId: packageContextId })).at(-1);
     if (!previous) {
-      const w = await this.#write({ protocolPath: 'package/index', type: 'index', dataFormat: 'application/json', data, parentContextId: packageContextId });
+      const w = await this.#write({ protocolPath: 'package/index', type: 'index', dataFormat: this.#dataFormat, data, parentContextId: packageContextId });
       return void (await this.#send(label, w.message, data));
     }
     const { initialWrite: _, encodedData: __, ...recordsWriteMessage } = previous;
@@ -95,7 +115,7 @@ export class DwnWriter implements StorageWriter {
 
   async #write(o: Write) {
     const message = (await RecordsWrite.create({
-      protocol: DIDPKG_PROTOCOL, protocolPath: o.protocolPath, schema: definition.types[o.type]!.schema, dataFormat: o.dataFormat,
+      protocol: this.#protocol, protocolPath: o.protocolPath, schema: this.#definition.types[o.type]!.schema, dataFormat: o.dataFormat,
       data: o.data, tags: o.tags, published: true, parentContextId: o.parentContextId, signer: this.options.signer,
     })).message;
     return { message, data: o.data };
@@ -103,7 +123,7 @@ export class DwnWriter implements StorageWriter {
 
   /** The records of one protocol path, the oldest first. The query is signed, so it also gives unpublished records. */
   async #query(filter: Omit<RecordsFilter, 'protocol'>): Promise<RecordsQueryReplyEntry[]> {
-    const { message } = await RecordsQuery.create({ filter: { protocol: DIDPKG_PROTOCOL, ...filter }, dateSort: DateSort.CreatedAscending, signer: this.options.signer });
+    const { message } = await RecordsQuery.create({ filter: { protocol: this.#protocol, ...filter }, dateSort: DateSort.CreatedAscending, signer: this.options.signer });
     const reply = await this.#send(`query ${filter.protocolPath}`, message);
     return (reply as { entries?: RecordsQueryReplyEntry[] }).entries ?? [];
   }

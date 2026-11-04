@@ -8,7 +8,7 @@ import { SEMVER } from '../trust/release.ts';
 import type { ReleaseReader } from '../trust/verify.ts';
 import { parseXidRelease, xidContentDigest, type XidDocumentResolver } from '../xid/release.ts';
 import { storageEndpoints, xidEndpoints } from './endpoints.ts';
-import type { Endpoint, StorageAdapter, StorageReader, StoredFile } from './types.ts';
+import type { Endpoint, RecordFormat, StorageAdapter, StorageReader, StoredFile } from './types.ts';
 
 /** The signed tarball bytes, the endpoint that gave them, and their URL if the adapter gives URLs. */
 export interface FoundTarball {
@@ -60,8 +60,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typ
 const utf8 = new TextDecoder('utf-8', { fatal: true });
 // A XID publisher signs Gordian Envelopes. The source gives their bytes, and the verifier parses them.
 const isXid = (publisher: string) => XID_RE.test(publisher);
-type RecordFile = Extract<StoredFile, { kind: 'index' | 'release' }>;
-const recordFile = (publisher: string, file: RecordFile): RecordFile => (isXid(publisher) ? { ...file, format: 'envelope' } : file);
+const recordFile = <F extends StoredFile>(publisher: string, file: F): F & { format?: RecordFormat } => (isXid(publisher) ? { ...file, format: 'envelope' } : file);
 const label = (f: StoredFile) => (f.kind === 'index' ? `the index of ${f.name}` : `the ${f.kind} ${f.name}@${f.version}`);
 
 function xidDigest(bytes: Uint8Array): string | undefined {
@@ -186,7 +185,7 @@ export class PackageSource implements ReleaseReader {
   /** As getTarball, and also the endpoint and the URL of the copy (`didpkg drl`). */
   async findTarball(did: string, name: string, version: string, dist: { integrity: string; size: number }): Promise<FoundTarball | null> {
     check(name, version);
-    return this.#first(did, { kind: 'tarball', name, version }, MAX_TARBALL_BYTES, this.#o.tarballTimeoutMs ?? TARBALL_TIMEOUT_MS, async (bytes, b, url) =>
+    return this.#first(did, recordFile(did, { kind: 'tarball', name, version }), MAX_TARBALL_BYTES, this.#o.tarballTimeoutMs ?? TARBALL_TIMEOUT_MS, async (bytes, b, url) =>
       bytes.length === dist.size && (await sri('sha512', bytes)) === dist.integrity ? { bytes, endpoint: b.endpoint, url } : undefined);
   }
 

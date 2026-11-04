@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sri, type Pin } from '@didpkg/core/trust';
+import { startDwn, startRelay } from '../../adapter-dwn/test/server.ts';
 import { serveDir, type StaticServer } from '../../adapter-https/test/serve.ts';
 import { createXid, updateXid } from '../src/id/xid.ts';
 import { shimHandler } from '../src/shim/shim.ts';
@@ -75,8 +76,8 @@ test('publish writes the XID document and the envelope layout, and a second run 
   expect(readFileSync(join(site, 'hello/index.envelope')).equals(index)).toBe(true);
 });
 
-test('publish refuses --to dwn and --relay for a XID publisher', async () => {
-  expect((await run([process.execPath, cli, 'publish', 'pub', tgz('1.0.0'), '--to', 'dwn'])).err).toContain('a XID publisher writes only to a folder');
+test('publish refuses --to dwn with no DWN service, and --relay for a XID publisher', async () => {
+  expect((await run([process.execPath, cli, 'publish', 'pub', tgz('1.0.0'), '--to', 'dwn'])).err).toContain('the XID document has no DWN service');
   expect((await run([process.execPath, cli, 'publish', 'pub', tgz('1.0.0'), '--to', `dir:${site}`, '--relay', 'https://r.example'])).err)
     .toContain('a XID publisher has no relay');
 });
@@ -131,4 +132,30 @@ test('the shim answers 404 for a XID with no resolver and no cached document', a
     new Request(`http://127.0.0.1:1/${installName}`));
   expect(res.status).toBe(404);
   expect(((await res.json()) as { error: string }).error).toContain('XID_NOT_FOUND');
+});
+
+test('publish --to dwn writes the protocol v2 to the did:key tenant, and the shim installs from the DWN', async () => {
+  const relay = startRelay(new Map());
+  const dwn = await startDwn({ relayUrl: relay.url });
+  try {
+    const created = await createXid({ alias: 'dpub', dwn: dwn.url, passphrase: PASS, updatePassphrase: UPDATE_PASS, env });
+    // The XID resolver of the shim is the static mirror. The DWN holds only the package files.
+    writeFileSync(join(site, 'xid', `${created.xid}.envelope`), readFileSync(created.files.document));
+    const first = await run([process.execPath, cli, 'publish', 'dpub', tgz('1.0.0'), '--to', 'dwn']);
+    expect(first.code, first.err).toBe(0);
+    const out = JSON.parse(first.out);
+    expect(out.targets).toEqual([{ url: dwn.url, ok: true }]);
+    // The same tarball again reads the signed copies from the DWN and writes the same bytes.
+    expect(JSON.parse((await run([process.execPath, cli, 'publish', 'dpub', tgz('1.0.0'), '--to', 'dwn'])).out)).toEqual(out);
+
+    const { resolver, xidResolver, source } = readSide({ xidResolvers: [mirror.base], allowLoopback: true });
+    const h = shimHandler({ origin: 'http://127.0.0.1:1', resolver, xidResolver, source, trust: new Map() });
+    const packument = await (await h(new Request(`http://127.0.0.1:1/${out.installName}`))).json() as { versions: Record<string, { dist: { tarball: string } }> };
+    const res = await h(new Request(packument.versions['1.0.0']!.dist.tarball));
+    expect(res.status).toBe(200);
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array(readFileSync(tgz('1.0.0'))));
+  } finally {
+    await dwn.stop();
+    relay.stop();
+  }
 });

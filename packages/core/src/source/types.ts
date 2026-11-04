@@ -6,7 +6,7 @@ export type EndpointType = 'DecentralizedWebNode' | 'DIDPackageRepository';
 
 /** One storage endpoint from the DID document of the publisher. */
 export interface Endpoint {
-  /** The publisher: a DID, or a XID in hex. */
+  /** The publisher DID, or the XID in hex. For the DWN of a XID publisher: the DWN tenant (a did:key). */
   did: string;
   /** The absolute DID URL of the service. For a XID publisher: the service URI. */
   serviceId: string;
@@ -17,11 +17,14 @@ export interface Endpoint {
 /** The form of a signed record: JSON for a DID publisher, a Gordian Envelope for a XID publisher. */
 export type RecordFormat = 'json' | 'envelope';
 
-/** One file of a package. Each adapter maps it to its layout (static layout v1, DWN protocol paths). Default format: json. */
+/**
+ * One file of a package. Each adapter maps it to its layout (static layout v1, DWN protocol paths). `format` is the
+ * form of the signed records of the publisher (default: json). A DWN keeps each form in its own protocol, also the tarball.
+ */
 export type StoredFile =
   | { kind: 'index'; name: string; format?: RecordFormat }
   | { kind: 'release'; name: string; version: string; format?: RecordFormat }
-  | { kind: 'tarball'; name: string; version: string };
+  | { kind: 'tarball'; name: string; version: string; format?: RecordFormat };
 
 export interface ReadOptions {
   signal: AbortSignal;

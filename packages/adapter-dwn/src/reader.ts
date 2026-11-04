@@ -3,7 +3,7 @@
 import { fetchBytes, isPrivateHost } from '@didpkg/core/did';
 import { DWN_SERVICE_TYPE } from '@didpkg/core/source';
 import type { Endpoint, ReadOptions, StorageAdapter, StorageReader, StoredCopy, StoredFile } from '@didpkg/core/source';
-import { DIDPKG_PROTOCOL } from './protocol.ts';
+import { protocolOf } from './protocol.ts';
 
 /** A query reply holds the package records of one name. */
 export const MAX_QUERY_BYTES = 1024 * 1024;
@@ -36,7 +36,7 @@ export interface DwnAdapterOptions {
 const isLoopback = (hostname: string) => hostname === 'localhost' || hostname === '[::1]' || /^127\.\d+\.\d+\.\d+$/.test(hostname);
 // DID Core 1.0 section 3.1: no "/", "?" or "#", so the DID is one path segment as it is.
 const DID_RE = /^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$/;
-const PROTOCOL_PATH = btoa(DIDPKG_PROTOCOL).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+const base64url = (s: string) => btoa(s).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const qs = (params: Record<string, string>) => new URLSearchParams(params).toString();
 
 /** A single-flight cache with a time limit. A failed load, and a value that `keep` refuses, are not kept. */
@@ -152,27 +152,28 @@ class DwnReader implements StorageReader {
 
   // A DRL read gives the newest published record that matches. Thus one copy per package contextId
   // (ADR 0003 section 6 item 3). `filter.contextId` is a subtree match, so a nested record needs one request.
-  // The URL of a copy is its DRL: an anonymous GET of it gives the same bytes.
+  // The URL of a copy is its DRL: an anonymous GET of it gives the same bytes. The record form selects the protocol.
   async *copies(file: StoredFile, { signal, maxBytes }: ReadOptions): AsyncGenerator<StoredCopy> {
+    const protocol = protocolOf(file.format);
     if (file.kind === 'index') {
-      yield* await this.#shared.indexes.get(`${this.#tenant.href}\n${file.name}`, this.#shared.indexTtlMs, async () => {
-        const contexts = await this.#contexts(file.name, signal);
-        const copies = await Promise.all(contexts.map((c) => this.#read('package/index', { 'filter.contextId': c }, signal, maxBytes)));
+      yield* await this.#shared.indexes.get(`${this.#tenant.href}\n${protocol}\n${file.name}`, this.#shared.indexTtlMs, async () => {
+        const contexts = await this.#contexts(protocol, file.name, signal);
+        const copies = await Promise.all(contexts.map((c) => this.#read(protocol, 'package/index', { 'filter.contextId': c }, signal, maxBytes)));
         return copies.filter((c) => c !== null);
       });
       return;
     }
     const path = file.kind === 'release' ? 'package/release' : 'package/release/tarball';
-    for (const c of await this.#contexts(file.name, signal)) {
-      const copy = await this.#read(path, { 'filter.contextId': c, 'filter.tags.version': file.version }, signal, maxBytes);
+    for (const c of await this.#contexts(protocol, file.name, signal)) {
+      const copy = await this.#read(protocol, path, { 'filter.contextId': c, 'filter.tags.version': file.version }, signal, maxBytes);
       if (copy) yield copy;
     }
   }
 
   /** The contextIds of the `package` records with the tag `name`. The DWN cannot make a name unique. */
-  #contexts(name: string, signal: AbortSignal): Promise<string[]> {
-    return this.#shared.contexts.get(`${this.#tenant.href}\n${name}`, this.#shared.contextTtlMs, async () => {
-      const params = { 'filter.protocol': DIDPKG_PROTOCOL, 'filter.protocolPath': 'package', 'filter.tags.name': name };
+  #contexts(protocol: string, name: string, signal: AbortSignal): Promise<string[]> {
+    return this.#shared.contexts.get(`${this.#tenant.href}\n${protocol}\n${name}`, this.#shared.contextTtlMs, async () => {
+      const params = { 'filter.protocol': protocol, 'filter.protocolPath': 'package', 'filter.tags.name': name };
       const { status, body } = await this.#get(`query?${qs(params)}`, signal, MAX_QUERY_BYTES);
       if (status !== 200) throw new Error(`${this.#tenant.host}: query HTTP ${status}`);
       let reply: { status?: { code?: unknown }; entries?: unknown };
@@ -188,8 +189,8 @@ class DwnReader implements StorageReader {
   }
 
   /** One record and its DRL, or null if absent. Only 404 means absent (ADR 0003 section 5). */
-  async #read(path: string, params: Record<string, string>, signal: AbortSignal, maxBytes: number): Promise<StoredCopy | null> {
-    const { drl, status, body } = await this.#get(`read/protocols/${PROTOCOL_PATH}/${path}?${qs(params)}`, signal, maxBytes);
+  async #read(protocol: string, path: string, params: Record<string, string>, signal: AbortSignal, maxBytes: number): Promise<StoredCopy | null> {
+    const { drl, status, body } = await this.#get(`read/protocols/${base64url(protocol)}/${path}?${qs(params)}`, signal, maxBytes);
     if (status === 404) return null;
     if (status !== 200) throw new Error(`${this.#tenant.host}: HTTP ${status}`);
     return { bytes: body, url: drl };

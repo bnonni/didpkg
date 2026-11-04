@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { sidecarFile } from '@didpkg/core/did/btcr2';
 import { format, parse, GrammarError } from '@didpkg/core/name';
 import { xidFromUr } from '@didpkg/core/xid';
+import { xidEndpoints } from '@didpkg/core/source';
 import { readConfig } from './config.ts';
 import { drl } from './drl.ts';
 import { createBtcr2, network } from './id/btcr2.ts';
@@ -222,7 +223,16 @@ async function id(args: string[]): Promise<string> {
     if (values['--dwn']!.length > 1 || values['--accept-terms']!.length > 1) throw new UsageError('use --dwn and --accept-terms one time');
     const acceptTerms = values['--accept-terms']![0];
     if (acceptTerms !== undefined && !/^[0-9a-f]{64}$/i.test(acceptTerms)) throw new UsageError('--accept-terms: use the SHA-256 hex of the terms (64 hex digits)');
-    const identity = readIdentity(idPaths(positional[0]!));
+    const paths = idPaths(positional[0]!);
+    const reg = { dwn: values['--dwn']![0], acceptTerms: acceptTerms?.toLowerCase() };
+    if (readIdentityFile(paths).format === XID_ID_FORMAT) {
+      const { identity, info } = readXidIdentity(paths);
+      const dwn = xidEndpoints(info).filter((e) => e.type === 'DecentralizedWebNode');
+      if (dwn.length === 0) throw new Error(`the XID document has no DWN service: run "didpkg id update ${identity.alias} --dwn <url>" first`);
+      const r = await registerIdentity({ alias: identity.alias, did: dwn[0]!.did, services: dwn.map((e) => e.url), ...reg });
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
+    const identity = readIdentity(paths);
     if (identity.btcr2) throw new UsageError('"id register" is not for did:btcr2: a did:btcr2 DID has no registration');
     if (identity.plc) {
       if (values['--dwn']!.length || acceptTerms !== undefined) throw new UsageError('--dwn and --accept-terms are not for did:plc');
@@ -233,7 +243,9 @@ async function id(args: string[]): Promise<string> {
       }
       return `${JSON.stringify(r, null, 2)}\n`;
     }
-    const r = await registerIdentity({ identity, dwn: values['--dwn']![0], acceptTerms: acceptTerms?.toLowerCase() });
+    const services = (identity.document.service ?? []).filter((s) => s.type === 'DecentralizedWebNode')
+      .flatMap((s) => s.serviceEndpoint).filter((u): u is string => typeof u === 'string');
+    const r = await registerIdentity({ alias: identity.alias, did: identity.did, services, ...reg });
     return `${JSON.stringify(r, null, 2)}\n`;
   }
   if (sub === 'update') {

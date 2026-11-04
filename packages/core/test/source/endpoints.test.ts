@@ -1,7 +1,9 @@
 // Endpoint selection (ADR 0003 section 4): exact types, the DWN first, document order.
 import { expect, test } from 'bun:test';
 import type { DidDocument } from '../../src/did/types.ts';
-import { MAX_ENDPOINTS, storageEndpoints } from '../../src/source/index.ts';
+import { MAX_ENDPOINTS, storageEndpoints, xidEndpoints } from '../../src/source/index.ts';
+import { readXidDocument } from '../../src/xid/index.ts';
+import { docBytes } from '../xid/fixture.ts';
 
 const DID = 'did:example:pub';
 const doc = (service: unknown[]): DidDocument => ({ id: DID, service } as DidDocument);
@@ -67,4 +69,18 @@ test('bad endpoint values are skipped', () => {
 test(`at most ${MAX_ENDPOINTS} endpoints`, () => {
   const urls = Array.from({ length: 20 }, (_, i) => `https://m${i}.example/`);
   expect(list(doc([repo('#pkg', urls)]))).toEqual(urls.slice(0, MAX_ENDPOINTS).map((u) => `DIDPackageRepository ${u}`));
+});
+
+test('xidEndpoints: each DWN service first, with the did:key of its Auth key as the tenant; then each repository', () => {
+  const info = readXidDocument(docBytes({ dwn: 'https://dwn.example/' }));
+  const dwnKey = info.keys.find((k) => k.nickname === 'dwn')!;
+  expect(dwnKey.didKey).toMatch(/^did:key:z6Mk/);
+  const repo = { uri: 'https://m.example/', capability: 'DIDPackageRepository', name: '', keyReferences: [], allow: [], deny: [] };
+  expect(xidEndpoints({ ...info, services: [repo, ...info.services] }).map((e) => [e.type, e.did, e.url])).toEqual([
+    ['DecentralizedWebNode', dwnKey.didKey!, 'https://dwn.example/'],
+    ['DIDPackageRepository', info.xid, 'https://m.example/'],
+  ]);
+  // The capability match is exact, and the key needs the privilege Auth.
+  expect(xidEndpoints(readXidDocument(docBytes()))).toEqual([]);
+  expect(xidEndpoints({ ...info, keys: info.keys.map((k) => (k === dwnKey ? { ...k, allow: ['Sign' as const] } : k)) })).toEqual([]);
 });

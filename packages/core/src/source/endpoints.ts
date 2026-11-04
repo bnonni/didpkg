@@ -1,6 +1,6 @@
 // Endpoint selection (ADR 0003 section 4). Readers select services by type, not by id.
 import type { DidDocument } from '../did/types.ts';
-import type { XidDocumentInfo } from '../xid/document.ts';
+import { grants, type XidDocumentInfo } from '../xid/document.ts';
 import type { Endpoint, EndpointType } from './types.ts';
 
 export const DWN_SERVICE_TYPE = 'DecentralizedWebNode';
@@ -32,14 +32,22 @@ export function storageEndpoints(doc: DidDocument): Endpoint[] {
 }
 
 /**
- * The storage endpoints of a XID document: each service with the capability DIDPackageRepository, in
- * document order. A service has one URI. A XID document has no DWN endpoint yet.
+ * The storage endpoints of a XID document: each DWN service first, then each service with the capability
+ * DIDPackageRepository. Each group is in document order. A service has one URI. The capability is the DID
+ * service type. The DWN tenant is the did:key of the first key of the service that has the privilege Auth.
  */
 export function xidEndpoints(doc: XidDocumentInfo): Endpoint[] {
   const out: Endpoint[] = [];
-  for (const s of doc.services) {
-    if (s.capability !== REPOSITORY_SERVICE_TYPE || !usable(REPOSITORY_SERVICE_TYPE, s.uri) || out.some((e) => e.url === s.uri)) continue;
-    out.push({ did: doc.xid, serviceId: s.uri, type: REPOSITORY_SERVICE_TYPE, url: s.uri });
+  for (const type of [DWN_SERVICE_TYPE, REPOSITORY_SERVICE_TYPE] as const) {
+    for (const s of doc.services) {
+      if (s.capability !== type || !usable(type, s.uri) || out.some((e) => e.type === type && e.url === s.uri)) continue;
+      if (type === REPOSITORY_SERVICE_TYPE) {
+        out.push({ did: doc.xid, serviceId: s.uri, type, url: s.uri });
+        continue;
+      }
+      const tenant = doc.keys.find((k) => k.didKey && s.keyReferences.includes(k.reference) && grants(k, 'Auth'))?.didKey;
+      if (tenant) out.push({ did: tenant, serviceId: s.uri, type, url: s.uri });
+    }
   }
   return out.slice(0, MAX_ENDPOINTS);
 }

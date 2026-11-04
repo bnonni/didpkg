@@ -21,6 +21,8 @@ export interface DocOptions {
   sign?: boolean;
   /** Replace the last mark with this mark. */
   mark?: (last: ProvenanceMark) => ProvenanceMark;
+  /** A DWN URL: the DWN service gets this URI and the capability DecentralizedWebNode. */
+  dwn?: string;
 }
 
 /** A publisher document: inception key (All), release key (Sign), DWN key (Auth) and a DWN service. */
@@ -32,7 +34,7 @@ export function publisherDoc(o: DocOptions = {}): XIDDocument {
   const dwn = Key.from(PrivateKeyBase.from(seed(4)).ed25519PublicKeys(), { nickname: 'dwn', permissions: Permissions.from({ allow: ['Auth'] }) });
   doc.addKey(dwn);
   doc.addResolutionMethod(`https://mirror.example/xid/${doc.xid.toHex()}.envelope`);
-  doc.addService(Service.from('https://dwn.example', { capability: 'dwn', keyReferences: [dwn.reference], permissions: Permissions.from({ allow: ['Auth'] }) }));
+  doc.addService(Service.from(o.dwn ?? 'https://dwn.example', { capability: o.dwn ? 'DecentralizedWebNode' : 'dwn', keyReferences: [dwn.reference], permissions: Permissions.from({ allow: ['Auth'] }) }));
   const seq = o.seq ?? 0;
   for (let i = 1; i <= seq; i++) doc.nextProvenanceMarkWithEmbeddedGenerator({ date: i === seq && o.date ? o.date : new Date(GENESIS_DATE.getTime() + i * 86_400_000) });
   if (o.mark) doc.setProvenance(o.mark(doc.provenance!));
