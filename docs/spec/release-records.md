@@ -191,3 +191,20 @@ Keys:
 3. The index must have a signature by a release key. A release record with no signature by a current release key passes only if the current index gives its digest (section 4 item 7).
 4. A pin keeps each key as the hex of the tagged CBOR of its public keys. A key change needs a signature by a pinned key, as for a DID publisher.
 5. A resolution failure gives a XID error (`XID_NOT_FOUND`, `XID_MISMATCH`, and the other XID errors above). Each other failure gives the policy error of the DID verifier.
+
+### Storage
+
+A static mirror of a XID publisher uses the static layout v1 (section 5), with these changes:
+
+| Path | Content | Changes? |
+|---|---|---|
+| `xid/<hex>.envelope` | The signed XID document, as tagged CBOR | Yes |
+| `<name>/index.envelope` | The index, as the tagged CBOR of the signed envelope | Yes |
+| `<name>/<version>.envelope` | The release record, as the tagged CBOR of the signed envelope | No |
+| `<name>/<version>.tgz` | The `npm pack` bytes, with no wrapper | No |
+
+1. The storage endpoints are the services of the XID document with the capability `DIDPackageRepository`, in document order. Each service has one URI. The URI must end with `/`.
+2. A mirror is also a XID resolver: the document path is the resolver path of the Resolution part above.
+3. The CLI writes the XID document first, then the tarball, the release record and the index.
+4. A XID document has no DWN endpoint in this version.
+5. The tarball URL of the shim has only `rec`, with no `vm`. A Gordian signature does not name its key, and a key from the current document changes after a rotation. Thus the URL of a version stays the same.

@@ -1,5 +1,6 @@
 // Endpoint selection (ADR 0003 section 4). Readers select services by type, not by id.
 import type { DidDocument } from '../did/types.ts';
+import type { XidDocumentInfo } from '../xid/document.ts';
 import type { Endpoint, EndpointType } from './types.ts';
 
 export const DWN_SERVICE_TYPE = 'DecentralizedWebNode';
@@ -26,6 +27,19 @@ export function storageEndpoints(doc: DidDocument): Endpoint[] {
         out.push({ did: doc.id, serviceId, type, url });
       }
     }
+  }
+  return out.slice(0, MAX_ENDPOINTS);
+}
+
+/**
+ * The storage endpoints of a XID document: each service with the capability DIDPackageRepository, in
+ * document order. A service has one URI. A XID document has no DWN endpoint yet.
+ */
+export function xidEndpoints(doc: XidDocumentInfo): Endpoint[] {
+  const out: Endpoint[] = [];
+  for (const s of doc.services) {
+    if (s.capability !== REPOSITORY_SERVICE_TYPE || !usable(REPOSITORY_SERVICE_TYPE, s.uri) || out.some((e) => e.url === s.uri)) continue;
+    out.push({ did: doc.xid, serviceId: s.uri, type: REPOSITORY_SERVICE_TYPE, url: s.uri });
   }
   return out.slice(0, MAX_ENDPOINTS);
 }

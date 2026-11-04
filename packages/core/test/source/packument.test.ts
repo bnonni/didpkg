@@ -77,8 +77,8 @@ describe('a package with each release status', () => {
   });
 
   test('tarballUrl gets the install name, the verified release and the DID document, one time per listed version', async () => {
-    const calls: TarballUrlInput[] = [];
-    await packument(reader, (input) => (calls.push(input), 'u'));
+    const calls: Extract<TarballUrlInput, { didDocument: unknown }>[] = [];
+    await packument(reader, (input) => (calls.push(input as (typeof calls)[number]), 'u'));
     const index = (await reader.getIndex(did, NAME))!;
     expect(calls.map((c) => [c.installName, c.release.version, contentDigest(c.release), c.didDocument.id])).toEqual(
       ['1.0.0', '1.1.0', '1.2.0', '2.1.0-beta.1'].map((v) => [installName, v, index.releases[v]!.digest, did]),

@@ -2,11 +2,12 @@
 // the trust verifier untrusted values. It selects a release and a tarball only by the digests in
 // signed objects, so a hostile endpoint can delay an install, but it cannot change the bytes.
 import type { DidResolver } from '../did/resolver.ts';
-import { PKG_NAME_RE } from '../name/grammar.ts';
+import { PKG_NAME_RE, XID_RE } from '../name/grammar.ts';
 import { contentDigest, sri } from '../trust/digest.ts';
 import { SEMVER } from '../trust/release.ts';
 import type { ReleaseReader } from '../trust/verify.ts';
-import { storageEndpoints } from './endpoints.ts';
+import { parseXidRelease, xidContentDigest, type XidDocumentResolver } from '../xid/release.ts';
+import { storageEndpoints, xidEndpoints } from './endpoints.ts';
 import type { Endpoint, StorageAdapter, StorageReader, StoredFile } from './types.ts';
 
 /** The signed tarball bytes, the endpoint that gave them, and their URL if the adapter gives URLs. */
@@ -40,6 +41,8 @@ export class SourceError extends Error {
 export interface PackageSourceOptions {
   /** The same resolver as the verifier. Its cache makes the second resolution free. */
   resolver: Pick<DidResolver, 'resolve'>;
+  /** The XID resolver of the verifier. With no XID resolver, a XID publisher has no endpoint. */
+  xidResolver?: XidDocumentResolver;
   adapters: readonly StorageAdapter[];
   fetch?: typeof fetch;
   jsonTimeoutMs?: number;
@@ -55,7 +58,19 @@ interface Bound {
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 const utf8 = new TextDecoder('utf-8', { fatal: true });
+// A XID publisher signs Gordian Envelopes. The source gives their bytes, and the verifier parses them.
+const isXid = (publisher: string) => XID_RE.test(publisher);
+type RecordFile = Extract<StoredFile, { kind: 'index' | 'release' }>;
+const recordFile = (publisher: string, file: RecordFile): RecordFile => (isXid(publisher) ? { ...file, format: 'envelope' } : file);
 const label = (f: StoredFile) => (f.kind === 'index' ? `the index of ${f.name}` : `the ${f.kind} ${f.name}@${f.version}`);
+
+function xidDigest(bytes: Uint8Array): string | undefined {
+  try {
+    return xidContentDigest(parseXidRelease(bytes));
+  } catch {
+    return undefined;
+  }
+}
 
 function parseJson(bytes: Uint8Array): { value: unknown } | undefined {
   try {
@@ -91,15 +106,22 @@ export class PackageSource implements ReleaseReader {
     return (await this.#bound(did)).map((b) => b.endpoint);
   }
 
-  /** Every index copy from every endpoint, in parallel. The verifier selects the highest valid sequence. */
+  /**
+   * Every index copy from every endpoint, in parallel. The verifier selects the highest valid sequence.
+   * A DID publisher gives JSON values. A XID publisher gives envelope bytes.
+   */
   async getIndexes(did: string, name: string): Promise<unknown[]> {
     check(name);
-    const file: StoredFile = { kind: 'index', name };
+    const file = recordFile(did, { kind: 'index', name });
     const results = await Promise.all((await this.#bound(did)).map(async (b) => {
       const values: unknown[] = [];
       let failed = false;
       try {
         for await (const { bytes } of this.#read(b, file, MAX_JSON_BYTES, this.#o.jsonTimeoutMs ?? JSON_TIMEOUT_MS)) {
+          if (file.format === 'envelope') {
+            values.push(bytes.slice());
+            continue;
+          }
           const json = parseJson(bytes);
           if (json) {
             values.push(json.value);
@@ -128,9 +150,15 @@ export class PackageSource implements ReleaseReader {
   async getRelease(did: string, name: string, version: string, digest: string): Promise<unknown> {
     check(name, version);
     const key = `${did}\n${name}@${version}\n${digest}`;
+    const file = recordFile(did, { kind: 'release', name, version });
     const kept = this.#releases.get(key);
-    if (kept) return parseJson(kept)!.value;
-    return this.#first(did, { kind: 'release', name, version }, MAX_JSON_BYTES, this.#o.jsonTimeoutMs ?? JSON_TIMEOUT_MS, async (bytes) => {
+    if (kept) return file.format === 'envelope' ? kept.slice() : parseJson(kept)!.value;
+    return this.#first(did, file, MAX_JSON_BYTES, this.#o.jsonTimeoutMs ?? JSON_TIMEOUT_MS, async (bytes) => {
+      if (file.format === 'envelope') {
+        if (xidDigest(bytes) !== digest) return undefined;
+        this.#keep(key, bytes);
+        return bytes.slice();
+      }
       const value = parseJson(bytes)?.value;
       if (!isObject(value) || contentDigest(value) !== digest) return undefined;
       this.#keep(key, bytes);
@@ -195,12 +223,19 @@ export class PackageSource implements ReleaseReader {
     }
   }
 
-  // The verifier resolves the DID first and reports each DID error. Here, no document means no endpoint.
+  // The verifier resolves the DID or the XID first and reports each error. Here, no document means no endpoint.
   async #bound(did: string): Promise<Bound[]> {
+    if (isXid(did)) {
+      const doc = await this.#o.xidResolver?.resolve(did).catch(() => undefined);
+      return doc?.xid === did ? this.#bind(xidEndpoints(doc)) : [];
+    }
     const { didDocument: doc } = await this.#o.resolver.resolve(did);
-    if (!doc || doc.id !== did) return [];
+    return doc && doc.id === did ? this.#bind(storageEndpoints(doc)) : [];
+  }
+
+  #bind(endpoints: Endpoint[]): Bound[] {
     const out: Bound[] = [];
-    for (const endpoint of storageEndpoints(doc)) {
+    for (const endpoint of endpoints) {
       const adapter = this.#o.adapters.find((a) => a.canRead(endpoint));
       if (adapter) out.push({ endpoint, reader: adapter.reader(endpoint, { fetch: this.#o.fetch ?? globalThis.fetch }) });
       else this.#o.log?.(`skip ${endpoint.url}: no adapter reads it`);

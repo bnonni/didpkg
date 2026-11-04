@@ -28,7 +28,7 @@ export class XidError extends Error {
 }
 
 export interface XidKeyInfo {
-  /** The key reference in hex. A service and a `vm` query name a key by its reference. */
+  /** The key reference in hex. A service names a key by its reference. */
   reference: string;
   allow: readonly Privilege[];
   deny: readonly Privilege[];

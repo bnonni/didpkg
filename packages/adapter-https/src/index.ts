@@ -5,7 +5,7 @@ import { REPOSITORY_SERVICE_TYPE } from '@didpkg/core/source';
 import type { Endpoint, ReadOptions, StorageAdapter, StorageReader, StoredCopy, StoredFile } from '@didpkg/core/source';
 import { layoutPath } from './layout.ts';
 
-export { layoutPath } from './layout.ts';
+export { layoutPath, xidDocumentPath } from './layout.ts';
 
 export interface HttpsAdapterOptions {
   /** Also read http and https on a loopback host (127.0.0.0/8, [::1], localhost). Only for tests and a local demo. */

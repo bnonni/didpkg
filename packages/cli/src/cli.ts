@@ -15,8 +15,9 @@ import { registerIdentity } from './id/register.ts';
 import { configDir, idPaths, readIdentity, readIdentityFile, XID_ID_FORMAT } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
 import { createWebvh, logUrl } from './id/webvh.ts';
-import { createXid, showXid, updateXid, type XidRole } from './id/xid.ts';
+import { createXid, readXidIdentity, showXid, updateXid, type XidRole } from './id/xid.ts';
 import { publish } from './publish/publish.ts';
+import { publishXid } from './publish/xid.ts';
 import { startShim, readSide, type ReadSideOptions } from './shim/start.ts';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -47,8 +48,10 @@ Usage:
                                   For did:plc: send the DID to the directory again
   didpkg id show <alias>          Print the public data of an identity as JSON
   didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
-                                  Sign an npm pack tarball with #didpkg-1 and write it to each target
-  didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--mode enforce|warn] [--allow-loopback]
+                                  Sign an npm pack tarball with the release key and write it to each target
+                                  (a XID publisher: only dir:<path>)
+  didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--mode enforce|warn]
+                    [--allow-loopback]
                                   Serve verified @didpkg packages to npm on 127.0.0.1 (default port 2092)
   didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--allow-loopback]
                                   Verify one version as the shim does, then print the tarball URL and the signed sha512
@@ -72,13 +75,14 @@ Examples:
   didpkg shim start               Then add "@didpkg:registry=http://127.0.0.1:2092/" to .npmrc
   didpkg shim start --cas https://ipfs.didpkg.dev
   didpkg shim start --sidecar https://pkgs.example.com/btcr2/
+  didpkg shim start --xid-resolver https://pkgs.example.com/
   didpkg drl @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key, and the DWN key of a XID) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht,
 did:webvh, did:plc and did:btcr2, and the inception key of a XID), else from the terminal. The shim reads $DIDPKG_HOME/config.json if it exists: the IPFS gateways ("cas"), the Esplora
-APIs ("esplora") and the Sidecar Data mirrors ("sidecar") for did:btcr2. The shim and "drl" read it. The --cas and
---sidecar options replace the lists of the file.
+APIs ("esplora") and the Sidecar Data mirrors ("sidecar") for did:btcr2, and the XID resolvers ("xid-resolver"). The
+shim and "drl" read it. The --cas, --sidecar and --xid-resolver options replace the lists of the file.
 
 The grammar is draft 2 and can change before 1.0. See
 https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md
@@ -273,7 +277,25 @@ async function publishCommand(args: string[]): Promise<string> {
   if (positional.length !== 2) throw new UsageError(`"publish" needs 2 arguments: <alias> <tarball> (got ${positional.length})`);
   if (values['--to']!.length === 0) throw new UsageError('"publish" needs --to dwn or --to dir:<path>');
   const [alias, file] = positional as [string, string];
-  const identity = readIdentity(idPaths(alias));
+  const paths = idPaths(alias);
+  if (readIdentityFile(paths).format === XID_ID_FORMAT) {
+    if (values['--relay']!.length) throw new UsageError('--relay: a XID publisher has no relay');
+    const { identity, info } = readXidIdentity(paths);
+    const r = await publishXid({
+      identity,
+      document: info.bytes,
+      tarball: new Uint8Array(readFileSync(file)),
+      to: values['--to']!,
+      passphrase: () => passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'Passphrase for the XID release key' }),
+    });
+    const failed = r.targets.filter((t) => !t.ok).map((t) => `${t.url} failed`);
+    if (failed.length) {
+      process.stderr.write(`didpkg: error: ${failed.join(', and ')}. Run the same publish again: it writes the same bytes.\n`);
+      process.exitCode = 1;
+    }
+    return `${JSON.stringify(r, null, 2)}\n`;
+  }
+  const identity = readIdentity(paths);
   const r = await publish({
     identity,
     tarball: new Uint8Array(readFileSync(file)),
@@ -296,6 +318,7 @@ async function publishCommand(args: string[]): Promise<string> {
 function readOptions(values: Record<string, string[]>, allowLoopback: boolean): ReadSideOptions {
   const cas = values['--cas']!.map((u) => endpoint(u, '--cas'));
   const sidecar = values['--sidecar']!.map((u) => endpoint(u, '--sidecar'));
+  const xidResolvers = (values['--xid-resolver'] ?? []).map((u) => endpoint(u, '--xid-resolver'));
   const config = readConfig();
   return {
     allowLoopback,
@@ -303,6 +326,7 @@ function readOptions(values: Record<string, string[]>, allowLoopback: boolean): 
     cas: cas.length ? cas : config.cas,
     esplora: config.esplora,
     sidecar: sidecar.length ? sidecar : config.sidecar,
+    xidResolvers: xidResolvers.length ? xidResolvers : config['xid-resolver'],
     home: configDir(),
     log: (line) => process.stderr.write(`${line}\n`),
   };
@@ -313,7 +337,7 @@ async function shimCommand(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub !== 'start') throw new UsageError(sub === undefined ? '"shim" needs a subcommand: start' : `unknown shim subcommand ${JSON.stringify(sub)}`);
   const loopback = rest.includes('--allow-loopback');
-  const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--port', '--relay', '--cas', '--sidecar', '--mode']);
+  const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--port', '--relay', '--cas', '--sidecar', '--xid-resolver', '--mode']);
   if (positional.length !== 0) throw new UsageError(`"shim start" takes no arguments (got ${positional.length})`);
   if (values['--port']!.length > 1 || values['--mode']!.length > 1) throw new UsageError('use --port and --mode one time');
   const port = values['--port']![0] ?? '2092';

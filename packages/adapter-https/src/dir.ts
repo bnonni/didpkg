@@ -2,8 +2,8 @@
 // The publisher deploys the folder (Pages, R2, rsync). This entry point uses node:fs, so not a browser.
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import type { PublishInput, ReadOptions, StorageReader, StorageWriter, StoredFile } from '@didpkg/core/source';
-import { layoutPath } from './layout.ts';
+import type { PublishInput, ReadOptions, RecordFormat, StorageReader, StorageWriter, StoredFile } from '@didpkg/core/source';
+import { layoutPath, xidDocumentPath } from './layout.ts';
 
 /** It also reads its folder, so `didpkg publish` can read the head index and a release back. */
 export class DirWriter implements StorageWriter, StorageReader {
@@ -14,14 +14,19 @@ export class DirWriter implements StorageWriter, StorageReader {
   }
 
   /** The tarball, the release, then the index. The index write is the commit point (ADR 0003 section 3). */
-  async publish({ name, version, release, tarball, index }: PublishInput): Promise<void> {
+  async publish({ name, version, release, tarball, index, format }: PublishInput): Promise<void> {
     await this.#put({ kind: 'tarball', name, version }, tarball, true);
-    await this.#put({ kind: 'release', name, version }, release, true);
-    await this.#put({ kind: 'index', name }, index, false);
+    await this.#put({ kind: 'release', name, version, format }, release, true);
+    await this.#put({ kind: 'index', name, format }, index, false);
   }
 
-  async writeIndex({ name, index }: { name: string; index: Uint8Array }): Promise<void> {
-    await this.#put({ kind: 'index', name }, index, false);
+  async writeIndex({ name, index, format }: { name: string; index: Uint8Array; format?: RecordFormat }): Promise<void> {
+    await this.#put({ kind: 'index', name, format }, index, false);
+  }
+
+  /** The signed XID document of a XID publisher, at xid/<hex>.envelope. It replaces an old copy. */
+  async writeXidDocument(xid: string, bytes: Uint8Array): Promise<void> {
+    await this.#write(join(this.#dir, ...xidDocumentPath(xid)), bytes);
   }
 
   /** A file in the folder root that is not in the layout, for example the Sidecar Data of a did:btcr2 publisher. It replaces an old file. */

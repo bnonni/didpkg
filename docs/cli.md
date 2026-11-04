@@ -8,7 +8,7 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 - The exit code is 0 if the command succeeds, else 1. A usage error also prints `Run "didpkg --help" for usage.`
 - An option with a value can be in each position after the command. Give a repeatable option one time for each value.
 - `-h` or `--help` after each command prints the full help.
-- Each endpoint URL (`--dwn`, `--repo`, `--relay`, `--plc`, `--cas`, `--sidecar`, and the URLs in the [config file](#config-file)) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
+- Each endpoint URL (`--dwn`, `--repo`, `--relay`, `--plc`, `--cas`, `--sidecar`, `--xid-resolver`, and the URLs in the [config file](#config-file)) must use `https`. `http` is permitted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), for a local test.
 
 ## Environment
 
@@ -42,7 +42,7 @@ didpkg name ur:xid/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbint
 @didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
 ```
 
-The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. A bad `ur:xid` gives `XID_INVALID`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services. A XID name does not install yet: the install shim and `didpkg drl` refuse it with `KIND_NOT_SUPPORTED`.
+The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. A bad `ur:xid` gives `XID_INVALID`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht or did:web DID, because only these DIDs have storage services. A XID name installs through the shim with a XID resolver ([`--xid-resolver`](#didpkg-shim-start)). `didpkg drl` refuses a XID name with `KIND_NOT_SUPPORTED`.
 
 ## didpkg parse
 
@@ -296,7 +296,7 @@ For a XID publisher, the JSON has `alias`, `kind` (`xid`), `xid`, `ur`, `created
 didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
 ```
 
-Signs an `npm pack` tarball with `#didpkg-1` and writes it to each target.
+Signs an `npm pack` tarball with the release key (`#didpkg-1` for a DID) and writes it to each target.
 
 | Option | Default | Use |
 |---|---|---|
@@ -316,10 +316,20 @@ The command refuses:
 
 For the full steps and the errors, read [Publish a package](publish.md).
 
+### A XID publisher
+
+For a XID identity, the release and the index are signed Gordian Envelopes. The command:
+
+- Takes only `--to dir:<path>`. It refuses `--to dwn` and `--relay`.
+- Writes the XID document to `<path>/xid/<hex>.envelope`, then `<name>/<version>.tgz`, `<name>/<version>.envelope` and `<name>/index.envelope`.
+- Signs the index with the release key. After [`id update --rotate release`](#didpkg-id-update), it also signs the index with the previous release key. Thus a client with a pin on the old key accepts the new key.
+
+Host the folder at a `--repo` URL of the identity. The XID document has a `dereferenceVia` URI for each `--repo` URL, so a shim with that URL in `--xid-resolver` finds the document. stdout gets `xid`, `name`, `version`, `installName`, `release`, `sequence` and `targets`.
+
 ## didpkg shim start
 
 ```text
-didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--mode enforce|warn] [--allow-loopback]
+didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--mode enforce|warn] [--allow-loopback]
 ```
 
 Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` package before npm gets it.
@@ -330,6 +340,7 @@ Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` pac
 | `--relay <url>` | `https://relay.pkarr.org`, `https://pkarr.pubky.org` | The Pkarr relays that resolve a did:dht DID. Repeatable. |
 | `--cas <url>` | `cas` of the [config file](#config-file), else `https://trustless-gateway.link` and `https://ipfs.didpkg.dev` | The IPFS gateways ([Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/)) that give the genesis document and the update data of a did:btcr2 DID. The shim tries them in order. Repeatable. The options replace the `cas` list of the config file. |
 | `--sidecar <url>` | `sidecar` of the [config file](#config-file), else none | A mirror of did:btcr2 Sidecar Data. For a DID, the shim gets `<url>/<id>.sidecar.json`, where `<id>` is the DID without `did:btcr2:`. The shim tries the mirrors in order. Repeatable. The options replace the `sidecar` list of the config file. |
+| `--xid-resolver <url>` | `xid-resolver` of the [config file](#config-file), else none | A XID resolver. For a XID, the shim gets `<url>/xid/<hex>.envelope`. A static mirror of a XID publisher is a XID resolver. Repeatable. The options replace the `xid-resolver` list of the config file. See [XID documents](#xid-documents). |
 | `--mode <mode>` | `enforce` | `warn` installs a package with a changed key or a changed release history, and writes a warning to the log. See [Pins](how-it-works.md#pins). |
 | `--allow-loopback` | Off | Read DIDs, DWNs and mirrors on a loopback host. Only for tests and the local demo. This option has no value. |
 
@@ -351,6 +362,10 @@ The did:btcr2 specification does not tell how a resolver gets Sidecar Data. The 
 
 The mirrors come before the copy, so an old copy does not hide a new update. The shim gets each item that the Sidecar Data does not have from the IPFS gateways. For an `x1` DID, the Sidecar Data must have the Genesis Document with the hash of the DID. Else the shim does not use the source. The shim checks each hash and each signature. Thus a mirror can hold back data, but it cannot change data.
 
+### XID documents
+
+No public XID resolver exists. The shim gets the XID document from each `--xid-resolver` URL and from each `dereferenceVia` URI of its copy, in parallel. The valid document with the highest provenance sequence wins. The shim keeps that document in `$DIDPKG_HOME/xid/<hex>.envelope` and uses it for 1 minute. If no source gives a valid document, the shim uses the kept copy. A document with a lower sequence than the kept copy gives `XID_ROLLBACK`. The HTTP status of a XID error: `XID_NOT_FOUND` gives 404, `XID_UNAVAILABLE` and `XID_INVALID` give 502, and each other XID error gives 403.
+
 ### Config file
 
 The shim and `didpkg drl` read `$DIDPKG_HOME/config.json` if the file exists. Each key is optional:
@@ -359,6 +374,7 @@ The shim and `didpkg drl` read `$DIDPKG_HOME/config.json` if the file exists. Ea
 |---|---|---|
 | `cas` | `["https://trustless-gateway.link", "https://ipfs.didpkg.dev"]` | The IPFS gateways for did:btcr2, in order. `--cas` replaces this list. An empty list (`[]`) turns IPFS off: then the shim resolves only a did:btcr2 DID that needs no data from IPFS. |
 | `sidecar` | `[]` | The Sidecar Data mirrors for did:btcr2, in order. `--sidecar` replaces this list. See [did:btcr2 Sidecar Data](#didbtcr2-sidecar-data). |
+| `xid-resolver` | `[]` | The XID resolvers. `--xid-resolver` replaces this list. See [XID documents](#xid-documents). |
 | `esplora` | `https://mempool.space/api` (`bitcoin`), `https://mempool.space/testnet/api` (`testnet3`), `https://mempool.space/testnet4/api` (`testnet4`), `https://mempool.space/signet/api` (`signet`), `https://mutinynet.com/api` (`mutinynet`) | The Esplora API for each Bitcoin network of did:btcr2. The keys are `bitcoin`, `testnet3`, `testnet4`, `signet`, `mutinynet` and `regtest`. A key replaces the default of its network. `regtest` has no default. |
 
 Example:
@@ -367,7 +383,8 @@ Example:
 {
   "cas": ["https://ipfs.example.com", "https://trustless-gateway.link"],
   "esplora": { "testnet4": "https://esplora.example.com/testnet4/api" },
-  "sidecar": ["https://pkgs.example.com/btcr2/"]
+  "sidecar": ["https://pkgs.example.com/btcr2/"],
+  "xid-resolver": ["https://pkgs.example.com/"]
 }
 ```
 

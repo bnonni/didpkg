@@ -143,9 +143,9 @@ The shim gets the method and the raw path of each request. `route(method, path)`
 
 1. The path can have `%2f` or `%2F` in place of the scope `/`. The router decodes only this escape. Each other `%` gives HTTP 404.
 2. The query is never part of the name.
-3. The shim makes each tarball URL: `<origin>/<install name>/-/<body>-<version>.tgz?rec=<digest>&vm=<method>`. `rec` is the content digest of the release record. `vm` is the verification method of its first proof ([release records](release-records.md)). The URL holds only facts of the signed release. Thus the URL of a version does not change after a key rotation.
+3. The shim makes each tarball URL: `<origin>/<install name>/-/<body>-<version>.tgz?rec=<digest>&vm=<method>`. `rec` is the content digest of the release record. `vm` is the verification method of its first proof ([release records](release-records.md)). The URL holds only facts of the signed release. Thus the URL of a version does not change after a key rotation. For a XID publisher, the URL has only `rec`, because a Gordian signature does not name its key.
 4. If a tarball request has `rec`, the digest in the index must be equal to `rec`. Else the shim gives HTTP 403 (`HISTORY_CHANGED`). A request with `rec` comes from a lockfile, thus the shim also serves a `yanked` version for it.
-5. This draft defines no release source for a XID publisher. Thus the shim gives HTTP 404 (`KIND_NOT_SUPPORTED`) for a name of the kind `xid`.
+5. For a name of the kind `xid`, the shim resolves the XID document and reads the release source of its services ([release records](release-records.md) section 6). A shim with no XID resolver gives HTTP 404 (`KIND_NOT_SUPPORTED`).
 
 ## 8. Test vectors
 

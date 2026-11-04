@@ -6,17 +6,21 @@ export type EndpointType = 'DecentralizedWebNode' | 'DIDPackageRepository';
 
 /** One storage endpoint from the DID document of the publisher. */
 export interface Endpoint {
+  /** The publisher: a DID, or a XID in hex. */
   did: string;
-  /** The absolute DID URL of the service. */
+  /** The absolute DID URL of the service. For a XID publisher: the service URI. */
   serviceId: string;
   type: EndpointType;
   url: string;
 }
 
-/** One file of a package. Each adapter maps it to its layout (static layout v1, DWN protocol paths). */
+/** The form of a signed record: JSON for a DID publisher, a Gordian Envelope for a XID publisher. */
+export type RecordFormat = 'json' | 'envelope';
+
+/** One file of a package. Each adapter maps it to its layout (static layout v1, DWN protocol paths). Default format: json. */
 export type StoredFile =
-  | { kind: 'index'; name: string }
-  | { kind: 'release'; name: string; version: string }
+  | { kind: 'index'; name: string; format?: RecordFormat }
+  | { kind: 'release'; name: string; version: string; format?: RecordFormat }
   | { kind: 'tarball'; name: string; version: string };
 
 export interface ReadOptions {
@@ -60,6 +64,8 @@ export interface PublishInput {
   tarball: Uint8Array;
   /** The exact bytes of the signed DidPkgIndex that lists the release. */
   index: Uint8Array;
+  /** The form of the release and the index. Default: json. */
+  format?: RecordFormat;
 }
 
 /** The write side. Credentials stay in the adapter. Every writer stores the same bytes. */
@@ -67,5 +73,5 @@ export interface StorageWriter {
   /** Writes the release and the tarball, then the index. The index write is the commit point. */
   publish(input: PublishInput): Promise<void>;
   /** Writes a new index only, for a status change or a dist-tag change. */
-  writeIndex(input: { name: string; index: Uint8Array }): Promise<void>;
+  writeIndex(input: { name: string; index: Uint8Array; format?: RecordFormat }): Promise<void>;
 }

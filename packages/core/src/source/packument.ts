@@ -6,6 +6,8 @@ import { format } from '../name/grammar.ts';
 import type { DidDocument } from '../did/types.ts';
 import { compareVersions, type DidPkgRelease } from '../trust/release.ts';
 import { checkRelease, type ReleaseReader, type VerifiedIndex } from '../trust/verify.ts';
+import type { XidDocumentInfo } from '../xid/document.ts';
+import { checkXidRelease, type VerifiedXidIndex, type XidPkgRelease } from '../xid/release.ts';
 
 /** One entry of `versions`. The signed `npm` fields of the release, plus the fields that the builder sets. */
 export interface PackumentVersion {
@@ -25,16 +27,14 @@ export interface Packument {
   versions: Record<string, PackumentVersion>;
 }
 
-export interface TarballUrlInput {
-  /** The canonical install name of the DID and the package. */
-  installName: string;
-  release: DidPkgRelease;
-  didDocument: DidDocument;
-}
+/** One verified release. `didDocument` for a DID publisher, `xidDocument` for a XID publisher. */
+export type TarballUrlInput =
+  | { /** The canonical install name of the publisher and the package. */ installName: string; release: DidPkgRelease; didDocument: DidDocument }
+  | { installName: string; release: XidPkgRelease; xidDocument: XidDocumentInfo };
 
 export interface PackumentOptions {
-  /** The result of verifyIndex. */
-  verified: Pick<VerifiedIndex, 'didDocument' | 'index'>;
+  /** The result of verifyIndex or verifyXidIndex. */
+  verified: Pick<VerifiedIndex, 'didDocument' | 'index'> | Pick<VerifiedXidIndex, 'xidDocument' | 'index'>;
   /** Usually the PackageSource that verifyIndex used. */
   reader: Pick<ReleaseReader, 'getRelease'>;
   /** The `dist.tarball` URL of one verified release. The shim decides the query. */
@@ -54,18 +54,24 @@ const isPrerelease = (version: string) => version.split('+')[0]!.includes('-');
  * listed version with no prerelease, else the highest listed version (ADR 0003 section 8).
  */
 export async function buildPackument(o: PackumentOptions): Promise<Packument> {
-  const { didDocument, index } = o.verified;
+  const { verified } = o;
+  const { index } = verified;
   const installName = format(index.publisher, index.name);
   const listed = Object.keys(index.releases)
     .filter((v) => ['active', 'deprecated'].includes(index.releases[v]!.status))
     .sort((a, b) => compareVersions(a, b) || (a < b ? -1 : 1));
 
   // Read in parallel. If more versions fail, the error of the lowest version is the result.
-  const releases: DidPkgRelease[] = [];
-  for (const r of await Promise.allSettled(listed.map((v) => checkRelease(o.reader, o.verified, v)))) {
+  const check = (v: string) => ('xidDocument' in verified ? checkXidRelease(o.reader, verified, v) : checkRelease(o.reader, verified, v));
+  const releases: (DidPkgRelease | XidPkgRelease)[] = [];
+  for (const r of await Promise.allSettled(listed.map(check))) {
     if (r.status === 'rejected') throw r.reason;
     releases.push(r.value.release);
   }
+  const urlOf = (release: DidPkgRelease | XidPkgRelease): string =>
+    o.tarballUrl('xidDocument' in verified
+      ? { installName, release: release as XidPkgRelease, xidDocument: verified.xidDocument }
+      : { installName, release: release as DidPkgRelease, didDocument: verified.didDocument });
 
   const versions: Record<string, PackumentVersion> = {};
   const time: Record<string, string> = {};
@@ -77,7 +83,7 @@ export async function buildPackument(o: PackumentOptions): Promise<Packument> {
       name: installName,
       version: release.version,
       ...(status === 'deprecated' ? { deprecated: message || DEPRECATED } : {}),
-      dist: { integrity: release.dist.integrity, tarball: o.tarballUrl({ installName, release, didDocument }) },
+      dist: { integrity: release.dist.integrity, tarball: urlOf(release) },
     };
     time[release.version] = release.published;
   }
