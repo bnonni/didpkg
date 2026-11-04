@@ -118,7 +118,7 @@ Makes a did:webvh publisher DID with the release key `#didpkg-1` and an update k
 
 `--relay` and `--web` are not permitted with `--webvh`. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`. It does no network write.
 
-stdout gets the JSON result: `alias`, `did`, `keyId`, `logUrl`, `documentUrl` and `files`. stderr tells you to host `<alias>.did.jsonl` at `logUrl` and `<alias>.did.json` at `documentUrl`, and to move the update key file offline. The address `nonni.org:pkgs` gives the URLs `https://nonni.org/pkgs/did.jsonl` and `https://nonni.org/pkgs/did.json`. An address with no path gives `https://<host>/.well-known/did.jsonl` and `https://<host>/.well-known/did.json`. Any static https host can serve the files, but the URLs must not redirect to another host.
+stdout gets the JSON result: `alias`, `did`, `keyId`, `logUrl`, `documentUrl` and `files`. stderr tells you to host `<alias>.did.jsonl` at `logUrl` and `<alias>.did.json` at `documentUrl`, and to move the update key file offline. The address `nonni.org:pkgs` gives the URLs `https://nonni.org/pkgs/did.jsonl` and `https://nonni.org/pkgs/did.json`. An address with no path gives `https://<host>/.well-known/did.jsonl` and `https://<host>/.well-known/did.json`. Any static https host can serve the files, but the URLs must not redirect to another host. To change the services later, use [`didpkg id update`](#a-didwebvh-publisher).
 
 The did.json is the parallel did:web DID that the did:webvh specification describes. The address `nonni.org:pkgs` gives `did:web:nonni.org:pkgs`. Its `alsoKnownAs` lists the did:webvh DID, and the did:webvh document lists the did:web DID. A did:web resolver can read the document, but it does not check the history of the log. didpkg install names use the did:webvh DID.
 
@@ -232,7 +232,9 @@ $ didpkg name <xid> hello
 didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
 ```
 
-Changes the XID document of a XID publisher. The command adds the next provenance mark, and the inception key signs the new document. It replaces the 3 files of [`id create --xid`](#didpkg-id-create-xid). The command takes only a XID identity.
+Changes the XID document of a XID publisher, or the services of a did:webvh publisher. The command takes only a XID or a did:webvh identity.
+
+For a XID, the command adds the next provenance mark, and the inception key signs the new document. It replaces the 3 files of [`id create --xid`](#didpkg-id-create-xid).
 
 | Option | Use |
 |---|---|
@@ -243,6 +245,20 @@ Changes the XID document of a XID publisher. The command adds the next provenanc
 | `--repo <url>` | Replace the mirror URLs and their `dereferenceVia` URIs. Repeatable. |
 
 The command asks for `DIDPKG_UPDATE_PASSPHRASE`. A new key also needs `DIDPKG_PASSPHRASE`: the new key gets the passphrase of the release key. A wrong passphrase changes no file. stdout gets the same JSON result as `id create --xid`. Host the new `<alias>.xid.envelope` at each `dereferenceVia` URI.
+
+### A did:webvh publisher
+
+The command adds a new entry to the DID log `<alias>.did.jsonl`. The update key signs the entry. The entry changes only the services: the release key stays.
+
+| Option | Use |
+|---|---|
+| `--dwn <url>` | Add the DWN service `#dwn`, or change its URL. One time only. |
+| `--remove dwn` | Remove the service `#dwn`. |
+| `--repo <url>` | Replace the mirror URLs of the service `#pkg`. Repeatable. |
+
+`--rotate` is for a XID only. The command asks for `DIDPKG_UPDATE_PASSPHRASE`, and it does no network write. The local `<alias>.did.jsonl` is the base of the new entry. The command replaces `<alias>.did.jsonl`, `<alias>.did.json` and the identity file. A wrong passphrase changes no file.
+
+stdout gets the JSON result: `alias`, `did`, `versionId` (the new entry), `logUrl`, `documentUrl` and `files`. Host the new `<alias>.did.jsonl` at `logUrl` and the new `<alias>.did.json` at `documentUrl`. A resolver reads the full log, thus each old entry must stay in the file.
 
 ## didpkg id backup
 

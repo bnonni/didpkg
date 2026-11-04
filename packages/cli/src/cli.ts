@@ -15,7 +15,7 @@ import { createPlc, registerPlc } from './id/plc.ts';
 import { registerIdentity } from './id/register.ts';
 import { configDir, idPaths, readIdentity, readIdentityFile, XID_ID_FORMAT } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
-import { createWebvh, logUrl } from './id/webvh.ts';
+import { createWebvh, logUrl, updateWebvh } from './id/webvh.ts';
 import { backupXid, createXid, readXidIdentity, restoreXid, showXid, updateXid, type XidRole } from './id/xid.ts';
 import { publish } from './publish/publish.ts';
 import { publishXid } from './publish/xid.ts';
@@ -43,7 +43,8 @@ Usage:
   didpkg id create <alias> --xid [--dwn <url>] [--repo <url>]...
                                   Make a XID publisher: a XID document with a release key (Sign) and a DWN key (Auth)
   didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
-                                  Change the keys or the services of a XID publisher, with the next provenance mark
+                                  Change the keys or the services of a XID publisher, with the next provenance mark.
+                                  For did:webvh: change the services, with a new log entry (no --rotate)
   didpkg id backup <alias> --sskr <m>-of-<n>
                                   Split the private keys of a XID publisher into n SSKR shares (ur:envelope, one a line);
                                   m shares restore them
@@ -77,6 +78,7 @@ Examples:
   didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
   didpkg id create gordian --xid --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id update gordian --rotate release
+  didpkg id update vh --dwn https://dwn.didpkg.dev
   didpkg id backup gordian --sskr 2-of-3
   didpkg id register main
   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:./site
@@ -266,7 +268,15 @@ async function id(args: string[]): Promise<string> {
       throw new UsageError('"id update" needs --rotate, --dwn, --remove or --repo');
     }
     const paths = idPaths(positional[0]!);
-    if (readIdentityFile(paths).format !== XID_ID_FORMAT) throw new Error(`${paths.identity}: "id update" takes only a XID identity`);
+    if (readIdentityFile(paths).format !== XID_ID_FORMAT) {
+      if (values['--rotate']!.length) throw new UsageError('--rotate is for a XID identity only');
+      const r = await updateWebvh({
+        alias: positional[0]!, dwn: values['--dwn']![0], removeDwn: remove === 'dwn', repos: values['--repo']!.length ? values['--repo'] : undefined,
+        updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the update key' }),
+      });
+      process.stderr.write(`Host ${r.files.log} at ${r.logUrl} and ${r.files.document} at ${r.documentUrl} again: the log has the entry ${r.versionId}.\n`);
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
     const r = await updateXid({
       alias: positional[0]!, rotate: values['--rotate'] as XidRole[], dwn: values['--dwn']![0], removeDwn: remove === 'dwn',
       repos: values['--repo']!.length ? values['--repo'] : undefined,

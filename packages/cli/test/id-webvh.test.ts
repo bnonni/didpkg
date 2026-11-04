@@ -1,4 +1,5 @@
-// `didpkg id create --webvh` and a did:webvh publish to a folder. A fetch stub serves the did.jsonl and did.json files.
+// `didpkg id create --webvh`, `didpkg id update` and a did:webvh publish to a folder. A fetch stub serves the did.jsonl and
+// did.json files.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,7 +14,7 @@ import { toMultikey, verifyProof } from '@didpkg/core/trust';
 import { DirWriter } from '@didpkg/adapter-https/dir';
 import { decryptKey } from '../src/id/keyfile.ts';
 import { idPaths, readIdentity } from '../src/id/store.ts';
-import { createWebvh, logUrl } from '../src/id/webvh.ts';
+import { createWebvh, logUrl, updateWebvh } from '../src/id/webvh.ts';
 import { publish } from '../src/publish/publish.ts';
 import { npmTgz } from './tgz.ts';
 
@@ -113,6 +114,53 @@ describe('id create --webvh', async () => {
   });
 });
 
+describe('id update for did:webvh', async () => {
+  const r = await createWebvh({
+    alias: 'up', webvh: 'example.com:up', repos: ['https://example.com/up/'], passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000,
+  });
+  const paths = idPaths('up', env);
+  const resolve = async () => {
+    const jsonl = readFileSync(paths.log, 'utf8');
+    const fetchStub = async (url: string) => (url === r.logUrl ? new Response(jsonl) : new Response('not found', { status: 404 }));
+    return { lines: jsonl.trim().split('\n'), result: await new DidResolver({ drivers: [webvhDriver({ fetch: fetchStub })] }).resolve(r.did) };
+  };
+
+  test('--dwn adds the service #dwn with a log entry, and the log resolves with 2 entries', async () => {
+    const u = await updateWebvh({ alias: 'up', dwn: 'https://dwn.example', updatePassphrase: UPDATE_PASS, env });
+    expect(u).toMatchObject({ did: r.did, logUrl: r.logUrl, documentUrl: r.documentUrl, versionId: expect.stringMatching(/^2-Qm/) });
+    const { lines, result } = await resolve();
+    expect(lines).toHaveLength(2);
+    const doc = result.didDocument!;
+    expect(doc.service).toContainEqual({ id: `${r.did}#dwn`, type: 'DecentralizedWebNode', serviceEndpoint: ['https://dwn.example'] });
+    expect(doc.service).toContainEqual({ id: `${r.did}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: ['https://example.com/up/'] });
+    expect(doc.assertionMethod).toEqual([r.keyId]);
+    expect(readIdentity(paths).document.service).toEqual(JSON.parse(lines[1]!).state.service);
+    const web = JSON.parse(readFileSync(paths.document, 'utf8'));
+    expect(web.service).toContainEqual({ id: 'did:web:example.com:up#dwn', type: 'DecentralizedWebNode', serviceEndpoint: ['https://dwn.example'] });
+    for (const f of [paths.log, paths.document]) expect(statSync(f).mode & 0o777).toBe(0o644);
+    expect(statSync(paths.identity).mode & 0o777).toBe(0o600);
+  });
+
+  test('--remove dwn and --repo make a third entry, and the release key stays', async () => {
+    await updateWebvh({ alias: 'up', removeDwn: true, repos: ['https://example.com/up2/'], updatePassphrase: UPDATE_PASS, env });
+    const { lines, result } = await resolve();
+    expect(lines).toHaveLength(3);
+    expect(result.didDocument!.service?.filter((s) => s.type !== 'relativeRef' && s.type !== 'LinkedVerifiablePresentation')).toEqual([
+      { id: `${r.did}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: ['https://example.com/up2/'] },
+    ]);
+    expect(result.didDocument!.verificationMethod).toEqual(JSON.parse(JSON.stringify(readIdentity(paths).document.verificationMethod)));
+  });
+
+  test('a wrong passphrase, no change, and a DWN to add and remove fail with no file change', async () => {
+    const before = readFileSync(paths.log, 'utf8');
+    await expect(updateWebvh({ alias: 'up', dwn: 'https://dwn.example', updatePassphrase: PASS, env })).rejects.toThrow('wrong passphrase');
+    await expect(updateWebvh({ alias: 'up', updatePassphrase: UPDATE_PASS, env })).rejects.toThrow('nothing to update');
+    await expect(updateWebvh({ alias: 'up', dwn: 'https://dwn.example', removeDwn: true, updatePassphrase: UPDATE_PASS, env })).rejects.toThrow('not both');
+    await expect(updateWebvh({ alias: 'up', dwn: 'http://dwn.example', updatePassphrase: UPDATE_PASS, env })).rejects.toThrow('https');
+    expect(readFileSync(paths.log, 'utf8')).toBe(before);
+  });
+});
+
 describe('the CLI', () => {
   const run = async (args: string[], extra: Record<string, string> = {}) => {
     const p = Bun.spawn([process.execPath, cli, ...args], {
@@ -135,6 +183,18 @@ describe('the CLI', () => {
     expect(r.err).toContain(
       `Host ${out.files.log} at https://example.net/.well-known/did.jsonl and ${out.files.document} at https://example.net/.well-known/did.json. Move ${out.files.updateKey} offline.`,
     );
+  });
+
+  test('id update --dwn adds a log entry, and --rotate fails for did:webvh', async () => {
+    const r = await run(['id', 'update', 'cli', '--dwn', 'https://dwn.example'], { DIDPKG_UPDATE_PASSPHRASE: UPDATE_PASS });
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.out);
+    expect(out.versionId).toStartWith('2-');
+    expect(r.err).toContain(`Host ${out.files.log} at https://example.net/.well-known/did.jsonl and ${out.files.document} at https://example.net/.well-known/did.json again`);
+    expect(readIdentity(idPaths('cli', env)).document.service).toContainEqual({ id: `${out.did}#dwn`, type: 'DecentralizedWebNode', serviceEndpoint: ['https://dwn.example'] });
+    const rotate = await run(['id', 'update', 'cli', '--rotate', 'release'], { DIDPKG_UPDATE_PASSPHRASE: UPDATE_PASS });
+    expect(rotate.code).toBe(1);
+    expect(rotate.err).toContain('--rotate is for a XID identity only');
   });
 
   test('--webvh with --web, with --relay, or with a bad address fails before a file write', async () => {
