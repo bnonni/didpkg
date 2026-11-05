@@ -129,7 +129,7 @@ A DWN accepts the writes of a did:webvh publisher only if the DWN resolves did:w
 ## didpkg id create (did:plc)
 
 ```text
-didpkg id create <alias> --plc <directory> --repo <url>...
+didpkg id create <alias> --plc <directory> [--dwn <url>] [--repo <url>]...
 ```
 
 Makes a did:plc publisher DID with the release key `#didpkg-1` and a secp256k1 rotation key. Then it sends the signed genesis operation to the directory, with an HTTP POST to `<directory>/<did>`.
@@ -137,11 +137,12 @@ Makes a did:plc publisher DID with the release key `#didpkg-1` and a secp256k1 r
 | Option | Default | Use |
 |---|---|---|
 | `--plc <directory>` | None | The directory URL, for example `https://plc.directory`. One time only. |
-| `--repo <url>` | None | A mirror URL. Necessary. Repeatable, maximum 10. |
+| `--dwn <url>` | None | A DWN endpoint: the service `#dwn` (type `DecentralizedWebNode`). One time only. |
+| `--repo <url>` | None | A mirror URL. Repeatable. |
 
-A did:plc service has 1 URL. Thus each `--repo` URL gets a service: the first URL is `#pkg`, and the next URLs are `#pkg-2`, `#pkg-3` and so on.
+Give `--dwn`, `--repo` or both. The directory accepts a maximum of 10 services. A did:plc service has 1 URL. Thus each `--repo` URL gets a service: the first URL is `#pkg`, and the next URLs are `#pkg-2`, `#pkg-3` and so on.
 
-`--dwn`, `--relay`, `--web` and `--webvh` are not permitted with `--plc`. `dwn-server` 0.1.45 does not resolve did:plc. Use `didpkg publish --to dir:<path>` and a static host for a did:plc publisher. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`.
+`--relay`, `--web` and `--webvh` are not permitted with `--plc`. A DWN accepts the writes of a did:plc publisher only if the DWN resolves did:plc. The stock `dwn-server` 0.1.45 does not resolve did:plc, but the didpkg DWN image does (see [deploy](deploy.md)). If your DWN runs the stock `dwn-server`, use `didpkg publish --to dir:<path>` and a static host. To add a DWN to a did:plc DID later, use [`didpkg id update`](#a-didplc-publisher). The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`.
 
 The rotation key is the update key of did:plc. It signs the genesis operation, and only this key can change the DID. The DID document does not show it: the operation log lists it in `rotationKeys`. The document shows `#didpkg-1` as a `Multikey`, and it has no `assertionMethod`. The didpkg verifier accepts a key with the fragment `#didpkg-<n>` as a release key of a did:plc DID. See rule 4 in [Proofs](spec/release-records.md#4-proofs).
 
@@ -232,7 +233,7 @@ $ didpkg name <xid> hello
 didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
 ```
 
-Changes the XID document of a XID publisher, or the services of a did:webvh publisher. The command takes only a XID or a did:webvh identity.
+Changes the XID document of a XID publisher, or the services of a did:webvh or did:plc publisher. The command takes only a XID, did:webvh or did:plc identity.
 
 For a XID, the command adds the next provenance mark, and the inception key signs the new document. It replaces the 3 files of [`id create --xid`](#didpkg-id-create-xid).
 
@@ -259,6 +260,22 @@ The command adds a new entry to the DID log `<alias>.did.jsonl`. The update key 
 `--rotate` is for a XID only. The command asks for `DIDPKG_UPDATE_PASSPHRASE`, and it does no network write. The local `<alias>.did.jsonl` is the base of the new entry. The command replaces `<alias>.did.jsonl`, `<alias>.did.json` and the identity file. A wrong passphrase changes no file.
 
 stdout gets the JSON result: `alias`, `did`, `versionId` (the new entry), `logUrl`, `documentUrl` and `files`. Host the new `<alias>.did.jsonl` at `logUrl` and the new `<alias>.did.json` at `documentUrl`. A resolver reads the full log, thus each old entry must stay in the file.
+
+### A did:plc publisher
+
+The command sends an update operation to the directory, with an HTTP POST to `<directory>/<did>`. The rotation key signs the operation. The operation changes only the services: the release key and the rotation key stay.
+
+| Option | Use |
+|---|---|
+| `--dwn <url>` | Add the DWN service `#dwn`, or change its URL. One time only. |
+| `--remove dwn` | Remove the service `#dwn`. |
+| `--repo <url>` | Replace the mirror URLs of the services `#pkg`, `#pkg-2` and so on. Repeatable. |
+
+`--rotate` is for a XID only. The command asks for `DIDPKG_UPDATE_PASSPHRASE`. The `prev` value of the operation is the CID of the last operation in the identity file. Other services stay. The DID must keep a `#dwn` service or a `#pkg` service.
+
+The command changes the identity file only after the directory accepts the operation. If the directory refuses it, the exit code is 1, and no file changes. If the reply of the directory is lost, run the same command again. Then the command finds the operation in the operation log of the directory.
+
+stdout gets the JSON result: `alias`, `did`, `cid` (the new operation), `directory` and `files`. Resolvers show the new services immediately, and there is no file to host.
 
 ## didpkg id backup
 
@@ -300,7 +317,7 @@ Registers the DID of an identity as a tenant of a DWN. A DWN with registration a
 
 For a XID identity, the tenant is the `did:key` of the DWN key, and the DWN URL is the DWN service of the XID document. The command refuses a XID identity with no DWN service: run [`didpkg id update <alias> --dwn <url>`](#didpkg-id-update) first.
 
-For a did:plc identity, the command sends the genesis operation to the directory again. Use it if the directory did not accept the DID at `didpkg id create`. The command succeeds if the operation log of the directory starts with this operation. `--dwn` and `--accept-terms` are not permitted for a did:plc identity.
+For a did:plc identity, the command first sends the genesis operation to the directory again. Use it if the directory did not accept the DID at `didpkg id create`. This step succeeds if the operation log of the directory has this operation. If the step fails, the command stops with exit code 1. Then, if the identity has a DWN service or you give `--dwn`, the command registers the DID on the DWN. The JSON result also has `directory`, the result of the first step. With no DWN, stdout gets only that result, and `--accept-terms` is not permitted.
 
 A did:btcr2 DID has no registration. For a did:btcr2 identity, the command stops with exit code 1.
 

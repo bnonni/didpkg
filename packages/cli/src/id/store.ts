@@ -29,8 +29,11 @@ export interface Identity {
   document: DidDocument;
   /** The signed did:dht relay payload (base64url). A keyless re-PUT sends these exact bytes. did:dht only. */
   relayPayload?: string;
-  /** The directory and the signed genesis operation. `didpkg id register` sends the operation again. did:plc only. */
-  plc?: { directory: string; genesis: Record<string, unknown> };
+  /**
+   * The directory, the signed genesis operation, and the signed update operations that the directory took, in log order.
+   * `didpkg id register` sends the genesis operation again. did:plc only.
+   */
+  plc?: { directory: string; genesis: Record<string, unknown>; updates?: Record<string, unknown>[] };
   /** The network and the Genesis Document. A resolver needs the Genesis Document of an x1 DID. did:btcr2 only. */
   btcr2?: { network: string; genesisDocument: Record<string, unknown> };
   releaseKey: EncryptedKey;

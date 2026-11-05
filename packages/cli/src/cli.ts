@@ -11,7 +11,7 @@ import { drl } from './drl.ts';
 import { createBtcr2, network } from './id/btcr2.ts';
 import { createDht, endpoint } from './id/dht.ts';
 import { passphrase } from './id/passphrase.ts';
-import { createPlc, registerPlc } from './id/plc.ts';
+import { createPlc, registerPlc, updatePlc } from './id/plc.ts';
 import { registerIdentity } from './id/register.ts';
 import { configDir, idPaths, readIdentity, readIdentityFile, XID_ID_FORMAT } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
@@ -36,7 +36,7 @@ Usage:
                                   Make a did:web publisher DID and its did.json to host
   didpkg id create <alias> --webvh <host>[:<path>]... [--dwn <url>] [--repo <url>]...
                                   Make a did:webvh publisher DID and its did.jsonl log to host
-  didpkg id create <alias> --plc <directory> --repo <url>...
+  didpkg id create <alias> --plc <directory> [--dwn <url>] [--repo <url>]...
                                   Make a did:plc publisher DID and send it to the directory
   didpkg id create <alias> --btcr2 <network> --repo <url>...
                                   Make a did:btcr2 publisher DID and its genesis file to put in IPFS
@@ -44,7 +44,8 @@ Usage:
                                   Make a XID publisher: a XID document with a release key (Sign) and a DWN key (Auth)
   didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
                                   Change the keys or the services of a XID publisher, with the next provenance mark.
-                                  For did:webvh: change the services, with a new log entry (no --rotate)
+                                  For did:webvh: change the services, with a new log entry (no --rotate).
+                                  For did:plc: change the services, with an update operation to the directory (no --rotate)
   didpkg id backup <alias> --sskr <m>-of-<n>
                                   Split the private keys of a XID publisher into n SSKR shares (ur:envelope, one a line);
                                   m shares restore them
@@ -52,7 +53,7 @@ Usage:
                                   Make the identity files of a XID publisher again from SSKR shares in the files
   didpkg id register <alias> [--dwn <url>] [--accept-terms <hash>]
                                   Accept the terms of the DWN, then register the DID there (proof of work).
-                                  For did:plc: send the DID to the directory again
+                                  For did:plc: first send the DID to the directory again
   didpkg id show <alias>          Print the public data of an identity as JSON
   didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
                                   Sign an npm pack tarball with the release key and write it to each target
@@ -174,11 +175,10 @@ async function id(args: string[]): Promise<string> {
 `;
     }
     if (plc !== undefined) {
-      if (values['--dwn']!.length) throw new UsageError('--dwn is not for did:plc: the DWN server does not resolve did:plc');
-      if (values['--repo']!.length === 0) throw new UsageError('--plc needs --repo <url>');
+      if (values['--dwn']!.length === 0 && values['--repo']!.length === 0) throw new UsageError('--plc needs --dwn <url> or --repo <url>');
       endpoint(plc, '--plc');
       const r = await createPlc({
-        alias, directory: plc, repos: values['--repo']!,
+        alias, directory: plc, dwn: values['--dwn']![0], repos: values['--repo']!,
         passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key #didpkg-1', confirm: true }),
         updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the rotation key', confirm: true }),
       });
@@ -243,17 +243,22 @@ async function id(args: string[]): Promise<string> {
     }
     const identity = readIdentity(paths);
     if (identity.btcr2) throw new UsageError('"id register" is not for did:btcr2: a did:btcr2 DID has no registration');
-    if (identity.plc) {
-      if (values['--dwn']!.length || acceptTerms !== undefined) throw new UsageError('--dwn and --accept-terms are not for did:plc');
-      const r = await registerPlc(identity);
-      if (!r.ok) {
-        process.stderr.write(`didpkg: error: the directory did not take the DID (${r.error}).\n`);
-        process.exitCode = 1;
-      }
-      return `${JSON.stringify(r, null, 2)}\n`;
-    }
     const services = (identity.document.service ?? []).filter((s) => s.type === 'DecentralizedWebNode')
       .flatMap((s) => s.serviceEndpoint).filter((u): u is string => typeof u === 'string');
+    if (identity.plc) {
+      // The directory first. Then the DWN, if the DID has a DWN service or the user gives --dwn.
+      if (reg.dwn !== undefined) endpoint(reg.dwn, '--dwn');
+      const dwn = reg.dwn !== undefined || services.length > 0;
+      if (!dwn && acceptTerms !== undefined) throw new UsageError('--accept-terms needs a DWN: the identity has no DecentralizedWebNode service');
+      const directory = await registerPlc(identity);
+      if (!directory.ok) {
+        process.stderr.write(`didpkg: error: the directory did not take the DID (${directory.error}).\n`);
+        process.exitCode = 1;
+      }
+      if (!directory.ok || !dwn) return `${JSON.stringify(directory, null, 2)}\n`;
+      const r = await registerIdentity({ alias: identity.alias, did: identity.did, services, ...reg });
+      return `${JSON.stringify({ ...r, directory }, null, 2)}\n`;
+    }
     const r = await registerIdentity({ alias: identity.alias, did: identity.did, services, ...reg });
     return `${JSON.stringify(r, null, 2)}\n`;
   }
@@ -270,9 +275,16 @@ async function id(args: string[]): Promise<string> {
     const paths = idPaths(positional[0]!);
     if (readIdentityFile(paths).format !== XID_ID_FORMAT) {
       if (values['--rotate']!.length) throw new UsageError('--rotate is for a XID identity only');
+      const change = { alias: positional[0]!, dwn: values['--dwn']![0], removeDwn: remove === 'dwn', repos: values['--repo']!.length ? values['--repo'] : undefined };
+      if (readIdentity(paths).plc) {
+        const r = await updatePlc({
+          ...change, updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the rotation key' }),
+        });
+        process.stderr.write(`The directory took the operation ${r.cid}. Resolvers show the new services now.\n`);
+        return `${JSON.stringify(r, null, 2)}\n`;
+      }
       const r = await updateWebvh({
-        alias: positional[0]!, dwn: values['--dwn']![0], removeDwn: remove === 'dwn', repos: values['--repo']!.length ? values['--repo'] : undefined,
-        updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the update key' }),
+        ...change, updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the update key' }),
       });
       process.stderr.write(`Host ${r.files.log} at ${r.logUrl} and ${r.files.document} at ${r.documentUrl} again: the log has the entry ${r.versionId}.\n`);
       return `${JSON.stringify(r, null, 2)}\n`;

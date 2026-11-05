@@ -151,6 +151,22 @@ describe('id register', () => {
     expect(JSON.parse(ok.out)).toMatchObject({ alias: 'web', did: 'did:web:example.com:pkgs', dwn: dwn.url });
   });
 
+  test('a did:plc identity with a DWN service: the CLI sends the DID to the directory, then registers it on the DWN', async () => {
+    const plc = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(null, { status: 200 }) });
+    try {
+      expect((await run(['id', 'create', 'plc', '--plc', `http://127.0.0.1:${plc.port}`, '--dwn', dwn.url])).code).toBe(0);
+      const r = await run(['id', 'register', 'plc', '--accept-terms', hash]);
+      expect(r.code).toBe(0);
+      const did = JSON.parse(await Bun.file(join(home, 'ids', 'plc.json')).text()).did;
+      expect(JSON.parse(r.out)).toEqual({
+        alias: 'plc', did, dwn: dwn.url, termsOfServiceHash: hash, directory: { url: `http://127.0.0.1:${plc.port}/${did}`, ok: true },
+      });
+      expect(r.err).toContain(`Registered ${did} on ${dwn.url}.`);
+    } finally {
+      plc.stop(true);
+    }
+  });
+
   // Linux only: the `script` of macOS has other options.
   test.skipIf(process.platform !== 'linux' || !existsSync('/usr/bin/script'))('on a terminal, "n" stops and "y" registers', async () => {
     expect((await run(['id', 'create', 'tty', '--web', 'example.com:tty', '--dwn', dwn.url])).code).toBe(0);

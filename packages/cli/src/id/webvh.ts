@@ -126,7 +126,7 @@ export interface WebvhUpdateResult {
 export async function updateWebvh(o: WebvhUpdateOptions): Promise<WebvhUpdateResult> {
   const paths = idPaths(o.alias, o.env);
   const identity = readIdentity(paths);
-  if (!identity.did.startsWith('did:webvh:')) throw new Error(`${paths.identity}: "id update" takes a did:webvh or a XID identity`);
+  if (!identity.did.startsWith('did:webvh:')) throw new Error(`${paths.identity}: "id update" takes a did:webvh, did:plc or XID identity`);
   if (o.dwn === undefined && !o.removeDwn && o.repos === undefined) throw new Error('nothing to update');
   if (o.removeDwn && o.dwn !== undefined) throw new Error('remove the DWN, or change it: not both');
   const address = identity.did.split(':').slice(3).join(':');
