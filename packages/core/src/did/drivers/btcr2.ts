@@ -29,12 +29,18 @@ const ESPLORA_MAX_BYTES = 1024 * 1024;
 
 /**
  * The default CAS, in order: the IPFS Trustless Gateway of @did-btcr2/api, then the gateway of the didpkg project.
- * The second gateway gets a request only if the first one fails or does not have the block.
+ * The second gateway gets a request if the first one fails, does not have the block, or gives no reply in CAS_HEDGE_MS.
  */
 export const CAS_GATEWAYS: readonly string[] = ['https://trustless-gateway.link', 'https://ipfs.didpkg.dev'];
 
 /** A gateway that does not have a block finds it in the IPFS network first. @did-btcr2/api uses the same limit. */
 const CAS_TIMEOUT_MS = 30_000;
+
+/**
+ * The next gateway gets a request after this delay, and the request before it continues (a hedged request).
+ * A resolution has 10 s at most (DID_TIMEOUT_MS), so a gateway with no reply must not use all of the time.
+ */
+const CAS_HEDGE_MS = 2_000;
 
 /** A file in IPFS is one raw block (spec section BTCR2 Update Data Distribution). A block is 1 MB at most. */
 const CAS_MAX_BYTES = 1024 * 1024;
@@ -79,6 +85,7 @@ export function btcr2Driver(options: Btcr2DriverOptions = {}): DidMethodDriver {
     freshMs: options.freshMs ?? 10 * 60_000,
     async resolve(did, resolutionOptions, ctx) {
       let source: string | undefined;
+      let gateways = cas;
       try {
         const { network } = Identifier.decode(did);
         source = esplora[network as NetworkName]?.replace(/\/+$/, '');
@@ -111,9 +118,11 @@ export function btcr2Driver(options: Btcr2DriverOptions = {}): DidMethodDriver {
             }
             // The resolver asks only for the items that the sidecar data does not have (spec section Resolve).
             // CAS has no address for an SMT Proof.
-            const casOn = cas.length > 0 && need.kind !== 'NeedSMTProof';
-            const got = casOn ? await fromCas(hashOf(need), cas, options, ctx.signal) : { transient: false };
+            const casOn = gateways.length > 0 && need.kind !== 'NeedSMTProof';
+            const got = casOn ? await fromCas(hashOf(need), gateways, options, ctx.signal) : { transient: false };
             if (!got.item) return missing(need, source, casOn, got.transient);
+            // The gateway of the item is first for the next item. A gateway with no reply then costs CAS_HEDGE_MS one time.
+            if (got.gateway) gateways = [got.gateway, ...gateways.filter((g) => g !== got.gateway)];
             // The resolver hashes the item again and compares the hash to the need.
             (resolver as unknown as { provide(need: ItemNeed, data: object): void }).provide(need, got.item);
           }
@@ -174,18 +183,28 @@ export function casCid(hash: string): string {
   return `b${base32nopad.encode(Uint8Array.of(...CID_PREFIX, ...hexToBytes(hash))).toLowerCase()}`;
 }
 
+interface CasResult {
+  item?: object;
+  /** The gateway that gave the item. */
+  gateway?: string;
+  transient: boolean;
+}
+
 /**
  * Gets an item from CAS through the IPFS Trustless Gateway protocol: the raw block with the CIDv1 of the hash
- * (spec section BTCR2 Update Data Distribution). It tries the gateways in turn and stops at the first item.
+ * (spec section BTCR2 Update Data Distribution). The gateways start in order. The next gateway starts if the one
+ * before it fails, or after CAS_HEDGE_MS. The first item stops the other requests.
  */
-async function fromCas(hash: string, gateways: readonly string[], options: Btcr2DriverOptions, signal: AbortSignal): Promise<{ item?: object; transient: boolean }> {
+function fromCas(hash: string, gateways: readonly string[], options: Btcr2DriverOptions, signal: AbortSignal): Promise<CasResult> {
   const cid = casCid(hash);
+  const stop = new AbortController();
+  const requests = AbortSignal.any([signal, stop.signal]);
   let transient = false;
-  for (const gateway of gateways) {
+  const get = async (gateway: string): Promise<object | undefined> => {
     try {
       const { status, body } = await fetchBytes(`${gateway}/ipfs/${cid}?format=raw`, {
         fetch: options.fetch,
-        signal,
+        signal: requests,
         timeoutMs: options.timeoutMs ?? CAS_TIMEOUT_MS,
         maxBytes: CAS_MAX_BYTES,
         allowPrivateHosts: options.allowPrivateHosts,
@@ -193,15 +212,44 @@ async function fromCas(hash: string, gateways: readonly string[], options: Btcr2
       });
       if (status === 429 || status >= 500) transient = true;
       // The spec: the resolver MUST NOT use the content if its hash is not the hash of the retrieval.
-      if (status !== 200 || bytesToHex(sha256(body)) !== hash.toLowerCase()) continue;
-      const item = jsonObject(body);
-      if (item) return { item, transient };
+      if (status !== 200 || bytesToHex(sha256(body)) !== hash.toLowerCase()) return undefined;
+      return jsonObject(body);
     } catch (e) {
       if (!(e instanceof FetchError)) throw e;
       if (e.transient) transient = true;
+      return undefined;
     }
-  }
-  return { transient };
+  };
+  return new Promise((resolve, reject) => {
+    let next = 0;
+    let open = gateways.length;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const end = (result: CasResult | undefined, error?: unknown) => {
+      clearTimeout(timer);
+      stop.abort();
+      if (result) resolve(result);
+      else reject(error);
+    };
+    const start = () => {
+      clearTimeout(timer);
+      if (next === gateways.length) return;
+      const gateway = gateways[next++]!;
+      timer = setTimeout(start, CAS_HEDGE_MS);
+      get(gateway).then(
+        (item) => {
+          if (stop.signal.aborted) return;
+          if (item) end({ item, gateway, transient });
+          else if (--open === 0) end({ transient });
+          else start();
+        },
+        (e: unknown) => {
+          if (!stop.signal.aborted) end(undefined, e);
+        },
+      );
+    };
+    if (open === 0) resolve({ transient });
+    else start();
+  });
 }
 
 // RFC 8259, section 8.1: JSON text is UTF-8.

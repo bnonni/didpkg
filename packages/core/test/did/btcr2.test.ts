@@ -9,6 +9,7 @@ import canonicalize from 'canonicalize';
 import { btcr2Driver, CAS_GATEWAYS, casCid, sidecarFile, type Btcr2DriverOptions, type Sidecar } from '../../src/did/drivers/btcr2.ts';
 import { MAX_PKG_NAME } from '../../src/name/grammar.ts';
 import { DID_ERROR_NS } from '../../src/did/errors.ts';
+import { DID_TIMEOUT_MS } from '../../src/did/resolver.ts';
 import type { FetchLike } from '../../src/did/fetch.ts';
 import type { DidResolutionResult } from '../../src/did/types.ts';
 import { BTCR2_ESPLORA as ESPLORA, btcr2Fixture, fakeFetch, hangingFetch, type Route } from './helpers.ts';
@@ -141,6 +142,21 @@ test('the default CAS gateways are tried in order', async () => {
   expect(CAS_GATEWAYS).toEqual(['https://trustless-gateway.link', 'https://ipfs.didpkg.dev']);
   expect(calls.filter((u) => u.includes('/ipfs/')).slice(0, 2)).toEqual([block(GATEWAY, genesisBytes), block(second, genesisBytes)]);
 });
+
+test('a first gateway with no reply does not stop the second one in the time limit of a resolution', async () => {
+  const [, second] = CAS_GATEWAYS as [string, string];
+  const { fetch: good, calls } = f.esplora(undefined, {
+    [block(second, genesisBytes)]: new Response(genesisBytes),
+    [block(second, updateBytes)]: new Response(updateBytes),
+  });
+  const fetch: FetchLike = (url, init) => (url.startsWith(GATEWAY) ? (calls.push(url), hangingFetch(url, init)) : good(url, init));
+  const begin = performance.now();
+  const r = await btcr2Driver({ fetch }).resolve(f.did, {}, { signal: AbortSignal.timeout(DID_TIMEOUT_MS) });
+  expect(r.didDocumentMetadata.versionId).toBe('2');
+  expect(performance.now() - begin).toBeLessThan(DID_TIMEOUT_MS / 2);
+  // The second gateway gave the genesis document, so it is first for the update.
+  expect(calls.filter((u) => u.includes('/ipfs/'))).toEqual([block(GATEWAY, genesisBytes), block(second, genesisBytes), block(second, updateBytes)]);
+}, 2 * DID_TIMEOUT_MS);
 
 test('a CAS gateway with HTTP 503 or a timeout gives a transient NOT_FOUND', async () => {
   const busy = await btcr2Driver({ fetch: f.esplora(undefined, { [block(GATEWAY, genesisBytes)]: new Response('busy', { status: 503 }) }).fetch }).resolve(f.did, {}, ctx);
