@@ -1,7 +1,7 @@
 # The demo DWN image: @enbox/dwn-server 0.1.45 on Bun 1.4.4, the same versions as the didpkg tests.
 # bun.lock pins every package. cborg is pinned to the version of the root lockfile.
-# The image runs start.ts: dwn-server with the DID resolver of resolver.ts (did:dht, did:jwk, did:key, did:web, did:webvh, did:plc).
-# resolver.ts imports the did:webvh and did:plc drivers from packages/core/src. The build context "core" gives that folder:
+# The image runs start.ts: dwn-server with the DID resolver of resolver.ts (did:dht, did:jwk, did:key, did:web, did:webvh, did:plc, did:btcr2).
+# resolver.ts imports the did:webvh, did:plc and did:btcr2 drivers from packages/core/src. The build context "core" gives that folder:
 # deploy/compose.yaml sets it. Without Compose: docker build --build-context core=packages/core/src deploy/dwn
 # The image has the same folder layout as the repo, so the relative imports of resolver.ts work. Bun runs the TypeScript.
 FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4

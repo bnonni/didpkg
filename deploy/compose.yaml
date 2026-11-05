@@ -12,11 +12,11 @@ services:
   dwn:
     build:
       context: ./dwn
-      # The image copies only this folder of the repo: the did:webvh driver of resolver.ts and its imports.
+      # The image copies only this folder of the repo: the DID drivers of resolver.ts and their imports.
       additional_contexts:
         core: ../packages/core/src
     # dwn-server 0.1.45 with the start script of deploy/dwn.
-    image: didpkg-dwn:0.1.45-didpkg.2
+    image: didpkg-dwn:0.1.45-didpkg.3
     restart: unless-stopped
     init: true
     security_opt: [no-new-privileges:true]

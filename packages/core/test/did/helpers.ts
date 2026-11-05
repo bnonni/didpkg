@@ -165,8 +165,9 @@ export interface Btcr2Signal { address: string; txid: string; blockHeight: numbe
 /**
  * A testnet4 x1 did:btcr2 with a #pkg service in the genesis document, and one signed update that adds #pkg-2.
  * The update is in a beacon signal at the P2PKH beacon address. `esplora(signals)` is a fake Esplora API.
+ * With `release`, the genesis document also has the Ed25519 release key #didpkg-1 in assertionMethod, as a didpkg publisher.
  */
-export async function btcr2Fixture() {
+export async function btcr2Fixture(o: { release?: boolean } = {}) {
   const secret = secp256k1.utils.randomSecretKey();
   const signer = {
     publicKey: secp256k1.getPublicKey(secret),
@@ -178,8 +179,14 @@ export async function btcr2Fixture() {
   // The genesis document is the k1 document of the key with the placeholder id, and a #pkg service.
   const k1 = DidBtcr2.create(signer.publicKey, { idType: 'KEY', network: 'testnet4' });
   const k1Doc = await resolveOffline(k1, {});
-  const genesisDocument = JSON.parse(JSON.stringify(k1Doc).replaceAll(k1, 'did:btcr2:_')) as { service: Service[] };
+  const genesisDocument = JSON.parse(JSON.stringify(k1Doc).replaceAll(k1, 'did:btcr2:_')) as { verificationMethod: object[]; assertionMethod: string[]; service: Service[] };
   genesisDocument.service.push({ id: 'did:btcr2:_#pkg', type: SERVICE_TYPE, serviceEndpoint: 'https://pkg.example.com/' });
+  const release = await ed.keygenAsync();
+  if (o.release) {
+    const publicKeyMultibase = toMultikey({ alg: 'Ed25519', bytes: release.publicKey });
+    genesisDocument.verificationMethod.push({ id: 'did:btcr2:_#didpkg-1', type: 'Multikey', controller: 'did:btcr2:_', publicKeyMultibase });
+    genesisDocument.assertionMethod.push('did:btcr2:_#didpkg-1');
+  }
   const did = DidBtcr2.create(sha256(new TextEncoder().encode(canonicalize(genesisDocument)!)), { idType: 'EXTERNAL', network: 'testnet4' });
   const genesis = await resolveOffline(did, { sidecar: { genesisDocument } });
 
@@ -226,7 +233,7 @@ export async function btcr2Fixture() {
     }
     return fakeFetch({ ...routes, ...extra });
   };
-  return { did, k1, genesisDocument, update, signal, tip, esplora };
+  return { did, k1, genesisDocument, update, signal, tip, esplora, releaseSecret: release.secretKey };
 }
 
 /** Resolves with the library alone. Each beacon address has no signal. */
