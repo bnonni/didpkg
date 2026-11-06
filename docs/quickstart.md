@@ -84,7 +84,7 @@ node -e "console.log(require('@didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce
 The second command prints `hello from didpkg`. The publisher of this package is `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy`. The shim resolves the DID, finds the DWN service `#dwn` in the DID document and reads the package from `https://dwn.didpkg.dev`. If the DWN is down, the shim reads the backup mirror of the publisher. The same package from a did:web publisher is:
 
 ```sh
-npm install @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
+npm install @didpkg/hello_did_web_nonni.org_pkgs_web
 ```
 
 pnpm and bun read the same `.npmrc` line. The demo tests pnpm 11 and Bun 1.4.4.
@@ -99,17 +99,17 @@ bun add @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmm
 An install name holds the package name and the DID of the publisher:
 
 ```sh
-didpkg parse @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
+didpkg parse @didpkg/hello_did_web_nonni.org_pkgs_web
 ```
 
 ```json
-{"form":"direct","name":"hello","did":"did:web:bnonni.github.io:didpkg-demo"}
+{"form":"direct","name":"hello","did":"did:web:nonni.org:pkgs:web"}
 ```
 
 This command gives the install name for a DID and a package name:
 
 ```sh
-didpkg name did:web:bnonni.github.io:didpkg-demo hello
+didpkg name did:web:nonni.org:pkgs:web hello
 ```
 
 The [install-name grammar](spec/install-names.md) is draft 2 and can change before 1.0.
@@ -119,7 +119,7 @@ The [install-name grammar](spec/install-names.md) is draft 2 and can change befo
 The lockfile holds the shim URL of each `@didpkg` tarball, for example:
 
 ```text
-http://127.0.0.1:2092/@didpkg/hello_did_web_bnonni.github.io_didpkg-demo/-/hello_did_web_bnonni.github.io_didpkg-demo-1.0.0.tgz?rec=sha256-Dd0%2BYq5r...&vm=did%3Aweb%3Abnonni.github.io%3Adidpkg-demo%23didpkg-1
+http://127.0.0.1:2092/@didpkg/hello_did_web_nonni.org_pkgs_web/-/hello_did_web_nonni.org_pkgs_web-1.0.0.tgz?rec=sha256-raiE%2F2QQU...&vm=did%3Aweb%3Anonni.org%3Apkgs%3Aweb%23didpkg-1
 ```
 
 1. Start the shim on the same port before each install from the lockfile, also before `npm ci` in CI.
@@ -154,7 +154,7 @@ The key in `dependencies` is the package name (`hello`), not the install name.
 The shim answers npm with an HTTP status and a reason. npm shows the reason in its error line, and the shim log shows the same reason:
 
 ```text
-npm error 404 Not Found - GET http://127.0.0.1:2092/@didpkg%2fnope_web_bnonni.github.io_didpkg-demo - INDEX_MISSING: no index for did:web:bnonni.github.io:didpkg-demo/nope
+npm error 404 Not Found - GET http://127.0.0.1:2092/@didpkg%2fnope_did_web_nonni.org_pkgs_web - INDEX_MISSING: no index for did:web:nonni.org:pkgs:web/nope
 ```
 
 | Status | Cause | Action |

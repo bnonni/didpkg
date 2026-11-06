@@ -227,7 +227,7 @@ hello/1.0.0.tgz       the tarball
 
 A did:btcr2 publisher also gets the file `<id>.sidecar.json` in the root of the folder. Each publish writes it again.
 
-Each publisher must have its own mirror URL, because the mirror path has no DID in it. If 2 publishers write to one URL, the second publish of the same version fails with `a different file exists`. For an example, see [didpkg-demo](https://github.com/bnonni/didpkg-demo): its root is the mirror of a did:dht publisher, and `web/` is the mirror of a did:web publisher.
+Each publisher must have its own mirror URL, because the mirror path has no DID in it. If 2 publishers write to one URL, the second publish of the same version fails with `a different file exists`. For example, the did:web, did:plc and did:btcr2 demo publishers use the mirrors `https://nonni.org/pkgs/web/`, `https://nonni.org/pkgs/plc/` and `https://nonni.org/pkgs/btcr2/`.
 
 You can also publish to a mirror with no DWN. Make the identity with `--repo` and no `--dwn`, then publish with `--to dir:<path>` only.
 

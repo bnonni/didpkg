@@ -45,7 +45,7 @@ The install name holds the package name, the identifier kind (`did` or `xid`) an
 | Identifier | Install name |
 |---|---|
 | did:dht | `@didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` |
-| did:web | `@didpkg/hello_did_web_bnonni.github.io_didpkg-demo` |
+| did:web | `@didpkg/hello_did_web_nonni.org_pkgs_web` |
 | did:webvh | `@didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs` |
 | did:plc | `@didpkg/hello_did_plc_cpvwafp2z4zqaidjkhyugj3p` |
 | did:btcr2 | `@didpkg/hello_did_btcr2_x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l` |
@@ -135,7 +135,7 @@ The live demo has 6 publishers. Each publisher publishes `hello@1.0.0` to the de
 | Publisher | Backup mirror |
 |---|---|
 | `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` | The root of [bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo) on GitHub Pages |
-| `did:web:bnonni.github.io:didpkg-demo` | The `web/` folder of the same mirror |
+| `did:web:nonni.org:pkgs:web` | `https://nonni.org/pkgs/web/`. The `did.json` file is in the same folder. |
 | `did:webvh:QmYpG6W1WsQVeXs8eJ2z4NMAaRFr4EkUe3vyKJMMdHxUiJ:nonni.org:pkgs` | `https://nonni.org/pkgs/` |
 | `did:plc:cpvwafp2z4zqaidjkhyugj3p` | `https://nonni.org/pkgs/plc/` |
 | `did:btcr2:x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l` | `https://nonni.org/pkgs/btcr2/`. The genesis document is a raw block in IPFS. |
@@ -144,7 +144,7 @@ The live demo has 6 publishers. Each publisher publishes `hello@1.0.0` to the de
 This command starts a shim with the public Pkarr relays. Then it installs the 6 packages with npm, pnpm and bun:
 
 ```sh
-npm run live -- --xid-resolver https://nonni.org/pkgs/xid/ @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_did_web_bnonni.github.io_didpkg-demo @didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_did_plc_cpvwafp2z4zqaidjkhyugj3p @didpkg/hello_did_btcr2_x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l @didpkg/hello_xid_816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967
+npm run live -- --xid-resolver https://nonni.org/pkgs/xid/ @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_did_web_nonni.org_pkgs_web @didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_did_plc_cpvwafp2z4zqaidjkhyugj3p @didpkg/hello_did_btcr2_x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l @didpkg/hello_xid_816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967
 ```
 
 ## Old drpm code

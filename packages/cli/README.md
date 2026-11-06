@@ -16,7 +16,7 @@ didpkg needs Node 22 or later.
 
 1. Start the shim: `didpkg shim start`. It runs until you push Ctrl+C, so use a second terminal for the next steps.
 2. Add this line to the `.npmrc` file of your project: `@didpkg:registry=http://127.0.0.1:2092/`
-3. Install the package with its install name: `npm install @didpkg/hello_did_web_bnonni.github.io_didpkg-demo`
+3. Install the package with its install name: `npm install @didpkg/hello_did_web_nonni.org_pkgs_web`
 
 The shim refuses a package if the signature, the DID document or the release history does not verify.
 
