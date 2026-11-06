@@ -1,20 +1,24 @@
-# The routes of the demo DWN. Only the routes that didpkg uses pass. Each other request gets 404, for example
+# The routes of each DWN. Only the routes that didpkg uses pass. Each other request gets 404, for example
 # /admin, /metrics, /connect and the WebSocket on "/".
+# Each DWN has a router and a service with its name: dwn for DWN_DOMAIN, and dwn2 for DWN2_DOMAIN if it is set
+# (compose.dwn2.yaml). The two DWNs have the same routes, the same limits and the same middlewares.
 # The reader uses GET /<did>/query and GET /<did>/read/...; the writer uses GET /info and POST /.
 # The registration uses GET /registration/terms-of-service, GET /registration/proof-of-work and POST /registration.
 http:
   routers:
-    dwn:
+{{- range $name, $domain := dict "dwn" (env "DWN_DOMAIN") "dwn2" (env "DWN2_DOMAIN") }}{{ if $domain }}
+    {{ $name }}:
       entryPoints: [websecure]
       rule: >-
-        Host(`{{ env "DWN_DOMAIN" }}`) && (
+        Host(`{{ $domain }}`) && (
         (Method(`GET`) && (Path(`/health`) || Path(`/info`) || PathRegexp(`^/did:[a-z0-9]+:[^/]+/(query|read)(/|$)`)
         || Path(`/registration/terms-of-service`) || Path(`/registration/proof-of-work`)))
         || (Method(`POST`) && (Path(`/`) || Path(`/registration`))))
       middlewares: [per-ip-limit, body-limit]
-      service: dwn
+      service: {{ $name }}
       tls:
         certResolver: le
+{{- end }}{{ end }}
 
   middlewares:
     # 20 requests a second for each client IP, burst 50. The didpkg reader sends 15 a second, burst 40.
@@ -28,7 +32,9 @@ http:
         maxRequestBodyBytes: 17825792
 
   services:
-    dwn:
+{{- range $name, $domain := dict "dwn" (env "DWN_DOMAIN") "dwn2" (env "DWN2_DOMAIN") }}{{ if $domain }}
+    {{ $name }}:
       loadBalancer:
         servers:
-          - url: http://dwn:3000
+          - url: http://{{ $name }}:3000
+{{- end }}{{ end }}

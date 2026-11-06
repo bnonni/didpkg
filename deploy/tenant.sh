@@ -7,6 +7,7 @@
 # show: the registration, the terms hash and the status. delete: the DID can register again; its records stay.
 # purge: delete, and remove all records of the DID. block: purge, then keep the DID suspended, so it cannot register again.
 # quota: 0 is no limit. "default" removes the quota of the DID, so the quota of compose.yaml applies.
+# Env: DWN_SERVICE (default dwn): the DWN service, for example dwn2 for the second DWN (compose.dwn2.yaml).
 set -euo pipefail
 usage() { sed -n '4,6s/^# //p' "$0" >&2; exit 2; }
 DID_RE='^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$'
@@ -17,8 +18,10 @@ case "${1:-} $#" in
   'quota 4') [[ $2 =~ $DID_RE && $3 =~ ^[0-9]+$ && $4 =~ ^[0-9]+$ ]] || usage ;;
   *) usage ;;
 esac
+svc=${DWN_SERVICE:-dwn}
+[[ $svc =~ ^dwn[0-9]*$ ]] || usage
 cd "$(dirname "$0")"
-docker compose exec -T -e CMD="$1" -e TENANT_DID="${2:-}" -e ARG3="${3:-}" -e ARG4="${4:-}" dwn bun -e '
+docker compose exec -T -e CMD="$1" -e TENANT_DID="${2:-}" -e ARG3="${3:-}" -e ARG4="${4:-}" "$svc" bun -e '
 const { CMD, TENANT_DID, ARG3, ARG4, DWN_ADMIN_TOKEN } = process.env;
 const tenant = `/tenants/${encodeURIComponent(TENANT_DID)}`;
 // One admin API request. Prints the JSON reply. A status that is not 2xx, and not in "allow", stops with exit 1.

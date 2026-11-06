@@ -8,6 +8,7 @@ This runbook puts the demo DWN `dwn.didpkg.dev` on one VPS. The files are in `de
 |---|---|---|
 | `dwn` | `@enbox/dwn-server` 0.1.45 on Bun 1.4.4 (`deploy/dwn/`, built on the VPS), started by `deploy/dwn/start.ts` | The DWN, with registration (terms of service and proof of work) and a quota for each tenant. Its port is not published. |
 | `traefik` | Traefik v3.7.16 | TLS from Let's Encrypt (TLS-ALPN challenge), the route allowlist, the limits. |
+| `dwn2` | The image of `dwn` (`deploy/compose.dwn2.yaml`) | Optional (section 5): a second DWN with its own name, its own data and its own admin token. |
 | `didpkg-dwn-backup.timer` | systemd on the host | One backup each day at 03:30 UTC (plus a random delay of up to 15 min). |
 
 Rules of the stack:
@@ -17,11 +18,11 @@ Rules of the stack:
 3. Only a registered DID can write, and the DWN gives only the records of a registered DID. A DID registers itself with `didpkg id register`. It accepts the terms of service (`deploy/terms-of-service.txt`) and does a proof of work (about 30 s). There is no provider auth. The registration does not prove control of the DID, but the DWN checks each write against the DID document.
 4. Traefik allows 20 requests a second for each client IP, with a burst of 50. The dwn-server sees only the Traefik address, so its own limits are off.
 5. A request body can be 17 MiB at most. A DWN record can be 16 MiB at most.
-6. The data is in the Docker volume `didpkg-dwn_dwn-sqlite`, in 2 SQLite files: `dwn.db` (the DWN records) and `registration.db` (the tenants and the quotas). The certificate is in `didpkg-dwn_acme`.
+6. The data is in the Docker volume `didpkg-dwn_dwn-sqlite`, in 2 SQLite files: `dwn.db` (the DWN records) and `registration.db` (the tenants and the quotas). The certificate is in `didpkg-dwn_acme`. The second DWN keeps its data in `didpkg-dwn_dwn2-sqlite`.
 7. Each tenant can store 50 MiB of record data and 10,000 DWN messages. A write over the quota fails with HTTP 500 and `TenantStorageQuotaExceeded` or `TenantMessageQuotaExceeded`.
 8. The DWN resolves did:dht, did:jwk, did:key, did:web, did:webvh, did:plc and did:btcr2. The stock dwn-server does not resolve did:webvh, did:plc and did:btcr2, so the image runs `deploy/dwn/start.ts` in place of the `main.js` of dwn-server. The start script adds the did:webvh, did:plc and did:btcr2 drivers of `packages/core/src` (`deploy/dwn/resolver.ts`). The did:plc driver reads `https://plc.directory`. The did:btcr2 driver reads the beacon signals from `https://mempool.space`. It reads the genesis document and each update from CAS, because the DWN has no Sidecar Data. The image build copies that folder (`additional_contexts` in `compose.yaml`), thus the VPS needs the full repository.
 
-The only secret is `deploy/.env` (the admin token). The DWN data and the backups hold only public data: packages and tenant DIDs.
+The only secret is `deploy/.env` (the admin tokens). The DWN data and the backups hold only public data: packages and tenant DIDs.
 
 ## 1. Before you start (you, about 20 min)
 
@@ -117,6 +118,53 @@ A publisher needs no action from you: each publisher registers its own DID (see 
 
    To check the mirror fallback, run `docker compose stop dwn` on the VPS, then `npm run live -- --dwn-down <install-name>...`, then `docker compose start dwn`.
 
+## 5. A second DWN (optional, about 20 min)
+
+The VPS can run a second DWN with its own name, for example `dwn.example.org`. It is the service `dwn2` in `deploy/compose.dwn2.yaml`:
+
+- It uses the image and the settings of `dwn`, and the same terms of service.
+- It has its own data volume (`didpkg-dwn_dwn2-sqlite`) and its own admin token. Thus a DID that registers on one DWN is not a tenant of the other DWN.
+- Traefik gives it the same routes and the same limits, and gets a second certificate for its name.
+
+The second DWN is in a separate file, not in a Compose profile. Compose checks each required variable of each service, also if the profile of the service is off. A profile would thus make `DWN2_DOMAIN` necessary on each VPS.
+
+The VPS must run a commit that has `deploy/compose.dwn2.yaml`. To get it, see "Update to a new commit" in [Operate](#operate).
+
+1. Add the DNS record `A dwn.example.org <VPS IPv4>` with TTL 300. Make sure that `dig +short dwn.example.org` shows the VPS address.
+2. On the VPS, in `/opt/didpkg/deploy`, add the 3 lines of the second DWN to `.env`. `COMPOSE_FILE` adds `compose.dwn2.yaml` to each `docker compose` command and to each script:
+
+   ```sh
+   printf '%s\n' COMPOSE_FILE=compose.yaml:compose.dwn2.yaml DWN2_DOMAIN=dwn.example.org "DWN2_ADMIN_TOKEN=$(openssl rand -hex 32)" >> .env
+   ```
+
+3. Start the second DWN. Compose makes a new Traefik container, because the Traefik settings change. The `dwn` container continues to run:
+
+   ```sh
+   docker compose up -d --build --wait
+   ```
+
+4. On your machine, run the route check for the new name. Each line must start with `ok`:
+
+   ```sh
+   deploy/check.sh https://dwn.example.org
+   ```
+
+To check the second DWN with a publisher, do section 4 with its URL.
+
+The scripts know the second DWN:
+
+- `backup.sh` makes one file for each DWN: `dwn-<time>.tar.gz` and `dwn2-<time>.tar.gz`.
+- `restore.sh` puts a file back into the DWN of its name: a `dwn2-` file goes into `dwn2`.
+- `tenant.sh` manages the tenants of `dwn2` if you put `DWN_SERVICE=dwn2` before it, for example `DWN_SERVICE=dwn2 ./tenant.sh list`.
+
+To stop the second DWN:
+
+1. Run `docker compose down dwn2`.
+2. Remove the 3 lines of the second DWN from `.env`.
+3. Run `docker compose up -d --wait`. Compose makes a new Traefik container with no router for the second DWN.
+
+The volume `didpkg-dwn_dwn2-sqlite` stays until you remove it.
+
 ## Operate
 
 | Task | Command (on the VPS, in `/opt/didpkg/deploy`) |
@@ -126,7 +174,7 @@ A publisher needs no action from you: each publisher registers its own DID (see 
 | Restart | `docker compose restart` |
 | Update to a new commit | `git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --force-recreate --wait` |
 | Change the admin token | Edit `.env`, then `docker compose up -d --wait` |
-| Restore a backup | `./restore.sh /var/backups/didpkg-dwn/dwn-<time>.tar.gz` |
+| Restore a backup | `./restore.sh /var/backups/didpkg-dwn/dwn-<time>.tar.gz` (a `dwn2-` file goes back into `dwn2`) |
 | See the backup timer | `systemctl list-timers didpkg-dwn-backup.timer` |
 
 An update must make new containers (`--force-recreate`). The stack mounts single files, for example `traefik/dynamic.yml`. A checkout replaces each changed file, but a container that runs continues to read the old file. Example: after the move to SQLite, Traefik gave 404 for `/registration` until a new Traefik container started.
@@ -141,7 +189,7 @@ rsync -a root@<vps>:/var/backups/didpkg-dwn/ ~/backups/didpkg-dwn/
 
 ## Manage the tenants
 
-Use `deploy/tenant.sh` on the VPS, in `/opt/didpkg/deploy`. It sends each request to the admin API from the dwn container.
+Use `deploy/tenant.sh` on the VPS, in `/opt/didpkg/deploy`. It sends each request to the admin API from the dwn container. For the second DWN, put `DWN_SERVICE=dwn2` before the command.
 
 | Task | Command |
 |---|---|
@@ -168,6 +216,8 @@ A change of the terms stops each tenant. Until a publisher registers again, the 
    ```sh
    git -C /opt/didpkg fetch && git -C /opt/didpkg checkout <commit> && docker compose up -d --build --force-recreate --wait dwn
    ```
+
+   The second DWN uses the same terms. If it runs, add `dwn2` after `dwn` in the command.
 
 3. Tell the publishers to run `didpkg id register <alias>` again, for example in a GitHub issue. Register the demo DIDs again too.
 
@@ -230,7 +280,7 @@ To go back before step 5, check out the old commit on the VPS and run `docker co
 
 ## Known limits
 
-1. The backup stops the dwn-server for some seconds each day, so that the copy of the database files is consistent. In that time, Traefik gives 502 and installs use the mirror.
+1. The backup stops each dwn-server for some seconds each day, so that the copy of the database files is consistent. In that time, Traefik gives 502 and installs use the mirror.
 2. The dwn-server can use only one did:dht gateway. If `relay.pkarr.org` is down, the DWN can refuse the writes of a did:dht publisher.
 3. Each DID that does the proof of work can register, because the DWN has no provider auth. The quota of each DID and `tenant.sh block` are the only limits on abuse. The server makes the proof of work harder if more than 10 registrations occur in one minute.
 4. The stack test replaces Let's Encrypt with a demo CA. Only `check.sh` on the real VPS proves the ACME settings.

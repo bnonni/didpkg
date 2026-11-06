@@ -7,7 +7,8 @@
 // - a write and a read with the didpkg DWN adapter;
 // - a write and a read of a did:webvh, a did:plc and a did:btcr2 publisher (deploy/dwn/resolver.ts resolves them);
 // - the body limit, backup.sh and restore.sh;
-// - the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.
+// - the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP;
+// - the second DWN of compose.dwn2.yaml: its routes, its own tenants and its backup.
 // Needs Docker with Compose 2.24 or later, openssl and curl. Run: npm run stack
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,6 +26,8 @@ import { dwnAdapter } from '../../packages/adapter-dwn/src/index.ts';
 import type { StorageReader, StoredFile } from '../../packages/core/src/source/index.ts';
 
 const DEPLOY = join(import.meta.dir, '..');
+// The host of the second DWN. curl resolves each *.localhost name to the loopback address.
+const DWN2_HOST = 'dwn2.localhost';
 const BUN_IMAGE = 'oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4';
 // GET /<z32 id> gives the file of that id. The dwn-server resolves the publisher DID through it.
 const RELAY = `Bun.serve({ port: 8080, async fetch(req) {
@@ -50,7 +53,7 @@ const BTCR2_HOSTS = [BTCR2_ESPLORA, ...CAS_GATEWAYS].map((u) => new URL(u).host)
 if (!process.env.DIDPKG_STACK_DIR) {
   const dir = mkdtempSync(join(tmpdir(), 'didpkg-stack-'));
   try {
-    const { ca } = await makeCerts(dir, 'localhost');
+    const { ca } = await makeCerts(dir, ['localhost', DWN2_HOST]);
     const p = Bun.spawn([process.execPath, import.meta.path], { env: { ...process.env, DIDPKG_STACK_DIR: dir, NODE_EXTRA_CA_CERTS: ca }, stdio: ['ignore', 'inherit', 'inherit'] });
     process.exitCode = await p.exited;
   } finally {
@@ -88,18 +91,21 @@ async function stack(dir: string): Promise<void> {
   const t0 = performance.now();
   const port = freePort();
   const base = `https://localhost:${port}`;
+  const base2 = `https://${DWN2_HOST}:${port}`;
   const env = {
     ...process.env,
-    COMPOSE_FILE: `${join(DEPLOY, 'compose.yaml')}:${join(dir, 'override.yaml')}`,
+    COMPOSE_FILE: ['compose.yaml', 'compose.dwn2.yaml'].map((f) => join(DEPLOY, f)).concat(join(dir, 'override.yaml')).join(':'),
     COMPOSE_PROJECT_NAME: 'didpkg-dwn-test',
     DWN_DOMAIN: 'localhost',
     ACME_EMAIL: 'stack-test@example.invalid',
     DWN_ADMIN_TOKEN: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex'),
+    DWN2_DOMAIN: DWN2_HOST,
+    DWN2_ADMIN_TOKEN: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex'),
     BACKUP_DIR: join(dir, 'backups'),
     CURL_CA_BUNDLE: join(dir, 'ca.pem'),
   };
-  const run = async (cmd: string[]): Promise<string> => {
-    const p = Bun.spawn(cmd, { cwd: DEPLOY, env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  const run = async (cmd: string[], extra: Record<string, string> = {}): Promise<string> => {
+    const p = Bun.spawn(cmd, { cwd: DEPLOY, env: { ...env, ...extra }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
     const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
     if (code !== 0) throw new Error(`${cmd.join(' ')} (exit ${code}): ${(out + err).trim().split('\n').slice(-6).join(' | ')}`);
     return out;
@@ -164,6 +170,9 @@ tls:
     console.log(`ok   compose up (${Math.round(performance.now() - t0)} ms)`);
     await run(['./check.sh', base]);
     check(true, 'check.sh: /health, /info and the registration routes pass; the admin, metrics and connect routes give 404');
+    await run(['./check.sh', base2]);
+    const info2 = JSON.parse(await run(['curl', '-sf', `${base2}/info`])) as { url: string };
+    check(info2.url === `https://${DWN2_HOST}`, `the second DWN: check.sh passes on its host, and /info comes from dwn2 (${info2.url})`);
 
     const fx = await dhtFixture();
     writeFileSync(join(dir, 'relay', fx.id), await fx.payload());
@@ -246,8 +255,10 @@ tls:
     const big = await fetch(`${base}/`, { method: 'POST', body: new Uint8Array(18 * 1024 * 1024) });
     check(big.status === 413, `Traefik refuses an 18 MiB body (${big.status})`);
 
-    const file = (await run(['./backup.sh'])).trim().split('\n').pop()!;
-    check(file.startsWith(env.BACKUP_DIR) && Bun.file(file).size > 0, 'backup.sh writes a backup file');
+    const backups = (await run(['./backup.sh'])).trim().split('\n');
+    const file = backups.find((f) => f.startsWith(join(env.BACKUP_DIR, 'dwn-')))!;
+    const file2 = backups.find((f) => f.startsWith(join(env.BACKUP_DIR, 'dwn2-')))!;
+    check(!!file && !!file2 && Bun.file(file).size > 0 && Bun.file(file2).size > 0, 'backup.sh writes a backup file for dwn and for dwn2');
     await healthy();
     const release102 = () => all(reader(), { kind: 'release', name: 'hello', version: '1.0.2' });
     await writer.publish({ name: 'hello', version: '1.0.2', ...files, release: new TextEncoder().encode('{"stack":"release 1.0.2"}') });
@@ -279,6 +290,7 @@ tls:
     check(own.source === 'tenant' && own.maxStorageBytes === 200 * 1024 * 1024 && own.maxMessages === 0, 'tenant.sh quota sets the quota of one DID');
     check((await quota('default')).quota.source === 'global', 'tenant.sh quota default gives the DID the quota of compose.yaml again');
     check((await tenant('list')).includes(`${fx.did} `), 'tenant.sh list shows the DID');
+    check(!(await run(['./tenant.sh', 'list'], { DWN_SERVICE: 'dwn2' })).includes(fx.did), 'the second DWN has its own tenants: DWN_SERVICE=dwn2 tenant.sh list does not show the DID');
     const write = () => writer.publish({ name: 'hello', version: '1.0.3', ...files }).then(() => 'accepted', (e: Error) => e.message);
     await tenant('suspend', fx.did);
     const suspended = await write();

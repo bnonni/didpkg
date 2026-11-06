@@ -1,0 +1,24 @@
+# A second DWN on the same VPS, with its own name. Runbook: docs/deploy.md, "A second DWN".
+# Turn it on in deploy/.env: COMPOSE_FILE=compose.yaml:compose.dwn2.yaml. Then each docker compose command and script uses it.
+# A separate file, not a profile: Compose checks each required variable of a service also if its profile is off.
+services:
+  dwn2:
+    # The image and the settings of dwn. Compose builds the image for each service; the second build uses the cache.
+    extends:
+      file: compose.yaml
+      service: dwn
+    environment:
+      DWN_BASE_URL: https://${DWN2_DOMAIN:?set DWN2_DOMAIN in deploy/.env}
+      DWN_ADMIN_TOKEN: ${DWN2_ADMIN_TOKEN:?set DWN2_ADMIN_TOKEN in deploy/.env}
+    volumes:
+      # Its own data volume (this mount replaces the mount of dwn at /app/data). The terms file is the same.
+      - dwn2-sqlite:/app/data
+
+  traefik:
+    # No depends_on: if dwn2 stops, Traefik continues to serve dwn.
+    environment:
+      # traefik/dynamic.yml adds the router of the second DWN only if this name is set.
+      DWN2_DOMAIN: ${DWN2_DOMAIN}
+
+volumes:
+  dwn2-sqlite: {}
