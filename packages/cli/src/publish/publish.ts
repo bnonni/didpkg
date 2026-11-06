@@ -1,4 +1,4 @@
-// `didpkg publish`. It loads only the release key #didpkg-1, never #0.
+// `didpkg publish`. It loads only the release key, never the did:dht update key #0.
 // 1. Checks: the tarball, the name, the version, the targets. Then the passphrase.
 // 2. Before the first write: the keyless re-PUT of the stored DID packet, and the DWN protocol install.
 // 3. It reads the head index and the release of the version from each target, and keeps only the copies
@@ -23,7 +23,7 @@ import { DirWriter } from '@didpkg/adapter-https/dir';
 import { sidecarData } from '../id/btcr2.ts';
 import { endpoint, putPayload, type StepResult } from '../id/dht.ts';
 import { decryptKey } from '../id/keyfile.ts';
-import type { Identity } from '../id/store.ts';
+import { dwnUrlsOf, type Identity } from '../id/store.ts';
 import { readTarball } from './tarball.ts';
 
 const READ_TIMEOUT_MS = 30_000;
@@ -35,7 +35,7 @@ export interface PublishOptions {
   identity: Identity;
   /** The exact `npm pack` bytes. */
   tarball: Uint8Array;
-  /** `dwn` (each URL of the DecentralizedWebNode services of the identity) or `dir:<path>`. */
+  /** `dwn` (each URL of the DecentralizedWebNode services, or the DWN URLs of a did:key or did:jwk identity) or `dir:<path>`. */
   to: readonly string[];
   /** The Pkarr relays of the re-PUT (did:dht only). */
   relays?: readonly string[];
@@ -59,14 +59,14 @@ interface Target { url: string; reader: StorageReader; writer: StorageWriter; dw
 interface Signed<T> { value: T; bytes: Uint8Array }
 
 /** The DWN URLs first, then the folders, with no duplicates. */
-function targetsOf(to: readonly string[], document: Identity['document']): { dwn: string[]; dirs: string[] } {
+function targetsOf(to: readonly string[], identity: Identity): { dwn: string[]; dirs: string[] } {
   const dwn: string[] = [];
   const dirs: string[] = [];
   for (const t of to) {
     if (t === 'dwn') {
-      const urls = (document.service ?? []).filter((s) => s.type === 'DecentralizedWebNode').flatMap((s) => s.serviceEndpoint);
+      const urls = dwnUrlsOf(identity);
       if (urls.length === 0) throw new Error('--to dwn: the identity has no DecentralizedWebNode service');
-      for (const u of urls) if (typeof u === 'string') dwn.push(endpoint(u, 'dwn'));
+      for (const u of urls) dwn.push(endpoint(u, 'dwn'));
     } else if (t.startsWith('dir:') && t.length > 4) {
       dirs.push(t.slice(4));
     } else {
@@ -79,14 +79,16 @@ function targetsOf(to: readonly string[], document: Identity['document']): { dwn
 export async function publish(o: PublishOptions): Promise<PublishResult> {
   const { did, document, releaseKey } = o.identity;
   const keyId = releaseKey.keyId;
-  if (keyId === `${did}#0`) throw new Error('the release key must not be the update key #0');
+  // The did:dht update key #0, as in the verifier. The did:jwk release key is #0.
+  const updateKey = did.startsWith('did:dht:') ? `${did}#0` : undefined;
+  if (keyId === updateKey) throw new Error('the release key must not be the update key #0');
   const doc = document as unknown as DidDocument;
   // The rule of the verifier, with the did:plc `#didpkg-<n>` keys.
   keyForRelationship(doc, keyId);
   const { name, version, npm } = readTarball(o.tarball);
   checkVersion(version);
   const installName = format(did, name);
-  const { dwn, dirs } = targetsOf(o.to, document);
+  const { dwn, dirs } = targetsOf(o.to, o.identity);
   const relays = did.startsWith('did:dht:') ? (o.relays ?? DEFAULT_RELAYS).map((r) => endpoint(r, 'relay')) : [];
 
   const seed = await decryptKey(releaseKey, await o.passphrase());
@@ -119,7 +121,7 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
     }
     if (value.publisher !== did || value.name !== name) return null;
     for (const proof of proofsOf(value)) {
-      if (proof.verificationMethod === `${did}#0`) continue;
+      if (proof.verificationMethod === updateKey) continue;
       if (await verifyProof({ ...value, proof }, doc).then(() => true, () => false)) return { value, bytes };
     }
     return null;

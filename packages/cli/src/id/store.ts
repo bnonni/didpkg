@@ -6,6 +6,7 @@
 //   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
 //   <alias>.sidecar.json     the Sidecar Data with the Genesis Document (did:btcr2 only, mode 0644).
 //   <alias>.genesis.json     the JCS bytes of the Genesis Document: the raw block to put in CAS (did:btcr2 only, mode 0644).
+// A did:key or did:jwk publisher (key.ts) has only <alias>.json, with the DWN URLs: its DID document has no services.
 // A XID publisher (xid.ts) has other files:
 //   <alias>.json                 the signed XID document and the locked release and DWN keys.
 //   <alias>.update-key.envelope  the XID document with the locked inception key and provenance generator. Move it offline.
@@ -36,7 +37,18 @@ export interface Identity {
   plc?: { directory: string; genesis: Record<string, unknown>; updates?: Record<string, unknown>[] };
   /** The network and the Genesis Document. A resolver needs the Genesis Document of an x1 DID. did:btcr2 only. */
   btcr2?: { network: string; genesisDocument: Record<string, unknown> };
+  /** The DWN URLs. The DID document has no services, so a consumer gives one of them to the shim. did:key and did:jwk only. */
+  dwn?: string[];
   releaseKey: EncryptedKey;
+}
+
+/** A did:key or did:jwk DID: the DID holds the key, and the DID document has no services. */
+export const isKeyDid = (did: string) => did.startsWith('did:key:') || did.startsWith('did:jwk:');
+
+/** The URLs of the DecentralizedWebNode services of the DID document, then the DWN URLs of a did:key or did:jwk identity. */
+export function dwnUrlsOf(identity: Identity): string[] {
+  const services = (identity.document.service ?? []).filter((s) => s.type === 'DecentralizedWebNode').flatMap((s) => s.serviceEndpoint);
+  return [...services, ...(identity.dwn ?? [])].filter((u): u is string => typeof u === 'string');
 }
 
 /** `$DIDPKG_HOME`, else `$XDG_CONFIG_HOME/didpkg`, else `~/.config/didpkg`. */
@@ -100,6 +112,9 @@ export function readIdentity(paths: Paths): Identity {
   if (id.did.startsWith('did:dht:') && typeof id.relayPayload !== 'string') throw new Error(`${paths.identity}: a did:dht identity needs the relay payload`);
   if (id.did.startsWith('did:plc:') && (typeof id.plc?.directory !== 'string' || typeof id.plc.genesis !== 'object' || id.plc.genesis === null)) {
     throw new Error(`${paths.identity}: a did:plc identity needs the directory and the genesis operation`);
+  }
+  if (isKeyDid(id.did) !== (id.dwn !== undefined) || (id.dwn !== undefined && (!Array.isArray(id.dwn) || id.dwn.length === 0 || !id.dwn.every((u) => typeof u === 'string')))) {
+    throw new Error(`${paths.identity}: a did:key or did:jwk identity needs a list of DWN URLs, and only such an identity has it`);
   }
   if (id.did.startsWith('did:btcr2:') && (typeof id.btcr2?.network !== 'string' || typeof id.btcr2.genesisDocument !== 'object' || id.btcr2.genesisDocument === null)) {
     throw new Error(`${paths.identity}: a did:btcr2 identity needs the network and the genesis document`);

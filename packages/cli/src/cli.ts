@@ -10,10 +10,11 @@ import { readConfig } from './config.ts';
 import { drl } from './drl.ts';
 import { createBtcr2, network } from './id/btcr2.ts';
 import { createDht, endpoint } from './id/dht.ts';
+import { createKey } from './id/key.ts';
 import { passphrase } from './id/passphrase.ts';
 import { createPlc, registerPlc, updatePlc } from './id/plc.ts';
 import { registerIdentity } from './id/register.ts';
-import { configDir, idPaths, readIdentity, readIdentityFile, XID_ID_FORMAT } from './id/store.ts';
+import { configDir, dwnUrlsOf, idPaths, isKeyDid, readIdentity, readIdentityFile, XID_ID_FORMAT } from './id/store.ts';
 import { createWeb, documentUrl } from './id/web.ts';
 import { createWebvh, logUrl, updateWebvh } from './id/webvh.ts';
 import { backupXid, createXid, readXidIdentity, restoreXid, showXid, updateXid, type XidRole } from './id/xid.ts';
@@ -40,6 +41,9 @@ Usage:
                                   Make a did:plc publisher DID and send it to the directory
   didpkg id create <alias> --btcr2 <network> [--dwn <url>] [--repo <url>]...
                                   Make a did:btcr2 publisher DID and its genesis file to put in IPFS
+  didpkg id create <alias> --key|--jwk --dwn <url>
+                                  Make a did:key or did:jwk publisher DID (Ed25519). Its DID document has no services:
+                                  each consumer gives the DWN to the shim with "shim start --dwn <url>"
   didpkg id create <alias> --xid [--dwn <url>] [--repo <url>]...
                                   Make a XID publisher: a XID document with a release key (Sign) and a DWN key (Auth)
   didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
@@ -77,6 +81,7 @@ Examples:
   didpkg id create vh --webvh pkgs.example.com:vh --repo https://pkgs.example.com/vh/
   didpkg id create plc --plc https://plc.directory --repo https://pkgs.example.com/plc/
   didpkg id create btc --btcr2 bitcoin --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/btcr2/
+  didpkg id create pk --key --dwn https://dwn.didpkg.dev
   didpkg id create gordian --xid --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id update gordian --rotate release
   didpkg id update vh --dwn https://dwn.didpkg.dev
@@ -129,7 +134,10 @@ async function id(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub === 'create') {
     const xid = rest.includes('--xid');
-    const { positional, values } = options(rest.filter((a) => a !== '--xid'), ['--dwn', '--repo', '--relay', '--web', '--webvh', '--plc', '--btcr2']);
+    const key = rest.includes('--key');
+    const jwk = rest.includes('--jwk');
+    const flags = ['--xid', '--key', '--jwk'];
+    const { positional, values } = options(rest.filter((a) => !flags.includes(a)), ['--dwn', '--repo', '--relay', '--web', '--webvh', '--plc', '--btcr2']);
     if (positional.length !== 1) throw new UsageError(`"id create" needs 1 argument: <alias> (got ${positional.length})`);
     for (const f of ['--dwn', '--web', '--webvh', '--plc', '--btcr2']) if (values[f]!.length > 1) throw new UsageError(`use ${f} one time`);
     const alias = positional[0]!;
@@ -142,6 +150,26 @@ async function id(args: string[]): Promise<string> {
     if (plc !== undefined && (web ?? webvh) !== undefined) throw new UsageError('use --plc without --web and --webvh');
     if (btcr2 !== undefined && (web ?? webvh ?? plc) !== undefined) throw new UsageError('use --btcr2 without --web, --webvh and --plc');
     if ((web ?? webvh ?? plc ?? btcr2) !== undefined && values['--relay']!.length) throw new UsageError('--relay is for did:dht only');
+    if (key || jwk) {
+      const flag = key ? '--key' : '--jwk';
+      if (key && jwk) throw new UsageError('use --key or --jwk, not both');
+      if (xid || (web ?? webvh ?? plc ?? btcr2) !== undefined || values['--relay']!.length) {
+        throw new UsageError(`use ${flag} without --web, --webvh, --plc, --btcr2, --xid and --relay`);
+      }
+      if (values['--repo']!.length) throw new UsageError(`${flag} takes no --repo: the DID document has no services, so a shim cannot find the folder`);
+      const dwn = values['--dwn']![0];
+      if (dwn === undefined) throw new UsageError(`${flag} needs --dwn <url>`);
+      endpoint(dwn, '--dwn');
+      const r = await createKey({
+        alias, method: key ? 'key' : 'jwk', dwn,
+        passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key', confirm: true }),
+      });
+      process.stderr.write(
+        `The DID document has no services. Give the DWN to each consumer: "didpkg shim start --dwn ${dwn}".\n`
+        + `If the DWN needs a registration, run "didpkg id register ${alias}". Then "didpkg publish ${alias} <tarball> --to dwn" installs the DWN protocol.\n`,
+      );
+      return `${JSON.stringify(r, null, 2)}\n`;
+    }
     if (xid) {
       if ((web ?? webvh ?? plc ?? btcr2) !== undefined || values['--relay']!.length) throw new UsageError('use --xid without --web, --webvh, --plc, --btcr2 and --relay');
       const r = await createXid({
@@ -248,8 +276,7 @@ async function id(args: string[]): Promise<string> {
       return `${JSON.stringify(r, null, 2)}\n`;
     }
     const identity = readIdentity(paths);
-    const services = (identity.document.service ?? []).filter((s) => s.type === 'DecentralizedWebNode')
-      .flatMap((s) => s.serviceEndpoint).filter((u): u is string => typeof u === 'string');
+    const services = dwnUrlsOf(identity);
     if (identity.plc) {
       // The directory first. Then the DWN, if the DID has a DWN service or the user gives --dwn.
       if (reg.dwn !== undefined) endpoint(reg.dwn, '--dwn');
@@ -281,7 +308,11 @@ async function id(args: string[]): Promise<string> {
     if (readIdentityFile(paths).format !== XID_ID_FORMAT) {
       if (values['--rotate']!.length) throw new UsageError('--rotate is for a XID identity only');
       const change = { alias: positional[0]!, dwn: values['--dwn']![0], removeDwn: remove === 'dwn', repos: values['--repo']!.length ? values['--repo'] : undefined };
-      if (readIdentity(paths).plc) {
+      const identity = readIdentity(paths);
+      if (isKeyDid(identity.did)) {
+        throw new Error(`a ${identity.did.slice(0, 7)} DID cannot change: make a new identity with "didpkg id create <alias> --key|--jwk --dwn <url>"`);
+      }
+      if (identity.plc) {
         const r = await updatePlc({
           ...change, updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the rotation key' }),
         });
@@ -342,7 +373,7 @@ async function id(args: string[]): Promise<string> {
     const i = readIdentity(paths);
     const out = {
       alias: i.alias, did: i.did, keyId: i.releaseKey.keyId, created: i.created,
-      assertionMethod: i.document.assertionMethod, service: i.document.service ?? [],
+      assertionMethod: i.document.assertionMethod, service: i.document.service ?? [], ...(i.dwn ? { dwn: i.dwn } : {}),
       files: { identity: paths.identity, updateKey: existsSync(paths.updateKey) ? paths.updateKey : null },
     };
     return `${JSON.stringify(out, null, 2)}\n`;
@@ -379,7 +410,7 @@ async function publishCommand(args: string[]): Promise<string> {
     tarball: new Uint8Array(readFileSync(file)),
     to: values['--to']!,
     relays: values['--relay']!.length ? values['--relay'] : undefined,
-    passphrase: () => passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'Passphrase for the release key #didpkg-1' }),
+    passphrase: () => passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: `Passphrase for the release key${isKeyDid(identity.did) ? '' : ' #didpkg-1'}` }),
   });
   const failed = [
     ...(r.relays.length && !r.relays.some((x) => x.ok) ? ['no relay accepted the DID'] : []),
