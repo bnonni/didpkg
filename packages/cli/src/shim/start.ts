@@ -36,6 +36,8 @@ export interface ReadSideOptions {
   sidecar?: readonly string[];
   /** XID resolver base URLs. The document of a XID is at `<url>/xid/<hex>.envelope`. Default: none. */
   xidResolvers?: readonly string[];
+  /** DWN base URLs for a did:key or did:jwk publisher. The DWN tenant is the DID. Default: none. */
+  dwn?: readonly string[];
   /**
    * The config folder: the Sidecar Data of its identities, a copy of each verified did:btcr2 resolve, and the
    * newest XID document of each XID (`xid/<hex>.envelope`). Default: none.
@@ -113,6 +115,7 @@ export function readSide(o: ReadSideOptions = {}): { resolver: DidResolver; xidR
   const source = new PackageSource({
     resolver,
     xidResolver: xids,
+    dwnHints: o.dwn,
     adapters: [dwnAdapter({ allowLoopback: loopback }), httpsAdapter({ allowLoopback: loopback })],
     log: o.log,
   });

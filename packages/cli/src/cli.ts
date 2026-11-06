@@ -59,10 +59,10 @@ Usage:
                                   Sign an npm pack tarball with the release key and write it to each target
                                   (a XID publisher: only dir:<path>)
   didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--mode enforce|warn]
-                    [--allow-loopback]
+                    [--dwn <url>]... [--allow-loopback]
                                   Serve verified @didpkg packages to npm on 127.0.0.1 (default port 2092)
   didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]...
-                    [--allow-loopback]
+                    [--dwn <url>]... [--allow-loopback]
                                   Verify one version as the shim does, then print the tarball URL and the signed sha512
   didpkg --help                   Print this help
   didpkg --version                Print the version
@@ -87,13 +87,18 @@ Examples:
   didpkg shim start --cas https://ipfs.didpkg.dev
   didpkg shim start --sidecar https://pkgs.example.com/btcr2/
   didpkg shim start --xid-resolver https://pkgs.example.com/
+  didpkg shim start --dwn https://dwn.didpkg.dev
   didpkg drl @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy@1.0.0
 
 Identity files are in $DIDPKG_HOME/ids (default ~/.config/didpkg/ids). The passphrases come from
 DIDPKG_PASSPHRASE (the release key, and the DWN key of a XID) and DIDPKG_UPDATE_PASSPHRASE (the update key of did:dht,
-did:webvh, did:plc and did:btcr2, and the inception key of a XID), else from the terminal. The shim reads $DIDPKG_HOME/config.json if it exists: the IPFS gateways ("cas"), the Esplora
-APIs ("esplora") and the Sidecar Data mirrors ("sidecar") for did:btcr2, and the XID resolvers ("xid-resolver"). The
-shim and "drl" read it. The --cas, --sidecar and --xid-resolver options replace the lists of the file.
+did:webvh, did:plc and did:btcr2, and the inception key of a XID), else from the terminal.
+
+The shim and "drl" read $DIDPKG_HOME/config.json if it exists. For did:btcr2, it gives the IPFS gateways ("cas"), the
+Esplora APIs ("esplora") and the Sidecar Data mirrors ("sidecar"). It also gives the XID resolvers ("xid-resolver") and
+the DWNs for did:key and did:jwk publishers ("dwn"). The --cas, --sidecar, --xid-resolver and --dwn options replace the
+lists of the file. A did:key or did:jwk document has no services. Thus the shim reads the packages of these publishers
+only from the DWNs of --dwn or "dwn".
 
 The grammar is draft 2 and can change before 1.0. See
 https://github.com/bnonni/didpkg/blob/main/docs/spec/install-names.md
@@ -392,6 +397,7 @@ function readOptions(values: Record<string, string[]>, allowLoopback: boolean): 
   const cas = values['--cas']!.map((u) => endpoint(u, '--cas'));
   const sidecar = values['--sidecar']!.map((u) => endpoint(u, '--sidecar'));
   const xidResolvers = (values['--xid-resolver'] ?? []).map((u) => endpoint(u, '--xid-resolver'));
+  const dwn = values['--dwn']!.map((u) => endpoint(u, '--dwn'));
   const config = readConfig();
   return {
     allowLoopback,
@@ -400,6 +406,7 @@ function readOptions(values: Record<string, string[]>, allowLoopback: boolean): 
     esplora: config.esplora,
     sidecar: sidecar.length ? sidecar : config.sidecar,
     xidResolvers: xidResolvers.length ? xidResolvers : config['xid-resolver'],
+    dwn: dwn.length ? dwn : config.dwn,
     home: configDir(),
     log: (line) => process.stderr.write(`${line}\n`),
   };
@@ -410,7 +417,7 @@ async function shimCommand(args: string[]): Promise<string> {
   const [sub, ...rest] = args;
   if (sub !== 'start') throw new UsageError(sub === undefined ? '"shim" needs a subcommand: start' : `unknown shim subcommand ${JSON.stringify(sub)}`);
   const loopback = rest.includes('--allow-loopback');
-  const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--port', '--relay', '--cas', '--sidecar', '--xid-resolver', '--mode']);
+  const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--port', '--relay', '--cas', '--sidecar', '--xid-resolver', '--dwn', '--mode']);
   if (positional.length !== 0) throw new UsageError(`"shim start" takes no arguments (got ${positional.length})`);
   if (values['--port']!.length > 1 || values['--mode']!.length > 1) throw new UsageError('use --port and --mode one time');
   const port = values['--port']![0] ?? '2092';
@@ -425,7 +432,7 @@ async function shimCommand(args: string[]): Promise<string> {
 /** Prints the tarball URL and the signed sha512 as JSON on stdout, and each warning on stderr. */
 async function drlCommand(args: string[]): Promise<string> {
   const loopback = args.includes('--allow-loopback');
-  const { positional, values } = options(args.filter((a) => a !== '--allow-loopback'), ['--relay', '--cas', '--sidecar', '--xid-resolver']);
+  const { positional, values } = options(args.filter((a) => a !== '--allow-loopback'), ['--relay', '--cas', '--sidecar', '--xid-resolver', '--dwn']);
   if (positional.length !== 1) throw new UsageError(`"drl" needs 1 argument: <install-name>[@<version>] (got ${positional.length})`);
   const o = readOptions(values, loopback);
   const { warnings, ...out } = await drl({ spec: positional[0]!, ...readSide(o) });

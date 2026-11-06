@@ -76,6 +76,7 @@ interface StorageWriter {
 4. A URL must parse, and it must not have credentials, a query or a fragment. A repository URL must end with `/` (RFC 3986 section 5). A DWN URL need not.
 5. A duplicate URL is used one time. The maximum is 8 endpoints (`MAX_ENDPOINTS`), so a hostile document cannot make one install send many requests.
 6. A service id becomes an absolute DID URL.
+7. A did:key or did:jwk document cannot have a service. Thus the consumer gives DWN URLs: `--dwn <url>` on `didpkg shim start` and `didpkg drl`, or the `"dwn"` list in `config.json`. For each URL, `hintEndpoints(did, urls)` makes a `DecentralizedWebNode` endpoint. The DWN tenant is the DID. The URL rules and the maximum of items 4 and 5 apply. There is no default list. Only did:key and did:jwk use the list. A document of another method is the authority for its services. The list is not a trust input: the DID signatures are the trust, and a hostile DWN can only delay an install.
 
 ### 5. Reads in PackageSource
 

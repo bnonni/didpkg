@@ -7,7 +7,7 @@ import { contentDigest, sri } from '../trust/digest.ts';
 import { SEMVER } from '../trust/release.ts';
 import type { ReleaseReader } from '../trust/verify.ts';
 import { parseXidRelease, xidContentDigest, type XidDocumentResolver } from '../xid/release.ts';
-import { storageEndpoints, xidEndpoints } from './endpoints.ts';
+import { hintEndpoints, storageEndpoints, xidEndpoints } from './endpoints.ts';
 import type { Endpoint, RecordFormat, StorageAdapter, StorageReader, StoredFile } from './types.ts';
 
 /** The signed tarball bytes, the endpoint that gave them, and their URL if the adapter gives URLs. */
@@ -43,6 +43,11 @@ export interface PackageSourceOptions {
   resolver: Pick<DidResolver, 'resolve'>;
   /** The XID resolver of the verifier. With no XID resolver, a XID publisher has no endpoint. */
   xidResolver?: XidDocumentResolver;
+  /**
+   * The DWN URLs of the consumer. Only a did:key or did:jwk publisher uses them, because its document cannot
+   * have a service. The list is not a trust input: the signatures are the trust. Default: none.
+   */
+  dwnHints?: readonly string[];
   adapters: readonly StorageAdapter[];
   fetch?: typeof fetch;
   jsonTimeoutMs?: number;
@@ -60,6 +65,8 @@ const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typ
 const utf8 = new TextDecoder('utf-8', { fatal: true });
 // A XID publisher signs Gordian Envelopes. The source gives their bytes, and the verifier parses them.
 const isXid = (publisher: string) => XID_RE.test(publisher);
+// The DID methods with no services in the document. A publisher of these methods uses the DWN list of the consumer.
+const NO_SERVICES = /^did:(?:key|jwk):/;
 const recordFile = <F extends StoredFile>(publisher: string, file: F): F & { format?: RecordFormat } => (isXid(publisher) ? { ...file, format: 'envelope' } : file);
 const label = (f: StoredFile) => (f.kind === 'index' ? `the index of ${f.name}` : `the ${f.kind} ${f.name}@${f.version}`);
 
@@ -229,7 +236,9 @@ export class PackageSource implements ReleaseReader {
       return doc?.xid === did ? this.#bind(xidEndpoints(doc)) : [];
     }
     const { didDocument: doc } = await this.#o.resolver.resolve(did);
-    return doc && doc.id === did ? this.#bind(storageEndpoints(doc)) : [];
+    if (!doc || doc.id !== did) return [];
+    const found = storageEndpoints(doc);
+    return this.#bind(found.length === 0 && NO_SERVICES.test(did) ? hintEndpoints(did, this.#o.dwnHints ?? []) : found);
   }
 
   #bind(endpoints: Endpoint[]): Bound[] {

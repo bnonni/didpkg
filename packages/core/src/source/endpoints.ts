@@ -52,6 +52,19 @@ export function xidEndpoints(doc: XidDocumentInfo): Endpoint[] {
   return out.slice(0, MAX_ENDPOINTS);
 }
 
+/**
+ * The DWN endpoints that the consumer gives for a did:key or did:jwk publisher, in list order. The document
+ * of these methods cannot have a service. The DWN tenant is the DID. The URL rules of the DID services apply.
+ */
+export function hintEndpoints(did: string, urls: readonly string[]): Endpoint[] {
+  const out: Endpoint[] = [];
+  for (const url of urls) {
+    if (!usable(DWN_SERVICE_TYPE, url) || out.some((e) => e.url === url)) continue;
+    out.push({ did, serviceId: url, type: DWN_SERVICE_TYPE, url });
+  }
+  return out.slice(0, MAX_ENDPOINTS);
+}
+
 // A repository URL is the base of relative layout paths. Thus it must end with "/", or the
 // last path segment is lost (RFC 3986 section 5). Credentials, a query and a fragment are not allowed.
 function usable(type: EndpointType, url: string): boolean {

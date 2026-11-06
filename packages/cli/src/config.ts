@@ -1,5 +1,6 @@
 // The config file `<config>/config.json`. Each key is optional. A key has the name of the flag that replaces it.
 //   cas      IPFS Trustless Gateway base URLs, in order, for the did:btcr2 data. `--cas` replaces the list. An empty list turns CAS off.
+//   dwn      DWN base URLs for a did:key or did:jwk publisher. Its DID document cannot have a service. `--dwn` replaces the list.
 //   esplora  The Esplora API base URL for each Bitcoin network of did:btcr2, for example {"testnet4": "https://..."}.
 //   sidecar  Mirror base URLs, in order, for the did:btcr2 Sidecar Data. `--sidecar` replaces the list.
 //   xid-resolver  XID resolver base URLs. The document of a XID is at `<url>/xid/<hex>.envelope`. `--xid-resolver` replaces the list.
@@ -13,6 +14,7 @@ type Esplora = NonNullable<Btcr2DriverOptions['esplora']>;
 
 export interface Config {
   cas?: string[];
+  dwn?: string[];
   esplora?: Esplora;
   sidecar?: string[];
   'xid-resolver'?: string[];
@@ -45,7 +47,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
   if (!isObject(v)) throw new Error(`${file}: the file must be a JSON object`);
   const config: Config = {};
   for (const [key, value] of Object.entries(v)) {
-    if (key === 'cas' || key === 'sidecar' || key === 'xid-resolver') {
+    if (key === 'cas' || key === 'dwn' || key === 'sidecar' || key === 'xid-resolver') {
       if (!Array.isArray(value) || !value.every((u) => typeof u === 'string')) throw new Error(`${file}: "${key}" must be a list of URLs`);
       config[key] = value.map((u) => endpoint(u, `${file}: ${key}`));
     } else if (key === 'esplora') {
@@ -60,7 +62,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
       }
       config.esplora = esplora;
     } else {
-      throw new Error(`${file}: unknown key ${JSON.stringify(key)} (use cas, esplora, sidecar, xid-resolver)`);
+      throw new Error(`${file}: unknown key ${JSON.stringify(key)} (use cas, dwn, esplora, sidecar, xid-resolver)`);
     }
   }
   return config;

@@ -58,6 +58,9 @@ const ERRORS: [string, string[], string][] = [
   ['drl: no argument', ['drl'], '"drl" needs 1 argument'],
   ['drl: unknown option', ['drl', '@didpkg/hello_did_web_nonni.org', '--port', '2092'], 'unknown option --port'],
   ['drl: other scope', ['drl', '@other/hello_did_web_nonni.org@1.0.0'], 'E_SCOPE'],
+  ['drl: --dwn needs a value', ['drl', '@didpkg/hello_did_web_nonni.org@1.0.0', '--dwn'], '--dwn needs a value'],
+  ['drl: http DWN', ['drl', '@didpkg/hello_did_web_nonni.org@1.0.0', '--dwn', 'http://dwn.example.com'], '--dwn: http://dwn.example.com must use https'],
+  ['shim start: --dwn needs a value', ['shim', 'start', '--dwn'], '--dwn needs a value'],
   ['drl: http XID resolver', ['drl', '@didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c@1.0.0', '--xid-resolver', 'http://example.com/'], '--xid-resolver: http://example.com/ must use https'],
 ];
 

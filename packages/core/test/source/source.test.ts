@@ -2,11 +2,14 @@
 // sequence wins, a release and a tarball come from the first endpoint with the signed digest, and
 // the errors tell the shim 404 (absent) from 502 (no usable bytes).
 import { beforeEach, expect, test } from 'bun:test';
+import * as ed from '@noble/ed25519';
+import { base64urlnopad } from '@scure/base';
+import { DidResolver, jwkDriver, keyDriver } from '../../src/did/index.ts';
 import type { DidDocument } from '../../src/did/types.ts';
 import {
   MAX_JSON_BYTES, MAX_TARBALL_BYTES, PackageSource, SourceError, type ReadOptions, type StorageAdapter, type StoredFile,
 } from '../../src/source/index.ts';
-import { PolicyError, verifyIndex, verifyRelease, type Pin } from '../../src/trust/index.ts';
+import { PolicyError, ed25519Signer, toMultikey, verifyIndex, verifyRelease, type Pin } from '../../src/trust/index.ts';
 import { FakeResolver, MemReader, NAME, didDoc, newKey, publish, reindex, tgz, type Key } from '../trust/sim.ts';
 
 const DID = 'did:example:pub';
@@ -26,9 +29,9 @@ class Host {
   reads: { file: string; maxBytes: number }[] = [];
 
   /** The same signed bytes as the publisher store, as every adapter stores them. */
-  static from(mem: MemReader): Host {
+  static from(mem: MemReader, did = DID): Host {
     const host = new Host();
-    const head = mem.indexes.get(`${DID}/${NAME}`);
+    const head = mem.indexes.get(`${did}/${NAME}`);
     if (head) host.files.set('index', [enc(head)]);
     for (const [key, release] of mem.releases) host.files.set(`${key.split('@')[1]}.release`, [enc(release)]);
     for (const [key, bytes] of mem.tarballs) host.files.set(`${key.split('@')[1]}.tarball`, [bytes]);
@@ -250,4 +253,46 @@ test('a release with the signed digest is read one time; a copy with another dig
   expect(await codeOf(() => source.getRelease(DID, NAME, '1.0.0', 'sha256-other'))).toBe('MISMATCH');
   expect(dwn.reads.filter((r) => r.file === '1.0.0.release').length).toBe(3);
   expect(dwn.reads.filter((r) => r.file === '1.0.0.tarball').length).toBe(3);
+});
+
+test('a did:key or did:jwk publisher reads from the DWN list of the consumer, in list order', async () => {
+  const urls = ['fake://b', 'fake://a', 'fake://b', 'fake://u:p@c', 'fake://d?x=1', 'fake://e#f', 'not a URL', ...[1, 2, 3, 4, 5, 6, 7].map((n) => `fake://n${n}`)];
+  const hosts = Object.fromEntries(urls.map((u) => [u, new Host()]));
+  const resolver = new FakeResolver();
+  for (const did of ['did:key:z6Mkpub', 'did:jwk:eyJwdWIiOjF9', 'did:dht:pub', DID]) resolver.docs.set(did, { doc: didDoc(did, [key]) });
+  const source = new PackageSource({ resolver, dwnHints: urls, adapters: [adapter(hosts)] });
+  for (const did of ['did:key:z6Mkpub', 'did:jwk:eyJwdWIiOjF9']) {
+    const endpoints = await source.endpoints(did);
+    expect(endpoints.map((e) => e.url)).toEqual(['fake://b', 'fake://a', 'fake://n1', 'fake://n2', 'fake://n3', 'fake://n4', 'fake://n5', 'fake://n6']);
+    expect(endpoints[0]).toEqual({ did, serviceId: 'fake://b', type: 'DecentralizedWebNode', url: 'fake://b' });
+  }
+  // A document of another method is the authority for its services: no service gives no endpoint.
+  expect(await source.endpoints('did:dht:pub')).toEqual([]);
+  expect(await source.endpoints(DID)).toEqual([]);
+  // A DID that does not resolve gets no endpoint from the list.
+  expect(await source.endpoints('did:key:z6Mkother')).toEqual([]);
+});
+
+test('a did:key or did:jwk document with a DWN service uses the service, not the list', async () => {
+  const did = 'did:key:z6Mkpub';
+  const resolver = new FakeResolver();
+  resolver.docs.set(did, { doc: { ...didDoc(did, [key]), service: [{ id: '#dwn', type: 'DecentralizedWebNode', serviceEndpoint: 'fake://own' }] } as DidDocument });
+  const source = new PackageSource({ resolver, dwnHints: ['fake://list'], adapters: [adapter({ 'fake://own': new Host(), 'fake://list': new Host() })] });
+  expect((await source.endpoints(did)).map((e) => e.url)).toEqual(['fake://own']);
+});
+
+test('a did:key and a did:jwk release verify with the bytes from a DWN of the consumer list', async () => {
+  const { secretKey, publicKey } = await ed.keygenAsync();
+  const mb = toMultikey({ alg: 'Ed25519', bytes: publicKey });
+  const jwk = JSON.stringify({ crv: 'Ed25519', kty: 'OKP', x: base64urlnopad.encode(publicKey) });
+  const resolver = new DidResolver({ drivers: [keyDriver(), jwkDriver()] });
+  for (const [did, vm] of [[`did:key:${mb}`, `did:key:${mb}#${mb}`], [`did:jwk:${base64urlnopad.encode(new TextEncoder().encode(jwk))}`, '#0']] as const) {
+    const store = new MemReader();
+    await publish(store, { did, version: '1.0.0', tarball: tgz('1.0.0'), signers: [ed25519Signer(secretKey, vm.startsWith('#') ? did + vm : vm)] });
+    const dwn = Host.from(store, did);
+    const source = new PackageSource({ resolver, dwnHints: ['fake://dwn'], adapters: [adapter({ 'fake://dwn': dwn })] });
+    const r = await verifyRelease({ did, name: NAME, version: '1.0.0', resolver, reader: source, trust: new Map<string, Pin>() });
+    expect(text(r.tarball)).toBe('fake-tgz:1.0.0');
+    expect(dwn.reads.map((x) => x.file)).toEqual(['index', '1.0.0.release', '1.0.0.tarball']);
+  }
 });
