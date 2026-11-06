@@ -119,7 +119,7 @@ The paths are relative to the endpoint URL:
 4. The CLI writes the tarball, then the release record, then the index. Thus a reader never sees an index entry with no files.
 5. The CLI does not change a published release record or tarball.
 
-Example: the DID `did:web:bnonni.github.io:didpkg-demo` has the endpoint `https://bnonni.github.io/didpkg-demo/web/`. Its index is at `https://bnonni.github.io/didpkg-demo/web/hello/index.json`.
+Example: the DID `did:web:example.com:pkgs` has the endpoint `https://pkgs.example.com/`. Its index is at `https://pkgs.example.com/hello/index.json`.
 
 ### DWN protocol v1
 

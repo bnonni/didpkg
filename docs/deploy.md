@@ -87,8 +87,8 @@ A publisher needs no action from you: each publisher registers its own DID (see 
 1. On your machine, make the identity with this DWN in its `#dwn` service:
 
    ```sh
-   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://<user>.github.io/<repo>/
-   didpkg id create web --web <user>.github.io:<repo> --dwn https://dwn.didpkg.dev --repo https://<user>.github.io/<repo>/web/
+   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://example.com/pkgs/
+   didpkg id create web --web example.com:pkgs --dwn https://dwn.didpkg.dev --repo https://example.com/pkgs/web/
    ```
 
    A did:dht identity goes to the default relays, `relay.pkarr.org` too. The DWN resolves did:dht through `relay.pkarr.org`. A did:web identity needs its `did.json` on the site before step 3.

@@ -29,7 +29,7 @@ The parts below are the same for the 2 kinds, with these differences for a XID p
 The storage endpoints are of 2 kinds:
 
 - The DWN of the publisher, with the didpkg protocol v1. This is the registry of the publisher. Example: `https://dwn.didpkg.dev`.
-- An optional static HTTPS mirror, as a backup copy. Its layout is `<name>/index.json`, `<name>/<version>.json` and `<name>/<version>.tgz`. Example: a GitHub Pages site.
+- An optional static HTTPS mirror, as a backup copy. Its layout is `<name>/index.json`, `<name>/<version>.json` and `<name>/<version>.tgz`. Any static HTTPS host can serve it, for example a VPS, a home server or Netlify.
 
 Each endpoint holds the same signed bytes. Thus one endpoint can stop, and the install still works from the other endpoints.
 

@@ -31,13 +31,13 @@ didpkg name <did|xid> <pkg-name>
 Prints the install name for the DID or the XID and the package name. A XID is 64 lowercase hex characters, or a `ur:xid`. The `ur:xid` can hold a bare XID or a XID document, and the command does not verify the document.
 
 ```sh
-didpkg name did:web:bnonni.github.io:didpkg-demo hello
+didpkg name did:web:example.com:pkgs hello
 didpkg name 71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c hello
 didpkg name ur:xid/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbintyjkrhfnvsbyrdfw hello
 ```
 
 ```text
-@didpkg/hello_did_web_bnonni.github.io_didpkg-demo
+@didpkg/hello_did_web_example.com_pkgs
 @didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
 @didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
 ```
@@ -53,11 +53,11 @@ didpkg parse <install-name>
 Prints the parts of an install name as one line of JSON.
 
 ```sh
-didpkg parse @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
+didpkg parse @didpkg/hello_did_web_example.com_pkgs
 ```
 
 ```json
-{"kind":"did","form":"direct","name":"hello","did":"did:web:bnonni.github.io:didpkg-demo"}
+{"kind":"did","form":"direct","name":"hello","did":"did:web:example.com:pkgs"}
 ```
 
 A hash-form name gives `{"kind":"did","form":"hash","name":...,"hash":...}`. A XID name gives `{"kind":"xid","form":"direct","name":...,"xid":...}`. A bad name gives a grammar error code, for example `E_SHAPE: no "_" separator` or `E_CANONICAL: name is not in canonical form`. A name without a kind segment `did` or `xid` gives `E_KIND`, for example `@didpkg/hello_dht_abc`. The codes are in [Install names](spec/install-names.md) section 6. The grammar is draft 2 and can change before 1.0.

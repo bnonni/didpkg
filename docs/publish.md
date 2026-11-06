@@ -73,21 +73,21 @@ The DID record must have 1000 bytes or less. Each `--repo` and `--dwn` URL makes
 ### did:web
 
 ```sh
-didpkg id create web --web me.github.io:pkgs --dwn https://dwn.didpkg.dev
+didpkg id create web --web example.com:pkgs --dwn https://dwn.didpkg.dev
 ```
 
 The command does no network write. It prints the URL of the DID document on stderr and in the JSON field `documentUrl`:
 
 ```text
-Host /home/me/.config/didpkg/ids/web.did.json at https://me.github.io/pkgs/did.json. Then "didpkg publish" installs the DWN protocol.
+Host /home/me/.config/didpkg/ids/web.did.json at https://example.com/pkgs/did.json. Then "didpkg publish" installs the DWN protocol.
 ```
 
 Copy the file `web.did.json` to that URL as `did.json`. The `--web` value gives the URL:
 
 | `--web` | DID | URL of `did.json` |
 |---|---|---|
-| `me.github.io` | `did:web:me.github.io` | `https://me.github.io/.well-known/did.json` |
-| `me.github.io:pkgs` | `did:web:me.github.io:pkgs` | `https://me.github.io/pkgs/did.json` |
+| `example.com` | `did:web:example.com` | `https://example.com/.well-known/did.json` |
+| `example.com:pkgs` | `did:web:example.com:pkgs` | `https://example.com/pkgs/did.json` |
 | `example.com%3A8443:pkgs` | `did:web:example.com%3A8443:pkgs` | `https://example.com:8443/pkgs/did.json` |
 
 The host must be in lowercase. The site must use HTTPS. If you change the hosted `did.json` file, you change the DID document. The did:web specification recommends the header `Access-Control-Allow-Origin: *` for `did.json`, so that a resolver in a web browser can read it.
@@ -172,10 +172,10 @@ The output is JSON:
 
 ```json
 {
-  "did": "did:web:me.github.io:pkgs",
+  "did": "did:web:example.com:pkgs",
   "name": "hello",
   "version": "1.0.0",
-  "installName": "@didpkg/hello_did_web_me.github.io_pkgs",
+  "installName": "@didpkg/hello_did_web_example.com_pkgs",
   "release": "sha256-adMqTpthgOM5QTg3UJsm7evplCFRKSemqfh3zfeh6nM=",
   "sequence": 1,
   "relays": [],
@@ -196,7 +196,7 @@ A published version does not change:
 Use the `installName` from step 6 in [Quickstart](quickstart.md), steps 2 to 4:
 
 ```sh
-npm install @didpkg/hello_did_web_me.github.io_pkgs
+npm install @didpkg/hello_did_web_example.com_pkgs
 ```
 
 ## Optional backup mirror
@@ -215,7 +215,7 @@ A mirror is a static HTTPS site that holds a backup copy of the same signed byte
    didpkg publish main hello-1.0.0.tgz --to dwn --to dir:../pkgs
    ```
 
-3. Push the folder to the site at the `--repo` URL. Do not edit the files: the signatures cover them. On GitHub Pages, add an empty `.nojekyll` file to the root of the site.
+3. Copy the folder to the site at the `--repo` URL. Any static HTTPS host can serve it: a VPS, a home server, Netlify or GitHub Pages. Do not edit the files: the signatures cover them. If the host runs Jekyll (GitHub Pages does by default), add an empty `.nojekyll` file to the root of the site.
 
 The folder gets 3 files for each package:
 
