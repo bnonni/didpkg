@@ -1,19 +1,23 @@
 // The deploy stack test. It starts deploy/compose.yaml with three local changes:
 // - a demo CA in place of Let's Encrypt;
 // - a did:dht relay container in place of relay.pkarr.org;
-// - a web container with the did:webvh log and the did:plc audit log (network aliases web.didpkg.test and plc.directory).
+// - a web container with the DID data of a did:webvh, a did:plc and a did:btcr2 publisher (network aliases: the DID hosts).
 // Then it proves these items through Traefik:
 // - the route allowlist (check.sh) and the registration (terms and proof of work);
 // - a write and a read with the didpkg DWN adapter;
-// - a write and a read of a did:webvh publisher and of a did:plc publisher (deploy/dwn/resolver.ts resolves them);
+// - a write and a read of a did:webvh, a did:plc and a did:btcr2 publisher (deploy/dwn/resolver.ts resolves them);
 // - the body limit, backup.sh and restore.sh;
 // - the quota for each tenant, tenant.sh, no ACME account, and the limit for each client IP.
 // Needs Docker with Compose 2.24 or later, openssl and curl. Run: npm run stack
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import canonicalize from 'canonicalize';
 import { makeCerts, WEB_HOST } from '../../demo/tls.ts';
-import { dhtFixture, plcFixture, webvhFixture } from '../../packages/core/test/did/helpers.ts';
+import { BTCR2_ESPLORA, btcr2Fixture, dhtFixture, plcFixture, webvhFixture } from '../../packages/core/test/did/helpers.ts';
+import { CAS_GATEWAYS, casCid } from '../../packages/core/src/did/drivers/btcr2.ts';
 import { PLC_DIRECTORY } from '../../packages/core/src/did/drivers/plc.ts';
 import { DwnWriter, ed25519MessageSigner } from '../../packages/adapter-dwn/src/writer.ts';
 import { getTerms, register } from '../../packages/adapter-dwn/src/registration.ts';
@@ -28,13 +32,19 @@ const RELAY = `Bun.serve({ port: 8080, async fetch(req) {
   return (await f.exists()) ? new Response(f, { headers: { 'content-type': 'application/pkarr.org/relays#payload' } }) : new Response('not found', { status: 404 });
 } });`;
 // GET /pkgs/did.jsonl over TLS gives the log of the did:webvh publisher. GET /<did:plc>/log/audit gives the audit log
-// of the did:plc publisher. The network aliases of the container are WEB_HOST and PLC_HOST.
-const WEB = `Bun.serve({ port: 443, tls: { cert: Bun.file('/web/site.pem'), key: Bun.file('/web/site.key') }, fetch(req) {
-  const path = new URL(req.url).pathname;
+// of the did:plc publisher. For the other URLs, /web/btcr2.json has the body of each <host><path><query>.
+// The network aliases of the container are WEB_HOST, PLC_HOST and BTCR2_HOSTS.
+const WEB = `Bun.serve({ port: 443, tls: { cert: Bun.file('/web/site.pem'), key: Bun.file('/web/site.key') }, async fetch(req) {
+  const url = new URL(req.url);
+  const path = url.pathname;
   const file = path === '/pkgs/did.jsonl' ? 'did.jsonl' : path.startsWith('/did:plc:') && path.endsWith('/log/audit') ? 'plc.json' : '';
-  return file ? new Response(Bun.file('/web/' + file)) : new Response('not found', { status: 404 });
+  if (file) return new Response(Bun.file('/web/' + file));
+  const body = (await Bun.file('/web/btcr2.json').json().catch(() => ({})))[url.host + path + url.search];
+  return typeof body === 'string' ? new Response(body) : new Response('not found', { status: 404 });
 } });`;
 const PLC_HOST = new URL(PLC_DIRECTORY).host;
+// The did:btcr2 driver of the DWN reads the default Esplora of testnet4 and the default CAS gateways.
+const BTCR2_HOSTS = [BTCR2_ESPLORA, ...CAS_GATEWAYS].map((u) => new URL(u).host);
 
 // The CA must be in NODE_EXTRA_CA_CERTS when Bun starts, so the test makes the CA and runs itself again.
 if (!process.env.DIDPKG_STACK_DIR) {
@@ -118,7 +128,7 @@ tls:
   // The web container has its own demo CA. Only the dwn container trusts it.
   const web = join(dir, 'web');
   mkdirSync(web);
-  await makeCerts(web, [WEB_HOST, PLC_HOST]);
+  await makeCerts(web, [WEB_HOST, PLC_HOST, ...BTCR2_HOSTS]);
   writeFileSync(join(dir, 'override.yaml'), `services:
   dwn:
     environment:
@@ -135,7 +145,7 @@ tls:
     volumes: ["${web}:/web:ro"]
     networks:
       default:
-        aliases: [${WEB_HOST}, ${PLC_HOST}]
+        aliases: [${[WEB_HOST, PLC_HOST, ...BTCR2_HOSTS].join(', ')}]
   relay:
     image: ${BUN_IMAGE}
     entrypoint: ["bun", "-e", ${JSON.stringify(RELAY)}]
@@ -212,6 +222,26 @@ tls:
     const plcReader = dwnAdapter({ allowLoopback: true }).reader({ did: plc.did, serviceId: `${plc.did}#dwn`, type: 'DecentralizedWebNode', url: base }, { fetch });
     const plcTarball = await all(plcReader, { kind: 'tarball', name: 'hello', version: '1.0.0' });
     check(Buffer.compare(plcTarball, files.tarball) === 0, 'a did:plc publisher registers, writes a release and reads it through Traefik');
+
+    // dwn-server 0.1.45 alone does not resolve did:btcr2. The DWN reads the beacon signal from the Esplora host,
+    // and the genesis document and the update from a CAS host. All of them are in the web container.
+    const btc = await btcr2Fixture({ release: true });
+    const btcRoutes: Record<string, string> = {};
+    const { fetch: esplora, routes } = btc.esplora();
+    for (const url of Object.keys(routes)) btcRoutes[url.slice('https://'.length)] = await (await esplora(url, {})).text();
+    const genesis = canonicalize(btc.genesisDocument)!;
+    const blocks = { [casCid(bytesToHex(sha256(new TextEncoder().encode(genesis))))]: genesis, [casCid(btc.signal.signalBytes)]: canonicalize(btc.update)! };
+    for (const gateway of CAS_GATEWAYS) {
+      for (const [cid, block] of Object.entries(blocks)) btcRoutes[`${new URL(gateway).host}/ipfs/${cid}?format=raw`] = block;
+    }
+    writeFileSync(join(web, 'btcr2.json'), JSON.stringify(btcRoutes));
+    const btcWriter = new DwnWriter({ dwnUrl: base, did: btc.did, signer: ed25519MessageSigner(btc.releaseSecret, `${btc.did}#didpkg-1`) });
+    await register(base, btc.did, { terms });
+    await btcWriter.installProtocol();
+    await btcWriter.publish({ name: 'hello', version: '1.0.0', ...files });
+    const btcReader = dwnAdapter({ allowLoopback: true }).reader({ did: btc.did, serviceId: `${btc.did}#dwn`, type: 'DecentralizedWebNode', url: base }, { fetch });
+    const btcTarball = await all(btcReader, { kind: 'tarball', name: 'hello', version: '1.0.0' });
+    check(Buffer.compare(btcTarball, files.tarball) === 0, 'a did:btcr2 publisher registers, writes a release and reads it through Traefik');
 
     const big = await fetch(`${base}/`, { method: 'POST', body: new Uint8Array(18 * 1024 * 1024) });
     check(big.status === 413, `Traefik refuses an 18 MiB body (${big.status})`);

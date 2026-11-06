@@ -18,7 +18,7 @@ import { toMultikey } from '../../src/trust/keys.ts';
 
 export type Route = (req: { url: string; init: RequestInit }) => Response | Promise<Response>;
 
-/** A fetch that answers from a URL table. Other URLs get 404. It records each URL. */
+/** A fetch that answers from a URL table. Other URLs get 404. It records each URL, and it gives the table. */
 export function fakeFetch(routes: Record<string, Route | Response>) {
   const calls: string[] = [];
   const fetch: FetchLike = async (url, init) => {
@@ -28,7 +28,7 @@ export function fakeFetch(routes: Record<string, Route | Response>) {
     if (!route) return new Response('not found', { status: 404 });
     return typeof route === 'function' ? route({ url, init }) : (route.clone() as Response); // clone() has the undici type
   };
-  return { fetch, calls };
+  return { fetch, calls, routes };
 }
 
 /** A fetch that never answers until the signal aborts. */
