@@ -4,6 +4,7 @@
 // The update key #initialKey is a secp256k1 Multikey in capabilityInvocation: the spec takes only this key type for an update.
 // The singleton beacon #initialP2WPKH is the P2WPKH address of the update key. An update spends a UTXO of this address.
 // The release key #didpkg-1 is an Ed25519 Multikey in assertionMethod.
+// The services #dwn and #pkg are in the Genesis Document: a change to them needs an update (a Beacon Signal).
 import { getNetwork, type NetworkName } from '@did-btcr2/bitcoin';
 import { BeaconUtils, DidBtcr2, ID_PLACEHOLDER_VALUE } from '@did-btcr2/method';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
@@ -28,6 +29,8 @@ const BEACON = 'initialP2WPKH';
 export interface Btcr2CreateOptions {
   alias: string;
   network: string;
+  /** A DWN endpoint: the service #dwn (type `DecentralizedWebNode`). */
+  dwn?: string;
   /** Static mirror URLs: the service #pkg (type `DIDPackageRepository`). */
   repos: string[];
   passphrase: string;
@@ -58,8 +61,8 @@ export function network(name: string): NetworkName {
 }
 
 /** The Genesis Document: the DID document with the placeholder id `did:btcr2:_`. */
-function genesisOf(n: NetworkName, updateKey: Uint8Array, releaseKey: Uint8Array, repos: string[]): Record<string, unknown> {
-  if (repos.length === 0) throw new Error('a did:btcr2 identity needs a --repo URL');
+function genesisOf(n: NetworkName, updateKey: Uint8Array, releaseKey: Uint8Array, o: { dwn?: string; repos: string[] }): Record<string, unknown> {
+  if (o.dwn === undefined && o.repos.length === 0) throw new Error('a did:btcr2 identity needs a --dwn URL or a --repo URL');
   const id = ID_PLACEHOLDER_VALUE;
   const beacon = BeaconUtils.generateBeaconServices({ id, publicKey: updateKey, network: getNetwork(n), beaconType: 'SingletonBeacon' })
     .find((s) => s.id === `${id}#${BEACON}`)!;
@@ -72,7 +75,11 @@ function genesisOf(n: NetworkName, updateKey: Uint8Array, releaseKey: Uint8Array
     ],
     assertionMethod: [`${id}#${RELEASE_KEY}`],
     capabilityInvocation: [`${id}#${UPDATE_KEY}`],
-    service: [beacon, { id: `${id}#pkg`, type: REPOSITORY_TYPE, serviceEndpoint: repos.map((r) => endpoint(r, 'repo')) }],
+    service: [
+      beacon,
+      ...(o.dwn === undefined ? [] : [{ id: `${id}#dwn`, type: 'DecentralizedWebNode', serviceEndpoint: [endpoint(o.dwn, 'dwn')] }]),
+      ...(o.repos.length === 0 ? [] : [{ id: `${id}#pkg`, type: REPOSITORY_TYPE, serviceEndpoint: o.repos.map((r) => endpoint(r, 'repo')) }]),
+    ],
   };
 }
 
@@ -99,7 +106,7 @@ export async function createBtcr2(o: Btcr2CreateOptions): Promise<Btcr2CreateRes
 
   const release = await ed.keygenAsync();
   const update = secp256k1.utils.randomSecretKey();
-  const genesisDocument = genesisOf(n, secp256k1.getPublicKey(update), release.publicKey, o.repos);
+  const genesisDocument = genesisOf(n, secp256k1.getPublicKey(update), release.publicKey, o);
   // The genesis file is the JCS form of the Genesis Document (spec algorithm "JSON Document Hashing"). Its SHA-256 is the
   // genesis bytes of the DID. The resolve in documentOf hashes the document again with the library, so the two must agree.
   const block = new TextEncoder().encode(canonicalize(genesisDocument)!);

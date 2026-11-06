@@ -91,7 +91,7 @@ The host must be in lowercase. The site must use HTTPS. If you change the hosted
 didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
 ```
 
-The command does no network write and makes no Bitcoin transaction. A did:btcr2 identity has no DWN, so publish with `--to dir:<path>` only. The DID is the hash of a Genesis Document. A resolver must have this document. Use one of these methods to give it:
+The command does no network write and makes no Bitcoin transaction. With `--dwn <url>`, the Genesis Document gets the DWN service `#dwn`. The DWN must resolve did:btcr2 (the didpkg DWN image does), and it gets the Genesis Document only from IPFS (method 2). Without `--dwn`, publish with `--to dir:<path>` only. The DID is the hash of a Genesis Document. A resolver must have this document. Use one of these methods to give it:
 
 1. Sidecar Data. `didpkg publish --to dir:<path>` writes the file `<id>.sidecar.json` to the root of the folder. `<id>` is the DID without `did:btcr2:`. Push the folder (step 7). Each user of the package must start the shim with `--sidecar <URL of the folder>`, or put the URL in the `sidecar` list of the [config file](cli.md#config-file).
 2. CAS (IPFS). Put the file `btc.genesis.json` in IPFS as a raw block, and keep it pinned. The shim gets the block through an IPFS gateway (default: `trustless-gateway.link`, then `ipfs.didpkg.dev`). With Kubo:

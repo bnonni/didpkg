@@ -9,7 +9,8 @@ import { DidBtcr2, Identifier } from '@did-btcr2/method';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import canonicalize from 'canonicalize';
-import { DidResolver } from '@didpkg/core/did';
+import { DidResolver, type DidDocument } from '@didpkg/core/did';
+import { storageEndpoints } from '@didpkg/core/source';
 import { btcr2Driver, ESPLORA, sidecarFile } from '@didpkg/core/did/btcr2';
 import { toMultikey, verifyProof } from '@didpkg/core/trust';
 import { DirWriter } from '@didpkg/adapter-https/dir';
@@ -26,6 +27,7 @@ const PASS = 'release passphrase 1';
 const UPDATE_PASS = 'update passphrase 1';
 const REPOS = ['https://pkgs.example.com/btcr2/', 'https://mirror.example.org/btcr2/'];
 const GATEWAY = 'https://cas.example';
+const DWN = 'https://dwn.example.com';
 
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
@@ -130,13 +132,34 @@ describe('id create --btcr2', async () => {
     expect(readIdentity(idPaths('btc-main', env)).document.service![0]!.serviceEndpoint).toMatch(/^bitcoin:bc1q/);
   });
 
+  test('with --dwn, the Genesis Document has #dwn before #pkg, and the DWN is the first storage endpoint', async () => {
+    const d = await createBtcr2({ alias: 'btc-dwn', network: 'testnet4', dwn: DWN, repos: REPOS.slice(0, 1), passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 });
+    const doc = readIdentity(idPaths('btc-dwn', env)).document;
+    expect(doc.service!.map((s) => [s.id, s.type, s.serviceEndpoint])).toEqual([
+      [`${d.did}#initialP2WPKH`, 'SingletonBeacon', expect.stringMatching(/^bitcoin:tb1q/)],
+      [`${d.did}#dwn`, 'DecentralizedWebNode', [DWN]],
+      [`${d.did}#pkg`, 'DIDPackageRepository', REPOS.slice(0, 1)],
+    ]);
+    expect(storageEndpoints(doc as unknown as DidDocument).map((e) => [e.type, e.url])).toEqual([['DecentralizedWebNode', DWN], ['DIDPackageRepository', REPOS[0]]]);
+  });
+
+  test('with --dwn and no --repo, the DID has no #pkg service, and the sidecar data resolves it', async () => {
+    const d = await createBtcr2({ alias: 'btc-dwn-only', network: 'signet', dwn: DWN, repos: [], passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 });
+    const sidecarOnly = JSON.parse(readFileSync(d.files.sidecar, 'utf8'));
+    const driver = btcr2Driver({ cas: [], fetch: stubNetwork().fetch, sidecar: async (did) => (did === d.did ? sidecarOnly : undefined) });
+    const doc = (await new DidResolver({ drivers: [driver] }).resolve(d.did)).didDocument!;
+    expect(doc.service!.map((s) => s.id)).toEqual([`${d.did}#initialP2WPKH`, `${d.did}#dwn`]);
+    expect(readIdentity(idPaths('btc-dwn-only', env)).document as unknown).toEqual(doc);
+  });
+
   test('bad options fail before a file write', async () => {
-    const o = { network: 'testnet4', repos: REPOS, passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 };
+    const o: Omit<Parameters<typeof createBtcr2>[0], 'alias'> = { network: 'testnet4', repos: REPOS, passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 };
     const cases: [string, Partial<typeof o>, string][] = [
       ['b1', { updatePassphrase: PASS }, 'must not be'],
-      ['b2', { repos: [] }, 'needs a --repo URL'],
+      ['b2', { repos: [] }, 'needs a --dwn URL or a --repo URL'],
       ['b3', { network: 'mainnet' }, '--btcr2: "mainnet" is not a network'],
       ['b4', { repos: ['http://pkgs.example.com/'] }, 'must use https'],
+      ['b5', { dwn: 'http://dwn.example.com' }, 'must use https'],
     ];
     for (const [alias, change, error] of cases) {
       await expect(createBtcr2({ ...o, ...change, alias })).rejects.toThrow(error);
@@ -186,15 +209,23 @@ describe('the CLI', () => {
     expect(r.err).toContain(`with the CID ${out.cid}:\n  ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ${out.files.genesis}\n`);
     expect(r.err).toContain(`Or use the Sidecar Data in ${out.files.sidecar}: "didpkg publish --to dir:<path>" writes a copy to <path>/${sidecarFile(out.did)}.\n`);
     const register = await run(['id', 'register', 'cli']);
-    expect([register.code, register.err]).toEqual([1, expect.stringContaining('"id register" is not for did:btcr2')]);
+    expect([register.code, register.err]).toEqual([1, expect.stringContaining('the identity has no DecentralizedWebNode service: use --dwn <url>')]);
+    expect(r.err).not.toContain('The DWN reads the genesis document only from IPFS.');
   });
 
-  test('--btcr2 with --dwn, --relay or --plc, without --repo, or with a bad network fails before a file write', async () => {
+  test('id create --btcr2 --dwn says that the DWN reads the genesis document only from IPFS', async () => {
+    const r = await run(['id', 'create', 'cli-dwn', '--btcr2', 'signet', '--dwn', DWN], keys);
+    expect(r.code).toBe(0);
+    expect(r.err).toContain('The DWN reads the genesis document only from IPFS. Put it there before "didpkg publish --to dwn".\n');
+    expect(readIdentity(idPaths('cli-dwn', env)).document.service!.map((s) => s.type)).toEqual(['SingletonBeacon', 'DecentralizedWebNode']);
+  });
+
+  test('--btcr2 with --relay or --plc, with no --dwn and no --repo, or with a bad network fails before a file write', async () => {
     const cases: [string, string[], string][] = [
-      ['c1', ['--btcr2', 'bitcoin', '--repo', REPOS[0]!, '--dwn', 'https://dwn.example'], '--dwn is not for did:btcr2'],
+      ['c1', ['--btcr2', 'bitcoin', '--dwn', 'http://dwn.example'], 'must use https'],
       ['c2', ['--btcr2', 'bitcoin', '--repo', REPOS[0]!, '--relay', 'https://relay.example'], '--relay is for did:dht only'],
       ['c3', ['--btcr2', 'bitcoin', '--plc', 'https://plc.example', '--repo', REPOS[0]!], 'use --btcr2 without --web, --webvh and --plc'],
-      ['c4', ['--btcr2', 'bitcoin'], '--btcr2 needs --repo <url>'],
+      ['c4', ['--btcr2', 'bitcoin'], '--btcr2 needs --dwn <url> or --repo <url>'],
       ['c5', ['--btcr2', 'bitcoin', '--btcr2', 'signet', '--repo', REPOS[0]!], 'use --btcr2 one time'],
       ['c6', ['--btcr2', 'testnet', '--repo', REPOS[0]!], '--btcr2: "testnet" is not a network'],
     ];

@@ -38,7 +38,7 @@ Usage:
                                   Make a did:webvh publisher DID and its did.jsonl log to host
   didpkg id create <alias> --plc <directory> [--dwn <url>] [--repo <url>]...
                                   Make a did:plc publisher DID and send it to the directory
-  didpkg id create <alias> --btcr2 <network> --repo <url>...
+  didpkg id create <alias> --btcr2 <network> [--dwn <url>] [--repo <url>]...
                                   Make a did:btcr2 publisher DID and its genesis file to put in IPFS
   didpkg id create <alias> --xid [--dwn <url>] [--repo <url>]...
                                   Make a XID publisher: a XID document with a release key (Sign) and a DWN key (Auth)
@@ -151,11 +151,10 @@ async function id(args: string[]): Promise<string> {
       return `${JSON.stringify(r, null, 2)}\n`;
     }
     if (btcr2 !== undefined) {
-      if (values['--dwn']!.length) throw new UsageError('--dwn is not for did:btcr2: the DWN server does not resolve did:btcr2');
-      if (values['--repo']!.length === 0) throw new UsageError('--btcr2 needs --repo <url>');
+      if (values['--dwn']!.length === 0 && values['--repo']!.length === 0) throw new UsageError('--btcr2 needs --dwn <url> or --repo <url>');
       network(btcr2);
       const r = await createBtcr2({
-        alias, network: btcr2, repos: values['--repo']!,
+        alias, network: btcr2, dwn: values['--dwn']![0], repos: values['--repo']!,
         passphrase: await passphrase({ env: 'DIDPKG_PASSPHRASE', prompt: 'New passphrase for the release key #didpkg-1', confirm: true }),
         updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'New passphrase for the update key #initialKey', confirm: true }),
       });
@@ -166,6 +165,8 @@ async function id(args: string[]): Promise<string> {
 `
         + `  ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ${r.files.genesis}
 `
+        + (values['--dwn']!.length ? `The DWN reads the genesis document only from IPFS. Put it there before "didpkg publish --to dwn".
+` : '')
         + `Or use the Sidecar Data in ${r.files.sidecar}: "didpkg publish --to dir:<path>" writes a copy to <path>/${sidecarFile(r.did)}.
 `
         + `A shim with "--sidecar <URL of the folder>" reads it.
@@ -242,7 +243,6 @@ async function id(args: string[]): Promise<string> {
       return `${JSON.stringify(r, null, 2)}\n`;
     }
     const identity = readIdentity(paths);
-    if (identity.btcr2) throw new UsageError('"id register" is not for did:btcr2: a did:btcr2 DID has no registration');
     const services = (identity.document.service ?? []).filter((s) => s.type === 'DecentralizedWebNode')
       .flatMap((s) => s.serviceEndpoint).filter((u): u is string => typeof u === 'string');
     if (identity.plc) {

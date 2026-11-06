@@ -167,6 +167,16 @@ describe('id register', () => {
     }
   });
 
+  test('a did:btcr2 identity with a DWN service in the Genesis Document registers on the DWN', async () => {
+    expect((await run(['id', 'create', 'btc', '--btcr2', 'regtest', '--dwn', dwn.url])).code).toBe(0);
+    const r = await run(['id', 'register', 'btc', '--accept-terms', hash]);
+    expect(r.code).toBe(0);
+    const did = JSON.parse(await Bun.file(join(home, 'ids', 'btc.json')).text()).did;
+    expect(did).toStartWith('did:btcr2:x1');
+    expect(JSON.parse(r.out)).toEqual({ alias: 'btc', did, dwn: dwn.url, termsOfServiceHash: hash });
+    expect(r.err).toContain(`Registered ${did} on ${dwn.url}.`);
+  });
+
   // Linux only: the `script` of macOS has other options.
   test.skipIf(process.platform !== 'linux' || !existsSync('/usr/bin/script'))('on a terminal, "n" stops and "y" registers', async () => {
     expect((await run(['id', 'create', 'tty', '--web', 'example.com:tty', '--dwn', dwn.url])).code).toBe(0);

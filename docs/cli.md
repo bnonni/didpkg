@@ -153,7 +153,7 @@ The directory keeps the operation log of each DID public. Nobody can delete a di
 ## didpkg id create (did:btcr2)
 
 ```text
-didpkg id create <alias> --btcr2 <network> --repo <url>...
+didpkg id create <alias> --btcr2 <network> [--dwn <url>] [--repo <url>]...
 ```
 
 Makes a did:btcr2 publisher DID with the release key `#didpkg-1` and a secp256k1 update key `#initialKey`. The DID is an `x1` identifier: the hash of a Genesis Document. The command makes no Bitcoin transaction and no network request.
@@ -161,16 +161,22 @@ Makes a did:btcr2 publisher DID with the release key `#didpkg-1` and a secp256k1
 | Option | Default | Use |
 |---|---|---|
 | `--btcr2 <network>` | None | The Bitcoin network: `bitcoin`, `signet`, `regtest`, `testnet3`, `testnet4` or `mutinynet`. One time only. |
-| `--repo <url>` | None | A mirror URL in the service `#pkg`. Necessary. Repeatable. |
+| `--dwn <url>` | None | A DWN endpoint: the service `#dwn` (type `DecentralizedWebNode`). One time only. |
+| `--repo <url>` | None | A mirror URL in the service `#pkg`. Repeatable. |
 
-`--dwn`, `--relay`, `--web`, `--webvh` and `--plc` are not permitted with `--btcr2`. `dwn-server` 0.1.45 does not resolve did:btcr2. Use `didpkg publish --to dir:<path>` and a static host for a did:btcr2 publisher. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`.
+Give `--dwn`, `--repo` or both. The services are in the Genesis Document, and a change to them needs a did:btcr2 update. `didpkg id update` does not do did:btcr2 updates. Thus, give all the services at create time.
+
+A DWN must resolve the DID before it accepts a write. The didpkg DWN image (`deploy/dwn`) resolves did:btcr2. The stock `dwn-server` 0.1.45 does not.
+
+`--relay`, `--web`, `--webvh` and `--plc` are not permitted with `--btcr2`. The command asks for 2 different passphrases: `DIDPKG_PASSPHRASE` and `DIDPKG_UPDATE_PASSPHRASE`.
 
 The Genesis Document is the DID document with the placeholder id `did:btcr2:_`. It has these items:
 
 - `#initialKey`: a secp256k1 `Multikey` in `capabilityInvocation`. The did:btcr2 specification permits only this key type to sign an update.
 - `#didpkg-1`: an Ed25519 `Multikey` in `assertionMethod`.
 - `#initialP2WPKH`: a `SingletonBeacon` service. Its address is the P2WPKH address of `#initialKey`. An update spends a UTXO of this address.
-- `#pkg`: the `DIDPackageRepository` service with the `--repo` URLs.
+- `#dwn`: the `DecentralizedWebNode` service with the `--dwn` URL, with `--dwn` only.
+- `#pkg`: the `DIDPackageRepository` service with the `--repo` URLs, with `--repo` only.
 
 The command writes 2 more files in `$DIDPKG_HOME/ids`:
 
@@ -184,9 +190,9 @@ A resolver must have the Genesis Document, because the DID has only its hash. Th
 1. Sidecar Data. `didpkg publish --to dir:<path>` writes a copy of `<alias>.sidecar.json` to `<path>/<id>.sidecar.json`. `<id>` is the DID without `did:btcr2:`. Host the folder. A shim with [`--sidecar <URL of the folder>`](#didpkg-shim-start) reads the file.
 2. CAS (IPFS). Put the genesis file in IPFS as a raw block. The CID in the result is the CIDv1 of that block. With Kubo, run `ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true <alias>.genesis.json`. The shim then gets the block from the IPFS gateways (see [`--cas`](#didpkg-shim-start)).
 
-The did:btcr2 specification recommends one of the two methods for the life of the DID.
+The did:btcr2 specification recommends one of the two methods for the life of the DID. A DWN gets the Genesis Document only from IPFS. Thus, with `--dwn`, put the genesis file in IPFS before `didpkg publish --to dwn`.
 
-stdout gets the JSON result: `alias`, `did`, `keyId`, `network`, `cid` and `files`. stderr tells you to move the update key file offline. It also gives the IPFS command and the name of the Sidecar Data file in the folder.
+stdout gets the JSON result: `alias`, `did`, `keyId`, `network`, `cid` and `files`. stderr tells you to move the update key file offline. It also gives the IPFS command and the name of the Sidecar Data file in the folder. With `--dwn`, it also tells you that the DWN reads the Genesis Document only from IPFS.
 
 ## didpkg id create (XID)
 
@@ -319,7 +325,7 @@ For a XID identity, the tenant is the `did:key` of the DWN key, and the DWN URL 
 
 For a did:plc identity, the command first sends the genesis operation to the directory again. Use it if the directory did not accept the DID at `didpkg id create`. This step succeeds if the operation log of the directory has this operation. If the step fails, the command stops with exit code 1. Then, if the identity has a DWN service or you give `--dwn`, the command registers the DID on the DWN. The JSON result also has `directory`, the result of the first step. With no DWN, stdout gets only that result, and `--accept-terms` is not permitted.
 
-A did:btcr2 DID has no registration. For a did:btcr2 identity, the command stops with exit code 1.
+For a did:btcr2 identity, the DWN URL is the `#dwn` service of the Genesis Document. The registration does not resolve the DID. Thus, this step does not need the genesis file in IPFS.
 
 | Option | Default | Use |
 |---|---|---|
