@@ -76,7 +76,7 @@ Examples:
   didpkg id create web --web pkgs.example.com --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id create vh --webvh pkgs.example.com:vh --repo https://pkgs.example.com/vh/
   didpkg id create plc --plc https://plc.directory --repo https://pkgs.example.com/plc/
-  didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
+  didpkg id create btc --btcr2 bitcoin --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/btcr2/
   didpkg id create gordian --xid --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
   didpkg id update gordian --rotate release
   didpkg id update vh --dwn https://dwn.didpkg.dev

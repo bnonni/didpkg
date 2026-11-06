@@ -88,7 +88,7 @@ The host must be in lowercase. The site must use HTTPS. If you change the hosted
 ### did:btcr2
 
 ```sh
-didpkg id create btc --btcr2 bitcoin --repo https://pkgs.example.com/btcr2/
+didpkg id create btc --btcr2 bitcoin --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/btcr2/
 ```
 
 The command does no network write and makes no Bitcoin transaction. With `--dwn <url>`, the Genesis Document gets the DWN service `#dwn`. The DWN must resolve did:btcr2 (the didpkg DWN image does), and it gets the Genesis Document only from IPFS (method 2). Without `--dwn`, publish with `--to dir:<path>` only. The DID is the hash of a Genesis Document. A resolver must have this document. Use one of these methods to give it:
