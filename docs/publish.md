@@ -33,6 +33,12 @@ Each DID method that `didpkg id create` makes can have a DWN service. If you do 
 
 A did:web install name is short and easy to read. A did:dht DID needs no host and no DNS name.
 
+didpkg also makes these DIDs:
+
+- [did:webvh](#didwebvh): a did:web DID with a signed log of its changes, on your HTTPS host.
+- [did:plc](#didplc): a DID in a PLC directory, for example `https://plc.directory`.
+- [did:btcr2](#didbtcr2): a Bitcoin DID. The DID is the hash of a Genesis Document.
+
 To publish with a XID in place of a DID, read [A XID publisher](#a-xid-publisher).
 
 ## 2. Prepare the passphrases
@@ -44,7 +50,7 @@ For a script or CI, set the passphrases in the environment:
 | Variable | Key | Used by |
 |---|---|---|
 | `DIDPKG_PASSPHRASE` | The release key `#didpkg-1` | `id create`, `publish` |
-| `DIDPKG_UPDATE_PASSPHRASE` | The update key `#0` (did:dht only) | `id create` |
+| `DIDPKG_UPDATE_PASSPHRASE` | The update key of the DID (each method except did:web) | `id create`, `id update` |
 
 The 2 passphrases must be different. Keep them in a password manager. If you lose a passphrase, nobody can decrypt its key. `didpkg id register` needs no passphrase.
 
@@ -92,6 +98,48 @@ Copy the file `web.did.json` to that URL as `did.json`. The `--web` value gives 
 
 The host must be in lowercase. The site must use HTTPS. If you change the hosted `did.json` file, you change the DID document. The did:web specification recommends the header `Access-Control-Allow-Origin: *` for `did.json`, so that a resolver in a web browser can read it.
 
+### did:webvh
+
+```sh
+didpkg id create vh --webvh example.com:pkgs --dwn https://dwn.didpkg.dev
+```
+
+The command makes the release key `#didpkg-1` and an update key. It asks for 2 different passphrases. It does no network write. It makes 2 files to host: the DID log `vh.did.jsonl` and the parallel did:web document `vh.did.json`. stderr shows the URL of each file, and the JSON fields `logUrl` and `documentUrl` give the same URLs:
+
+| `--webvh` | URL of `did.jsonl` | URL of `did.json` |
+|---|---|---|
+| `example.com` | `https://example.com/.well-known/did.jsonl` | `https://example.com/.well-known/did.json` |
+| `example.com:pkgs` | `https://example.com/pkgs/did.jsonl` | `https://example.com/pkgs/did.json` |
+
+1. Copy the 2 files to these URLs. The URLs must not redirect to another host.
+2. Set the header `Access-Control-Allow-Origin: *` for `did.jsonl`. The did:webvh specification makes this header a requirement. It also recommends the content type `text/jsonl`.
+3. Move `vh.update-key.json` offline. Only `didpkg id update` needs it.
+
+didpkg adds the SCID (self-certifying identifier) to the address. Thus the DID is `did:webvh:<SCID>:example.com:pkgs`. The install name has the SCID in lowercase and a [case mask](spec/install-names.md#3-the-fold-and-the-case-mask) for the uppercase letters. To get the install name, run `didpkg name <did> hello`.
+
+The DWN must resolve did:webvh. The didpkg DWN image does, and `https://dwn.didpkg.dev` runs it. The stock `dwn-server` 0.1.45 does not.
+
+To add or change the DWN later, run `didpkg id update vh --dwn <url>`. The command adds a signed entry to the log. Host the new `vh.did.jsonl` and `vh.did.json` again. The log must keep each old entry. See [the CLI reference](cli.md#a-didwebvh-publisher).
+
+### did:plc
+
+```sh
+didpkg id create plc --plc https://plc.directory --dwn https://dwn.didpkg.dev
+```
+
+`--plc` is the URL of the PLC directory. `https://plc.directory` is the public directory. The command makes the release key `#didpkg-1` and a rotation key. It asks for 2 different passphrases. Then it sends the signed genesis operation to the directory. There is no file to host.
+
+1. Give `--dwn`, `--repo` or both. The directory accepts a maximum of 10 services. Each `--repo` URL gets its own service: `#pkg`, `#pkg-2` and so on.
+2. Move `plc.update-key.json` offline. It holds the rotation key. Only this key can change the DID.
+
+The DID is `did:plc:<24 characters>`, and the install name is `@didpkg/hello_did_plc_<24 characters>`. The directory keeps the operation log of each DID public. Nobody can delete a did:plc DID or its log.
+
+If the directory does not accept the DID, the command exits with 1. The identity is saved. In step 5, `didpkg id register plc` sends the operation again.
+
+The DWN must resolve did:plc. The didpkg DWN image does, and `https://dwn.didpkg.dev` runs it. The stock `dwn-server` 0.1.45 does not.
+
+To add or change the DWN later, run `didpkg id update plc --dwn <url>`. The command sends an update operation to the directory. See [the CLI reference](cli.md#a-didplc-publisher).
+
 ### did:btcr2
 
 ```sh
@@ -122,8 +170,9 @@ The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$
 | File | Content | Mode | Action |
 |---|---|---|---|
 | `<alias>.json` | The DID document and the encrypted release key | `0600` | `didpkg publish` reads only this file. Make a backup copy. |
-| `<alias>.update-key.json` | The encrypted update key of the DID (each method except did:web) | `0600` | Move it offline. didpkg 0.1.0 does not use it. You need it to change the DID document. |
+| `<alias>.update-key.json` | The encrypted update key of the DID (each method except did:web) | `0600` | Move it offline. You need it to change the DID document. `didpkg id update` uses it for did:webvh and did:plc. |
 | `<alias>.did.json` | The DID document to host (did:web), or the parallel did:web document (did:webvh) | `0644` | Host it. See step 3. |
+| `<alias>.did.jsonl` | The DID log to host (did:webvh only) | `0644` | Host it. See [did:webvh](#didwebvh). |
 | `<alias>.genesis.json` | The JCS bytes of the Genesis Document (did:btcr2 only) | `0644` | Put it in IPFS as a raw block. See [the CLI reference](cli.md#didpkg-id-create-didbtcr2). |
 | `<alias>.sidecar.json` | The Sidecar Data with the Genesis Document (did:btcr2 only) | `0644` | Keep it. `didpkg publish --to dir:` writes a copy to the folder. See [did:btcr2](#didbtcr2). |
 
