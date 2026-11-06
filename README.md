@@ -1,6 +1,13 @@
 # didpkg
 
-didpkg is a package manager with the DID (Decentralized Identifier) of the publisher as the root of trust. The publisher signs each release with a key from its DID document. The DWN (Decentralized Web Node) of the publisher is the registry. Static HTTPS mirrors hold the same signed bytes. Users install with plain npm, pnpm or bun, through a local shim that verifies each package before npm gets it.
+didpkg is a package manager with the DID (Decentralized Identifier) of the publisher as the root of trust. The idea is simple: put a DWN (Decentralized Web Node) in your DID document, then publish your packages to it. The DWN is your registry.
+
+```text
+publisher:  didpkg publish --to dwn  ->  the DWN in the DID document
+user:       npm install  ->  didpkg shim  ->  resolve the DID, read the DWN, verify
+```
+
+The publisher signs each release with a key from its DID document. Users install with plain npm, pnpm or bun, through a local shim on their computer. The shim verifies each package before npm gets it.
 
 didpkg is experimental. Do not use it for production packages.
 
@@ -33,7 +40,7 @@ echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
 npm install @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
-The install name holds the package name, the identifier kind (`did` or `xid`) and the identifier. A DID name also holds the DID method. The demo has the package `hello` from 6 publishers:
+The install name holds the package name, the identifier kind (`did` or `xid`) and the identifier. A DID name also holds the DID method. The demo has the package `hello` from 6 publishers. Each publisher has the demo DWN `https://dwn.didpkg.dev` in its DID document (or XID document), and the shim reads `hello` from that DWN:
 
 | Identifier | Install name |
 |---|---|
@@ -47,6 +54,19 @@ The install name holds the package name, the identifier kind (`did` or `xid`) an
 A XID name has no host. Thus the shim needs a XID resolver for it: start it with `didpkg shim start --xid-resolver https://nonni.org/pkgs/xid/`.
 
 The [quickstart](docs/quickstart.md) gives each step and the HTTP errors. For one install with no shim, `didpkg drl` prints a verified tarball URL ([one-off install](docs/quickstart.md#one-off-install-with-no-shim)).
+
+## Publish
+
+Make a did:dht DID with a DWN service, register it on the DWN, then publish to the DWN:
+
+```sh
+didpkg id create main --dwn https://dwn.didpkg.dev
+didpkg id register main
+npm pack
+didpkg publish main hello-1.0.0.tgz --to dwn
+```
+
+The output gives the install name. A static HTTPS mirror is an optional backup copy of the same signed bytes. [Publish a package](docs/publish.md) gives each step, the other DID methods, XIDs and the backup mirror.
 
 ## Documentation
 
@@ -110,14 +130,16 @@ The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dw
 npm run stack
 ```
 
-The live demo has 6 publishers. Each publisher publishes `hello@1.0.0`:
+The live demo has 6 publishers. Each publisher publishes `hello@1.0.0` to the demo DWN `dwn.didpkg.dev`. Each publisher also writes a backup copy to a static mirror:
 
-- `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` publishes to `dwn.didpkg.dev` and to a mirror on GitHub Pages ([bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo)).
-- `did:web:bnonni.github.io:didpkg-demo` publishes to `dwn.didpkg.dev` and to the `web/` folder of the same mirror.
-- `did:webvh:QmYpG6W1WsQVeXs8eJ2z4NMAaRFr4EkUe3vyKJMMdHxUiJ:nonni.org:pkgs` publishes to `dwn.didpkg.dev` and to a static mirror at `https://nonni.org/pkgs/`.
-- `did:plc:cpvwafp2z4zqaidjkhyugj3p` publishes to `dwn.didpkg.dev` and to a static mirror at `https://nonni.org/pkgs/plc/`.
-- `did:btcr2:x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l` publishes to `dwn.didpkg.dev` and to a static mirror at `https://nonni.org/pkgs/btcr2/`. Its genesis document is a raw block in IPFS.
-- The XID `816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967` publishes to `dwn.didpkg.dev` and to a static mirror at `https://nonni.org/pkgs/xid/`. The mirror also holds its XID document.
+| Publisher | Backup mirror |
+|---|---|
+| `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy` | The root of [bnonni/didpkg-demo](https://github.com/bnonni/didpkg-demo) on GitHub Pages |
+| `did:web:bnonni.github.io:didpkg-demo` | The `web/` folder of the same mirror |
+| `did:webvh:QmYpG6W1WsQVeXs8eJ2z4NMAaRFr4EkUe3vyKJMMdHxUiJ:nonni.org:pkgs` | `https://nonni.org/pkgs/` |
+| `did:plc:cpvwafp2z4zqaidjkhyugj3p` | `https://nonni.org/pkgs/plc/` |
+| `did:btcr2:x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l` | `https://nonni.org/pkgs/btcr2/`. The genesis document is a raw block in IPFS. |
+| The XID `816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967` | `https://nonni.org/pkgs/xid/`. The mirror also holds the XID document, because the DWN does not hold it. |
 
 This command starts a shim with the public Pkarr relays. Then it installs the 6 packages with npm, pnpm and bun:
 

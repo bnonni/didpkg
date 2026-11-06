@@ -1,6 +1,6 @@
 # Quickstart
 
-This guide installs the didpkg CLI, starts the shim and installs a demo package by its DID. It takes about 5 minutes.
+This guide installs the didpkg CLI, starts the shim and installs a demo package by its DID. The shim reads the package from the DWN (Decentralized Web Node) in the DID document of the publisher. It takes about 5 minutes.
 
 ## Before you start
 
@@ -81,7 +81,7 @@ npm install @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6
 node -e "console.log(require('@didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy'))"
 ```
 
-The second command prints `hello from didpkg`. The publisher of this package is `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy`. The same package from a did:web publisher is:
+The second command prints `hello from didpkg`. The publisher of this package is `did:dht:eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy`. The shim resolves the DID, finds the DWN service `#dwn` in the DID document and reads the package from `https://dwn.didpkg.dev`. If the DWN is down, the shim reads the backup mirror of the publisher. The same package from a did:web publisher is:
 
 ```sh
 npm install @didpkg/hello_did_web_bnonni.github.io_didpkg-demo
@@ -136,7 +136,7 @@ didpkg drl @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6s
 Install from the `url` value. The URL has `&`, so put it in single quotes:
 
 ```sh
-npm install 
+npm install '<url>'
 ```
 
 `pnpm add` and `bun add` take the same URL. The trade-off:

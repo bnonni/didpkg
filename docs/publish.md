@@ -1,6 +1,12 @@
 # Publish a package
 
-This guide makes a publisher DID, signs an npm package with its key and writes the package to storage. It takes about 15 minutes. For the parts and the checks at install, read [How didpkg works](how-it-works.md).
+This guide makes a publisher DID with a DWN (Decentralized Web Node) in its DID document. Then it signs an npm package with a key of the DID and publishes the package to the DWN. The DWN is your registry. It takes about 15 minutes. For the parts and the checks at install, read [How didpkg works](how-it-works.md).
+
+```text
+didpkg id create  ->  a DID document with the release key #didpkg-1 and the DWN service #dwn
+didpkg publish    ->  the signed release and the tarball, in the DWN
+npm install       ->  the shim resolves the DID, reads the DWN and verifies the package
+```
 
 ## Before you start
 
@@ -8,13 +14,14 @@ You must have:
 
 - The didpkg CLI. See [Quickstart](quickstart.md), step 1.
 - A package folder with a `package.json` file. The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. A scope (`@me/lib`) and `_` are not permitted.
-- Storage for the package, one or both of these:
-  - A static HTTPS site that you control, for example a GitHub Pages repository. This is the mirror.
-  - A DWN that accepts writes from your DID. The demo DWN `https://dwn.didpkg.dev` accepts each DID that registers there (step 5). To run your own DWN, read [Deploy a DWN](deploy.md).
+- A DWN that accepts writes from your DID. The demo DWN `https://dwn.didpkg.dev` accepts each DID that registers there (step 5). To run your own DWN, read [Deploy a DWN](deploy.md).
 
-A DWN is optional. With only a mirror, the shim reads each package from the mirror.
+A static HTTPS mirror is optional. It is a backup copy of the same signed bytes. See [Optional backup mirror](#optional-backup-mirror).
 
 ## 1. Select a DID method
+
+Each DID method that `didpkg id create` makes can have a DWN service. If you do not know which method to use, use did:dht. It needs no host and no DNS name. The steps of this guide use did:dht.
+
 
 | | did:dht | did:web |
 |---|---|---|
@@ -48,11 +55,11 @@ The alias is the local name of the identity. It has 1 to 63 characters of `a-z`,
 ### did:dht
 
 ```sh
-didpkg id create main --dwn https://dwn.example.com --repo https://me.github.io/pkgs/
+didpkg id create main --dwn https://dwn.didpkg.dev
 ```
 
-1. `--dwn <url>` adds the DWN service `#dwn`. Use it one time, or not at all.
-2. `--repo <url>` adds a mirror URL to the service `#pkg`. Give it one time for each mirror.
+1. `--dwn <url>` adds the DWN service `#dwn`. Use it one time.
+2. `--repo <url>` (optional) adds a backup mirror URL to the service `#pkg`. Give it one time for each mirror. See [Optional backup mirror](#optional-backup-mirror).
 3. `--relay <url>` sets the Pkarr relays. The default relays are `https://relay.pkarr.org` and `https://pkarr.pubky.org`.
 
 The command writes the 2 key files first. Then it sends the DID record to the relays and installs the didpkg protocol on the DWN. It prints the DID and the file paths as JSON.
@@ -66,7 +73,7 @@ The DID record must have 1000 bytes or less. Each `--repo` and `--dwn` URL makes
 ### did:web
 
 ```sh
-didpkg id create web --web me.github.io:pkgs --repo https://me.github.io/pkgs/
+didpkg id create web --web me.github.io:pkgs --dwn https://dwn.didpkg.dev
 ```
 
 The command does no network write. It prints the URL of the DID document on stderr and in the JSON field `documentUrl`:
@@ -88,12 +95,12 @@ The host must be in lowercase. The site must use HTTPS. If you change the hosted
 ### did:btcr2
 
 ```sh
-didpkg id create btc --btcr2 bitcoin --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/btcr2/
+didpkg id create btc --btcr2 bitcoin --dwn https://dwn.didpkg.dev
 ```
 
 The command does no network write and makes no Bitcoin transaction. With `--dwn <url>`, the Genesis Document gets the DWN service `#dwn`. The DWN must resolve did:btcr2 (the didpkg DWN image does), and it gets the Genesis Document only from IPFS (method 2). Without `--dwn`, publish with `--to dir:<path>` only. The DID is the hash of a Genesis Document. A resolver must have this document. Use one of these methods to give it:
 
-1. Sidecar Data. `didpkg publish --to dir:<path>` writes the file `<id>.sidecar.json` to the root of the folder. `<id>` is the DID without `did:btcr2:`. Push the folder (step 7). Each user of the package must start the shim with `--sidecar <URL of the folder>`, or put the URL in the `sidecar` list of the [config file](cli.md#config-file).
+1. Sidecar Data. `didpkg publish --to dir:<path>` writes the file `<id>.sidecar.json` to the root of the folder. `<id>` is the DID without `did:btcr2:`. Push the folder to the mirror site (see [Optional backup mirror](#optional-backup-mirror)). Each user of the package must start the shim with `--sidecar <URL of the folder>`, or put the URL in the `sidecar` list of the [config file](cli.md#config-file).
 2. CAS (IPFS). Put the file `btc.genesis.json` in IPFS as a raw block, and keep it pinned. The shim gets the block through an IPFS gateway (default: `trustless-gateway.link`, then `ipfs.didpkg.dev`). With Kubo:
 
 ```sh
@@ -107,10 +114,6 @@ curl -sf -H 'Accept: application/vnd.ipld.raw' 'https://trustless-gateway.link/i
 ```
 
 The hash must be the SHA-256 of the genesis file. The did:btcr2 specification recommends one method for the life of the DID.
-
-### One mirror for each publisher
-
-Each publisher must have its own mirror URL, because the mirror path has no DID in it. If 2 publishers write to one URL, the second publish of the same version fails with `a different file exists`. For an example, see [didpkg-demo](https://github.com/bnonni/didpkg-demo): its root is the mirror of a did:dht publisher, and `web/` is the mirror of a did:web publisher.
 
 ## 4. Keep the key files safe
 
@@ -140,7 +143,7 @@ didpkg id register main
 
 If the identity has no `#dwn` service, add `--dwn <url>`. For all options, read [CLI reference](cli.md#didpkg-id-register).
 
-If the operator changes the terms, the DWN refuses your writes and the reads of your packages: `401 Agreed terms-of-service is outdated`. Run `didpkg id register main` again. Until then, the shim reads your packages from the mirror.
+If the operator changes the terms, the DWN refuses your writes and the reads of your packages: `401 Agreed terms-of-service is outdated`. Run `didpkg id register main` again. Until then, the shim reads your packages only from a backup mirror, if you have one.
 
 A DWN with a tenant allowlist and no registration accepts only the DIDs that its operator adds. Give the `did` value of `didpkg id show main` to the operator.
 
@@ -150,11 +153,11 @@ For did:web, host `did.json` before the publish, because the DWN resolves the DI
 
 ```sh
 npm pack
-didpkg publish main hello-1.0.0.tgz --to dwn --to dir:../pkgs
+didpkg publish main hello-1.0.0.tgz --to dwn
 ```
 
 1. `--to dwn` writes to each DWN in the `#dwn` service of the identity.
-2. `--to dir:<path>` writes the mirror files to a local folder. Give `--to` one time for each target.
+2. `--to dir:<path>` (optional) writes the files of a backup mirror to a local folder. See [Optional backup mirror](#optional-backup-mirror). Give `--to` one time for each target.
 3. `--relay <url>` sets the Pkarr relays for a did:dht identity.
 
 The command does these steps:
@@ -176,7 +179,7 @@ The output is JSON:
   "release": "sha256-adMqTpthgOM5QTg3UJsm7evplCFRKSemqfh3zfeh6nM=",
   "sequence": 1,
   "relays": [],
-  "targets": [{ "url": "dir:../pkgs", "ok": true }]
+  "targets": [{ "url": "https://dwn.didpkg.dev", "ok": true }]
 }
 ```
 
@@ -188,9 +191,33 @@ A published version does not change:
 - A different tarball with the same version fails with `hello@1.0.0 is published with a different tarball`. Increase the version.
 - A version with build metadata, for example `1.0.1+build.5`, fails. SemVer ignores build metadata, so `1.0.1+a` and `1.0.1+b` are one version.
 
-## 7. Push the mirror
+## 7. Check the install
 
-The folder target gets 3 files for each package:
+Use the `installName` from step 6 in [Quickstart](quickstart.md), steps 2 to 4:
+
+```sh
+npm install @didpkg/hello_did_web_me.github.io_pkgs
+```
+
+## Optional backup mirror
+
+A mirror is a static HTTPS site that holds a backup copy of the same signed bytes as the DWN. The shim reads the DWN and each mirror. If the DWN is down, the shim installs from a mirror. A mirror is not necessary, except for a [XID publisher](#a-xid-publisher).
+
+1. Add the mirror URL to the DID document with `--repo <url>` at `id create`. For did:dht, each URL makes the DID record larger (step 3).
+
+   ```sh
+   didpkg id create main --dwn https://dwn.didpkg.dev --repo https://pkgs.example.com/
+   ```
+
+2. Publish to the DWN and to a local folder:
+
+   ```sh
+   didpkg publish main hello-1.0.0.tgz --to dwn --to dir:../pkgs
+   ```
+
+3. Push the folder to the site at the `--repo` URL. Do not edit the files: the signatures cover them. On GitHub Pages, add an empty `.nojekyll` file to the root of the site.
+
+The folder gets 3 files for each package:
 
 ```text
 hello/index.json      the signed index
@@ -200,15 +227,9 @@ hello/1.0.0.tgz       the tarball
 
 A did:btcr2 publisher also gets the file `<id>.sidecar.json` in the root of the folder. Each publish writes it again.
 
-Push the folder to the site at the `--repo` URL. Do not edit the files: the signatures cover them. On GitHub Pages, add an empty `.nojekyll` file to the root of the site.
+Each publisher must have its own mirror URL, because the mirror path has no DID in it. If 2 publishers write to one URL, the second publish of the same version fails with `a different file exists`. For an example, see [didpkg-demo](https://github.com/bnonni/didpkg-demo): its root is the mirror of a did:dht publisher, and `web/` is the mirror of a did:web publisher.
 
-## 8. Check the install
-
-Use the `installName` from step 6 in [Quickstart](quickstart.md), steps 2 to 4:
-
-```sh
-npm install @didpkg/hello_did_web_me.github.io_pkgs
-```
+You can also publish to a mirror with no DWN. Make the identity with `--repo` and no `--dwn`, then publish with `--to dir:<path>` only.
 
 ## A XID publisher
 

@@ -1,6 +1,6 @@
 # How didpkg works
 
-didpkg puts the trust in the DID of the publisher, not in the registry. The publisher signs each release with a key from its DID document. The storage only moves bytes. The shim on your computer checks each signature and each digest before npm gets a package.
+didpkg puts the trust in the DID of the publisher, not in the registry. The publisher puts a DWN (Decentralized Web Node) in its DID document and publishes each package to it. The publisher signs each release with a key from its DID document. The DWN and each backup mirror only move bytes. The shim on your computer checks each signature and each digest before npm gets a package.
 
 ## Identifier kinds
 
@@ -28,8 +28,8 @@ The parts below are the same for the 2 kinds, with these differences for a XID p
 
 The storage endpoints are of 2 kinds:
 
-- A DWN (Decentralized Web Node) of the publisher, with the didpkg protocol v1. Example: `https://dwn.didpkg.dev`.
-- A static HTTPS mirror with the layout `<name>/index.json`, `<name>/<version>.json` and `<name>/<version>.tgz`. Example: a GitHub Pages site.
+- The DWN of the publisher, with the didpkg protocol v1. This is the registry of the publisher. Example: `https://dwn.didpkg.dev`.
+- An optional static HTTPS mirror, as a backup copy. Its layout is `<name>/index.json`, `<name>/<version>.json` and `<name>/<version>.tgz`. Example: a GitHub Pages site.
 
 Each endpoint holds the same signed bytes. Thus one endpoint can stop, and the install still works from the other endpoints.
 
@@ -40,7 +40,7 @@ sequenceDiagram
   participant npm as npm, pnpm or bun
   participant shim as didpkg shim (127.0.0.1)
   participant did as DID method (DHT or HTTPS host)
-  participant store as DWN and mirrors
+  participant store as DWN (and backup mirrors)
   npm->>shim: GET the packument of the install name
   shim->>did: resolve the DID
   did-->>shim: DID document (keys, endpoints)
