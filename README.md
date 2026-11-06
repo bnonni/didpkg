@@ -40,7 +40,7 @@ echo '@didpkg:registry=http://127.0.0.1:2092/' >> .npmrc
 npm install @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy
 ```
 
-The install name holds the package name, the identifier kind (`did` or `xid`) and the identifier. A DID name also holds the DID method. The demo has the package `hello` from 6 publishers. Each publisher has the demo DWN `https://dwn.didpkg.dev` in its DID document (or XID document), and the shim reads `hello` from that DWN:
+The install name holds the package name, the identifier kind (`did` or `xid`) and the identifier. A DID name also holds the DID method. The demo has the package `hello` from 8 publishers. The shim reads each `hello` package from the demo DWN `https://dwn.didpkg.dev`:
 
 | Identifier | Install name |
 |---|---|
@@ -49,9 +49,15 @@ The install name holds the package name, the identifier kind (`did` or `xid`) an
 | did:webvh | `@didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs` |
 | did:plc | `@didpkg/hello_did_plc_cpvwafp2z4zqaidjkhyugj3p` |
 | did:btcr2 | `@didpkg/hello_did_btcr2_x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l` |
+| did:key | `@didpkg/hello_did_key.jipdria6_z6mkpxedd7bxksn37prfsajv7c6iu3kmg8geeovmjwp2ujry` |
+| did:jwk | `@didpkg/hello_did_jwk.ek76dcyo6iflyzmfqpe_eyjjcnyioijfzdi1nte5iiwia3r5ijoit0tqiiwieci6iknkzgowvkwxanvtrnbpvg03mwpyduntbfdyx2cxbjy5dunzd1l5a2hruwmifq` |
 | XID | `@didpkg/hello_xid_816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967` |
 
-A XID name has no host. Thus the shim needs a XID resolver for it: start it with `didpkg shim start --xid-resolver https://nonni.org/pkgs/xid/`.
+6 publishers have the demo DWN in the DID document (or XID document). A did:key or did:jwk document has no services. Thus the shim needs the DWN as an option for these names. A XID name has no host. Thus the shim needs a XID resolver for it. For all 8 names, start the shim with the two options:
+
+```sh
+didpkg shim start --dwn https://dwn.didpkg.dev --xid-resolver https://nonni.org/pkgs/xid/
+```
 
 The [quickstart](docs/quickstart.md) gives each step and the HTTP errors. For one install with no shim, `didpkg drl` prints a verified tarball URL ([one-off install](docs/quickstart.md#one-off-install-with-no-shim)).
 
@@ -130,7 +136,7 @@ The demo DWN (`dwn.didpkg.dev`) runs from the files in `deploy/`: the pinned `dw
 npm run stack
 ```
 
-The live demo has 6 publishers. Each publisher publishes `hello@1.0.0` to the demo DWN `dwn.didpkg.dev`. Each publisher also writes a backup copy to a static mirror:
+The live demo has 8 publishers. Each publisher publishes `hello@1.0.0` to the demo DWN `dwn.didpkg.dev`. 6 publishers also write a backup copy to a static mirror:
 
 | Publisher | Backup mirror |
 |---|---|
@@ -141,10 +147,12 @@ The live demo has 6 publishers. Each publisher publishes `hello@1.0.0` to the de
 | `did:btcr2:x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l` | `https://nonni.org/pkgs/btcr2/`. The genesis document is a raw block in IPFS. |
 | The XID `816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967` | `https://nonni.org/pkgs/xid/`. The mirror also holds the XID document, because the DWN does not hold it. |
 
-This command starts a shim with the public Pkarr relays. Then it installs the 6 packages with npm, pnpm and bun:
+The did:key and did:jwk publishers have no mirror, because their DID documents have no services.
+
+This command starts a shim with the public Pkarr relays. Then it installs the 8 packages with npm, pnpm and bun:
 
 ```sh
-npm run live -- --xid-resolver https://nonni.org/pkgs/xid/ @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_did_web_nonni.org_pkgs_web @didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_did_plc_cpvwafp2z4zqaidjkhyugj3p @didpkg/hello_did_btcr2_x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l @didpkg/hello_xid_816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967
+npm run live -- --dwn https://dwn.didpkg.dev --xid-resolver https://nonni.org/pkgs/xid/ @didpkg/hello_did_dht_eszfqrywoegyb5grhitsfrybjnce47y5n8j4ec66bgt9r6skmmwy @didpkg/hello_did_web_nonni.org_pkgs_web @didpkg/hello_did_webvh.v3jo2r5k_qmypg6w1wsqvexs8ej2z4nmaarfr4ekue3vykjmmdhxuij_nonni.org_pkgs @didpkg/hello_did_plc_cpvwafp2z4zqaidjkhyugj3p @didpkg/hello_did_btcr2_x1qzpqymyzalnn0m4mg7llfwjewstugrdyznf8qdmde2png2tua07xvjlqu0l @didpkg/hello_xid_816d5e4543788d2ac68acef158545765a5da81caf6e68ad807e73c5b163a9967 @didpkg/hello_did_key.jipdria6_z6mkpxedd7bxksn37prfsajv7c6iu3kmg8geeovmjwp2ujry @didpkg/hello_did_jwk.ek76dcyo6iflyzmfqpe_eyjjcnyioijfzdi1nte5iiwia3r5ijoit0tqiiwieci6iknkzgowvkwxanvtrnbpvg03mwpyduntbfdyx2cxbjy5dunzd1l5a2hruwmifq
 ```
 
 ## Old drpm code
