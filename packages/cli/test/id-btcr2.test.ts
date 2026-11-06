@@ -1,14 +1,16 @@
 // `didpkg id create --btcr2` and a did:btcr2 publish to a folder. The create makes no network request. A stub Esplora API
 // shows no beacon signal, and a stub IPFS gateway serves the genesis file as a raw block.
 import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getNetwork, type NetworkName } from '@did-btcr2/bitcoin';
 import { DidBtcr2, Identifier } from '@did-btcr2/method';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { Address, OutScript, Transaction } from '@scure/btc-signer';
 import canonicalize from 'canonicalize';
 import { DidResolver, type DidDocument } from '@didpkg/core/did';
 import { storageEndpoints } from '@didpkg/core/source';
@@ -364,5 +366,164 @@ describe('the CLI', () => {
       expect(r.err).toContain(error);
       expect(existsSync(idPaths(alias, env).identity)).toBe(false);
     }
+  });
+});
+
+/** The bytes of a transaction that pays `value` sat to `script`. Its txid is the reversed double SHA-256 of the bytes. */
+function fundingTx(script: Uint8Array, value: number): { hex: string; txid: string } {
+  const le = (n: bigint, size: number) => Uint8Array.from({ length: size }, (_, i) => Number((n >> BigInt(8 * i)) & 0xffn));
+  const raw = Uint8Array.from([
+    ...le(2n, 4), 1, ...new Uint8Array(32).fill(0x11), ...le(0n, 4), 0, ...le(0xffffffffn, 4),
+    1, ...le(BigInt(value), 8), script.length, ...script, ...le(0n, 4),
+  ]);
+  return { hex: bytesToHex(raw), txid: bytesToHex(sha256(sha256(raw)).reverse()) };
+}
+
+/**
+ * A loopback stub of an Esplora API and an IPFS gateway with the `blocks` (CID to bytes). The beacon address has one
+ * confirmed UTXO of 5,000 sat. POST /tx keeps the transaction. After confirm(), the transaction is in a block, with
+ * more than 6 confirmations.
+ */
+function stubServer(beacon: string, network: NetworkName) {
+  const blocks: Record<string, Uint8Array> = {};
+  const posted: Transaction[] = [];
+  const script = OutScript.encode(Address(getNetwork(network)).decode(beacon));
+  const funding = fundingTx(script, 5000);
+  let confirmed = false;
+  const block = { block_height: 149_000, block_hash: '00'.repeat(4) + '33'.repeat(28), block_time: 1_789_000_000 };
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch: async (req) => {
+      const path = new URL(req.url).pathname;
+      if (path.startsWith('/ipfs/')) {
+        const b = blocks[path.slice('/ipfs/'.length)];
+        return b ? new Response(b as Uint8Array<ArrayBuffer>) : new Response('not found', { status: 404 });
+      }
+      if (path === '/tx' && req.method === 'POST') {
+        const tx = Transaction.fromRaw(hexToBytes(await req.text()), { allowUnknownOutputs: true });
+        posted.push(tx);
+        return new Response(tx.id);
+      }
+      if (path === '/blocks/tip/height') return new Response('150000');
+      if (path === `/address/${beacon}/utxo`) {
+        return Response.json(posted.length ? [] : [{ txid: funding.txid, vout: 0, value: 5000, status: { confirmed: true, ...block } }]);
+      }
+      if (path === `/tx/${funding.txid}/hex`) return new Response(funding.hex);
+      if (posted.some((tx) => path === `/tx/${tx.id}`)) return Response.json({ txid: path.slice(4), status: { confirmed } });
+      if (path.startsWith(`/address/${beacon}/txs/chain`)) {
+        return Response.json(!confirmed ? [] : posted.map((tx) => ({
+          txid: tx.id,
+          status: { confirmed: true, ...block },
+          vin: [{ txid: funding.txid, vout: 0, prevout: { scriptpubkey_address: beacon } }],
+          vout: Array.from({ length: tx.outputsLength }, (_, i) => ({ scriptpubkey: bytesToHex(tx.getOutput(i).script!), value: Number(tx.getOutput(i).amount) })),
+        })));
+      }
+      if (path.startsWith('/block/')) return Response.json({ id: path.split('/').at(-1), height: 149_000, mediantime: 1_788_999_000 });
+      return new Response('not found', { status: 404 });
+    },
+  });
+  return { url: `http://127.0.0.1:${server.port}`, blocks, posted, script, funding, confirm: () => { confirmed = true; }, stop: () => server.stop(true) };
+}
+
+describe('id broadcast of a did:btcr2 identity', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'didpkg-id-broadcast-'));
+  const benv = { DIDPKG_HOME: home };
+  const NEW_REPOS = ['https://pkgs.example.net/btcr2/'];
+  const created = await createBtcr2({ alias: 'bc', network: 'testnet4', dwn: DWN, repos: REPOS, passphrase: PASS, updatePassphrase: UPDATE_PASS, env: benv, iterations: 1000 });
+  const paths = idPaths('bc', benv);
+  const beacon = String(readIdentity(paths).document.service![0]!.serviceEndpoint).slice('bitcoin:'.length);
+  const stub = stubServer(beacon, 'testnet4');
+  stub.blocks[created.cid] = new Uint8Array(readFileSync(created.files.genesis));
+  writeFileSync(join(home, 'config.json'), JSON.stringify({ esplora: { testnet4: stub.url }, cas: [stub.url] }));
+  const net = { esplora: { testnet4: stub.url }, allowPrivateHosts: true };
+  const r = await updateBtcr2({ alias: 'bc', repos: NEW_REPOS, updatePassphrase: UPDATE_PASS, env: benv, ...net });
+  const pending = () => readIdentity(paths).btcr2!.pending;
+  const run = async (args: string[], extra: Record<string, string> = {}) => {
+    const p = Bun.spawn([process.execPath, cli, ...args], {
+      env: { PATH: process.env.PATH!, ...benv, ...extra }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe',
+    });
+    const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+    return { code, out, err };
+  };
+  const keys = { DIDPKG_UPDATE_PASSPHRASE: UPDATE_PASS };
+  afterAll(() => {
+    stub.stop();
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  test('with no update block in IPFS, the broadcast refuses and sends nothing', async () => {
+    const b = await run(['id', 'broadcast', 'bc', '--allow-loopback'], keys);
+    expect(b.code).toBe(1);
+    expect(b.err).toContain(`no IPFS gateway gives ${r.cid}: nothing is sent`);
+    expect(b.err).toContain(`  ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ${r.files.update}`);
+    expect(b.err).not.toContain(created.cid);
+    expect(stub.posted).toEqual([]);
+    expect(pending()!.txid).toBeUndefined();
+  });
+
+  test('the transaction spends the beacon UTXO, has 1 OP_RETURN with the signal, and the change goes to the beacon address', async () => {
+    stub.blocks[r.cid] = new Uint8Array(readFileSync(r.files.update));
+    const b = await run(['id', 'broadcast', 'bc', '--allow-loopback', '--fee-rate', '2'], keys);
+    expect([b.code, b.err]).toEqual([0, expect.stringContaining('Sent the Beacon Signal')]);
+    const out = JSON.parse(b.out);
+    expect(out).toMatchObject({ did: r.did, versionId: 2, cid: r.cid, signal: r.signal, beacon, state: 'sent' });
+    expect(stub.posted.length).toBe(1);
+    const tx = stub.posted[0]!;
+    expect(tx.id).toBe(out.txid);
+    expect(tx.inputsLength).toBe(1);
+    expect([bytesToHex(tx.getInput(0).txid!), tx.getInput(0).index]).toEqual([stub.funding.txid, 0]);
+    const outputs = Array.from({ length: tx.outputsLength }, (_, i) => tx.getOutput(i));
+    expect(outputs.filter((o) => o.script![0] === 0x6a).map((o) => [bytesToHex(o.script!), o.amount])).toEqual([[`6a20${r.signal}`, 0n]]);
+    const change = outputs.filter((o) => o.script![0] !== 0x6a);
+    expect(change.map((o) => bytesToHex(o.script!))).toEqual([bytesToHex(stub.script)]);
+    const fee = 5000 - Number(change[0]!.amount);
+    expect(fee >= 2 * 100 && fee <= 2 * 200).toBe(true);
+    expect(pending()!.txid).toBe(out.txid);
+  });
+
+  test('while Esplora has the transaction, a broadcast needs no passphrase and sends nothing; id update refuses', async () => {
+    const b = await run(['id', 'broadcast', 'bc', '--allow-loopback']);
+    expect([b.code, JSON.parse(b.out).state, JSON.parse(b.out).txid]).toEqual([0, 'waiting', pending()!.txid]);
+    expect(stub.posted.length).toBe(1);
+    await expect(updateBtcr2({ alias: 'bc', dwn: 'https://dwn2.example.com', updatePassphrase: UPDATE_PASS, env: benv, ...net }))
+      .rejects.toThrow(`resolvers do not show the transaction ${pending()!.txid} of the update to version 2 yet`);
+    const show = JSON.parse((await run(['id', 'show', 'bc'])).out);
+    expect(show.btcr2).toEqual({ network: 'testnet4', beacon, pending: { versionId: 2, cid: r.cid, txid: pending()!.txid } });
+  });
+
+  test('after 6 confirmations, a clean resolve gives version 2, and the broadcast clears the pending update', async () => {
+    stub.confirm();
+    const resolver = new DidResolver({ drivers: [btcr2Driver({ esplora: { testnet4: stub.url }, cas: [stub.url], allowPrivateHosts: true })] });
+    const clean = await resolver.resolve(r.did);
+    expect(clean.didDocumentMetadata.versionId).toBe('2');
+    expect(clean.didDocument!.service!.find((s) => s.id === `${r.did}#pkg`)!.serviceEndpoint).toEqual(NEW_REPOS);
+    const withPending = readFileSync(paths.identity, 'utf8');
+    const b = await run(['id', 'broadcast', 'bc', '--allow-loopback']);
+    expect([b.code, JSON.parse(b.out).state, b.err]).toEqual([0, 'confirmed', expect.stringContaining('The identity has no pending update now.')]);
+    expect(pending()).toBeUndefined();
+    expect(readIdentity(paths).document).toEqual(clean.didDocument as never);
+    expect(JSON.parse((await run(['id', 'show', 'bc'])).out).btcr2).toEqual({ network: 'testnet4', beacon });
+    const again = await run(['id', 'broadcast', 'bc', '--allow-loopback']);
+    expect([again.code, again.err]).toEqual([1, expect.stringContaining('the identity has no update to send')]);
+    // id update also sees the confirmed update: it clears the pending record, then signs the update to version 3.
+    writeFileSync(paths.identity, withPending, { mode: 0o600 });
+    const next = await updateBtcr2({ alias: 'bc', dwn: 'https://dwn2.example.com', updatePassphrase: UPDATE_PASS, env: benv, ...net });
+    expect([next.versionId, pending()!.versionId, pending()!.txid]).toEqual([3, 3, undefined]);
+    expect(readIdentity(paths).document).toEqual(clean.didDocument as never);
+    expect(stub.posted.length).toBe(1);
+  });
+
+  test('bad options fail before a request', async () => {
+    for (const [args, message] of [
+      [['id', 'broadcast', 'bc', '--fee-rate', '0'], '--fee-rate: 0 is not a number of sat/vB'],
+      [['id', 'broadcast', 'bc', '--fee-rate', '1e3'], '--fee-rate: 1e3 is not a number of sat/vB'],
+      [['id', 'broadcast', 'bc', '--fee-rate', '1', '--fee-rate', '2'], 'use --fee-rate one time'],
+      [['id', 'broadcast'], '"id broadcast" needs 1 argument'],
+    ] as const) {
+      const b = await run([...args]);
+      expect([b.code, b.err]).toEqual([1, expect.stringContaining(message)]);
+    }
+    expect(stub.posted.length).toBe(1);
   });
 });

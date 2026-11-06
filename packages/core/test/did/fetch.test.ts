@@ -57,6 +57,22 @@ test('fetchBytes follows a redirect on the same host only', async () => {
   expect(calls).not.toContain('https://b.example/x');
 });
 
+test('fetchBytes with post sends the body and its type, and does not follow a redirect', async () => {
+  const seen: RequestInit[] = [];
+  const { fetch, calls } = fakeFetch({
+    'https://a.example/tx': ({ init }) => (seen.push(init), new Response('txid', { headers: { 'content-type': 'text/plain' } })),
+    'https://a.example/moved': new Response(null, { status: 307, headers: { location: '/tx' } }),
+  });
+  const post = { body: '0200', contentType: 'text/plain' };
+  const r = await fetchBytes('https://a.example/tx', { fetch, post });
+  expect([r.status, r.contentType, new TextDecoder().decode(r.body)]).toEqual([200, 'text/plain', 'txid']);
+  expect([seen[0]!.method, seen[0]!.body, seen[0]!.headers]).toEqual(['POST', '0200', { 'content-type': 'text/plain' }]);
+  const moved = await reason(fetchBytes('https://a.example/moved', { fetch, post }));
+  expect([moved.message.includes('a POST does not follow a redirect'), moved.transient]).toEqual([true, false]);
+  expect(calls).toEqual(['https://a.example/tx', 'https://a.example/moved']);
+  expect((await reason(fetchBytes('http://a.example/tx', { fetch, post }))).message).toContain('only https');
+});
+
 test('fetchBytes stops at the size limit', async () => {
   const big = new Uint8Array(MAX_RESPONSE_BYTES + 1);
   const stream = () => new Response(new ReadableStream({ start(c) { c.enqueue(big.subarray(0, 1000)); c.enqueue(big); c.close(); } }));

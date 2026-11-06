@@ -1,7 +1,8 @@
 // The identity files in `<config>/ids/`. Each file has mode 0600, and the folder has mode 0700.
 //   <alias>.json             the public data and the encrypted release key #didpkg-1. `didpkg publish` reads only this file.
 //   <alias>.update-key.json  the encrypted DID update key (#0 for did:dht, a did:key for did:webvh, the secp256k1 rotation
-//                            key for did:plc, the secp256k1 #initialKey for did:btcr2). Move it offline. Only `didpkg id update` reads it.
+//                            key for did:plc, the secp256k1 #initialKey for did:btcr2). Move it offline. Only `didpkg id update`
+//                            and `didpkg id broadcast` (did:btcr2) read it.
 //   <alias>.did.json         the did.json to host (mode 0644): the did:web document, or the parallel did:web document of did:webvh.
 //   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
 //   <alias>.sidecar.json     the Sidecar Data with the Genesis Document (did:btcr2 only, mode 0644).
@@ -40,11 +41,12 @@ export interface Identity {
    * The network and the Genesis Document. A resolver needs the Genesis Document of an x1 DID. did:btcr2 only.
    * `pending` is the signed update that Bitcoin does not show yet. Its Beacon Signal (the SHA-256 of `update`) must be the
    * only signal to `versionId`: two different updates to one version make the DID invalid (LATE_PUBLISHING).
+   * `txid` is the last Bitcoin transaction with that signal.
    */
   btcr2?: {
     network: string;
     genesisDocument: Record<string, unknown>;
-    pending?: { versionId: number; cid: string; update: Record<string, unknown> };
+    pending?: { versionId: number; cid: string; update: Record<string, unknown>; txid?: string };
   };
   /** The DWN URLs. The DID document has no services, so a consumer gives one of them to the shim. did:key and did:jwk only. */
   dwn?: string[];

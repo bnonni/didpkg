@@ -8,7 +8,7 @@ import { xidFromUr } from '@didpkg/core/xid';
 import { xidEndpoints } from '@didpkg/core/source';
 import { readConfig } from './config.ts';
 import { drl } from './drl.ts';
-import { createBtcr2, network, updateBtcr2 } from './id/btcr2.ts';
+import { broadcastBtcr2, createBtcr2, MAX_FEE_RATE, network, showBtcr2, updateBtcr2 } from './id/btcr2.ts';
 import { createDht, endpoint } from './id/dht.ts';
 import { createKey } from './id/key.ts';
 import { passphrase } from './id/passphrase.ts';
@@ -51,6 +51,10 @@ Usage:
                                   For did:webvh: change the services, with a new log entry (no --rotate).
                                   For did:plc: change the services, with an update operation to the directory (no --rotate).
                                   For did:btcr2: change the services, with a signed update to put in IPFS (no --rotate)
+  didpkg id broadcast <alias> [--fee-rate <sat/vB>] [--cas <url>]... [--allow-loopback]
+                                  For did:btcr2: send the Beacon Signal of the signed update in a Bitcoin transaction from
+                                  the beacon address (default fee rate 5 sat/vB). First, an IPFS gateway must give each
+                                  block of the DID. Run it again to see if resolvers show the update
   didpkg id backup <alias> --sskr <m>-of-<n>
                                   Split the private keys of a XID publisher into n SSKR shares (ur:envelope, one a line);
                                   m shares restore them
@@ -321,7 +325,8 @@ async function id(args: string[]): Promise<string> {
         process.stderr.write(
           `A resolver needs the update. Put ${r.files.update} in IPFS as a raw block with the CID ${r.cid}:\n`
           + `  ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ${r.files.update}\n`
-          + `Resolvers show version ${r.versionId} when a Bitcoin transaction with the Beacon Signal ${r.signal} has 6 confirmations.\n`,
+          + `Then send the Beacon Signal ${r.signal} in a Bitcoin transaction: didpkg id broadcast ${r.alias}\n`
+          + `Resolvers show version ${r.versionId} when the transaction has 6 confirmations.\n`,
         );
         return `${JSON.stringify(r, null, 2)}\n`;
       }
@@ -379,6 +384,31 @@ async function id(args: string[]): Promise<string> {
 `);
     return `${JSON.stringify(r, null, 2)}\n`;
   }
+  if (sub === 'broadcast') {
+    const loopback = rest.includes('--allow-loopback');
+    const { positional, values } = options(rest.filter((a) => a !== '--allow-loopback'), ['--fee-rate', '--cas']);
+    if (positional.length !== 1) throw new UsageError(`"id broadcast" needs 1 argument: <alias> (got ${positional.length})`);
+    if (values['--fee-rate']!.length > 1) throw new UsageError('use --fee-rate one time');
+    const rate = values['--fee-rate']![0];
+    if (rate !== undefined && !(/^[0-9]+(\.[0-9]+)?$/.test(rate) && Number(rate) > 0 && Number(rate) <= MAX_FEE_RATE)) {
+      throw new UsageError(`--fee-rate: ${rate} is not a number of sat/vB more than 0 and not more than ${MAX_FEE_RATE}`);
+    }
+    const cas = values['--cas']!.map((u) => endpoint(u, '--cas'));
+    const paths = idPaths(positional[0]!);
+    if (readIdentityFile(paths).format === XID_ID_FORMAT || !readIdentity(paths).btcr2) throw new UsageError('"id broadcast" is for a did:btcr2 identity only');
+    const config = readConfig();
+    const r = await broadcastBtcr2({
+      alias: positional[0]!, feeRate: rate === undefined ? undefined : Number(rate), cas: cas.length ? cas : config.cas,
+      esplora: config.esplora, allowPrivateHosts: loopback,
+      updatePassphrase: () => passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the update key' }),
+    });
+    process.stderr.write({
+      sent: `Sent the Beacon Signal ${r.signal} in the transaction ${r.txid}. Resolvers show version ${r.versionId} when it has 6 confirmations.\n`,
+      waiting: `The transaction ${r.txid} is on the network. Resolvers show version ${r.versionId} when it has 6 confirmations.\n`,
+      confirmed: `Resolvers show version ${r.versionId}. The identity has no pending update now.\n`,
+    }[r.state]);
+    return `${JSON.stringify(r, null, 2)}\n`;
+  }
   if (sub === 'show') {
     if (rest.length !== 1) throw new UsageError(`"id show" needs 1 argument: <alias> (got ${rest.length})`);
     const paths = idPaths(rest[0]!);
@@ -387,11 +417,12 @@ async function id(args: string[]): Promise<string> {
     const out = {
       alias: i.alias, did: i.did, keyId: i.releaseKey.keyId, created: i.created,
       assertionMethod: i.document.assertionMethod, service: i.document.service ?? [], ...(i.dwn ? { dwn: i.dwn } : {}),
+      ...(i.btcr2 ? { btcr2: showBtcr2(i) } : {}),
       files: { identity: paths.identity, updateKey: existsSync(paths.updateKey) ? paths.updateKey : null },
     };
     return `${JSON.stringify(out, null, 2)}\n`;
   }
-  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create, update, backup, restore, register or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
+  throw new UsageError(sub === undefined ? '"id" needs a subcommand: create, update, broadcast, backup, restore, register or show' : `unknown id subcommand ${JSON.stringify(sub)}`);
 }
 
 async function publishCommand(args: string[]): Promise<string> {

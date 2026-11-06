@@ -29,15 +29,19 @@ export interface FetchLimits {
   noStore?: boolean;
   /** The value of the Accept request header. */
   accept?: string;
+  /** Sends a POST with this body in place of a GET. A POST does not follow a redirect. */
+  post?: { body: string; contentType: string };
 }
 
 export interface FetchedBytes {
   status: number;
   url: string;
+  /** The Content-Type response header, if the response has one. */
+  contentType?: string;
   body: Uint8Array;
 }
 
-/** GET a URL with the limits. A 4xx or 5xx status is a return value, not an error. */
+/** GET a URL with the limits (or a POST, with `post`). A 4xx or 5xx status is a return value, not an error. */
 export async function fetchBytes(url: string, limits: FetchLimits = {}): Promise<FetchedBytes> {
   const allowPrivate = !!limits.allowPrivateHosts;
   const timeoutMs = limits.timeoutMs ?? SOURCE_TIMEOUT_MS;
@@ -46,21 +50,27 @@ export async function fetchBytes(url: string, limits: FetchLimits = {}): Promise
   const timeout = Number.isFinite(timeoutMs) ? AbortSignal.timeout(timeoutMs) : undefined;
   const signal = AbortSignal.any([limits.signal, timeout].filter((s) => s !== undefined));
   let current = checkUrl(url, allowPrivate);
+  const headers = {
+    ...(limits.accept && { accept: limits.accept }),
+    ...(limits.post && { 'content-type': limits.post.contentType }),
+  };
 
   for (let hop = 0; ; hop++) {
     const host = current.host;
     try {
       const res = await doFetch(current.href, {
-        method: 'GET',
+        method: limits.post ? 'POST' : 'GET',
         redirect: 'manual',
         signal,
         ...(limits.noStore && { cache: 'no-store' }),
-        ...(limits.accept && { headers: { accept: limits.accept } }),
+        ...(Object.keys(headers).length > 0 && { headers }),
+        ...(limits.post && { body: limits.post.body }),
       });
       if (res.type === 'opaqueredirect') throw new FetchError(`${host}: the redirect target is not readable`, false);
       if (REDIRECTS.has(res.status)) {
         const location = res.headers.get('location');
         await res.body?.cancel();
+        if (limits.post) throw new FetchError(`${host}: HTTP ${res.status}: a POST does not follow a redirect`, false);
         if (!location) throw new FetchError(`${host}: HTTP ${res.status} with no Location`, false);
         const next = checkUrl(new URL(location, current).href, allowPrivate);
         if (next.host !== host || next.protocol !== current.protocol) {
@@ -70,7 +80,8 @@ export async function fetchBytes(url: string, limits: FetchLimits = {}): Promise
         current = next;
         continue;
       }
-      return { status: res.status, url: current.href, body: await readCapped(res, maxBytes, host) };
+      const contentType = res.headers.get('content-type') ?? undefined;
+      return { status: res.status, url: current.href, ...(contentType && { contentType }), body: await readCapped(res, maxBytes, host) };
     } catch (e) {
       if (e instanceof FetchError) throw e;
       if (timeout?.aborted) throw new FetchError(`${host}: no response in ${timeoutMs} ms`, true);
