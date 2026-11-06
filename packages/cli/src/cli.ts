@@ -8,7 +8,7 @@ import { xidFromUr } from '@didpkg/core/xid';
 import { xidEndpoints } from '@didpkg/core/source';
 import { readConfig } from './config.ts';
 import { drl } from './drl.ts';
-import { createBtcr2, network } from './id/btcr2.ts';
+import { createBtcr2, network, updateBtcr2 } from './id/btcr2.ts';
 import { createDht, endpoint } from './id/dht.ts';
 import { createKey } from './id/key.ts';
 import { passphrase } from './id/passphrase.ts';
@@ -49,7 +49,8 @@ Usage:
   didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
                                   Change the keys or the services of a XID publisher, with the next provenance mark.
                                   For did:webvh: change the services, with a new log entry (no --rotate).
-                                  For did:plc: change the services, with an update operation to the directory (no --rotate)
+                                  For did:plc: change the services, with an update operation to the directory (no --rotate).
+                                  For did:btcr2: change the services, with a signed update to put in IPFS (no --rotate)
   didpkg id backup <alias> --sskr <m>-of-<n>
                                   Split the private keys of a XID publisher into n SSKR shares (ur:envelope, one a line);
                                   m shares restore them
@@ -311,6 +312,18 @@ async function id(args: string[]): Promise<string> {
       const identity = readIdentity(paths);
       if (isKeyDid(identity.did)) {
         throw new Error(`a ${identity.did.slice(0, 7)} DID cannot change: make a new identity with "didpkg id create <alias> --key|--jwk --dwn <url>"`);
+      }
+      if (identity.btcr2) {
+        const r = await updateBtcr2({
+          ...change, esplora: readConfig().esplora,
+          updatePassphrase: await passphrase({ env: 'DIDPKG_UPDATE_PASSPHRASE', prompt: 'Passphrase for the update key' }),
+        });
+        process.stderr.write(
+          `A resolver needs the update. Put ${r.files.update} in IPFS as a raw block with the CID ${r.cid}:\n`
+          + `  ipfs block put --cid-codec raw --mhtype sha2-256 --pin=true ${r.files.update}\n`
+          + `Resolvers show version ${r.versionId} when a Bitcoin transaction with the Beacon Signal ${r.signal} has 6 confirmations.\n`,
+        );
+        return `${JSON.stringify(r, null, 2)}\n`;
       }
       if (identity.plc) {
         const r = await updatePlc({

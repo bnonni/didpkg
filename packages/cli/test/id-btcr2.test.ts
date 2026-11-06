@@ -8,13 +8,14 @@ import { fileURLToPath } from 'node:url';
 import { DidBtcr2, Identifier } from '@did-btcr2/method';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import canonicalize from 'canonicalize';
 import { DidResolver, type DidDocument } from '@didpkg/core/did';
 import { storageEndpoints } from '@didpkg/core/source';
-import { btcr2Driver, ESPLORA, sidecarFile } from '@didpkg/core/did/btcr2';
+import { btcr2Driver, casCid, ESPLORA, sidecarFile } from '@didpkg/core/did/btcr2';
 import { toMultikey, verifyProof } from '@didpkg/core/trust';
 import { DirWriter } from '@didpkg/adapter-https/dir';
-import { createBtcr2 } from '../src/id/btcr2.ts';
+import { createBtcr2, updateBtcr2 } from '../src/id/btcr2.ts';
 import { decryptKey } from '../src/id/keyfile.ts';
 import { idPaths, readIdentity } from '../src/id/store.ts';
 import { publish } from '../src/publish/publish.ts';
@@ -31,8 +32,11 @@ const DWN = 'https://dwn.example.com';
 
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
-/** A stub Esplora API with no transaction at an address, and a stub IPFS gateway with the `blocks` (CID to bytes). */
-function stubNetwork(blocks: Record<string, Uint8Array> = {}) {
+/**
+ * A stub Esplora API and a stub IPFS gateway with the `blocks` (CID to bytes). An address has no transaction, but each
+ * Beacon Signal of `signals` is a confirmed transaction at its address, with the signal bytes (hex) in an OP_RETURN output.
+ */
+function stubNetwork(blocks: Record<string, Uint8Array> = {}, signals: { address: string; signal: string }[] = []) {
   const urls: string[] = [];
   const fetch = async (url: string) => {
     urls.push(url);
@@ -42,7 +46,15 @@ function stubNetwork(blocks: Record<string, Uint8Array> = {}) {
       return block ? new Response(block as Uint8Array<ArrayBuffer>) : new Response('not found', { status: 404 });
     }
     if (url.endsWith('/blocks/tip/height')) return new Response('150000');
-    if (u.pathname.includes('/address/') && u.pathname.endsWith('/txs/chain')) return Response.json([]);
+    if (u.pathname.includes('/address/') && u.pathname.endsWith('/txs/chain')) {
+      return Response.json(signals.filter((s) => u.pathname.includes(`/address/${s.address}/`)).map((s, i) => ({
+        txid: `${i + 2}`.repeat(64),
+        status: { confirmed: true, block_height: 149_000, block_hash: '00'.repeat(4) + '33'.repeat(28), block_time: 1_789_000_000 },
+        vin: [{ txid: '11'.repeat(32), vout: 0, prevout: { scriptpubkey_address: s.address } }],
+        vout: [{ scriptpubkey: `6a20${s.signal}`, value: 0 }],
+      })));
+    }
+    if (u.pathname.includes('/block/')) return Response.json({ id: u.pathname.split('/').at(-1), height: 149_000, mediantime: 1_788_999_000 });
     return new Response('not found', { status: 404 });
   };
   return { urls, fetch };
@@ -189,6 +201,116 @@ describe('id create --btcr2', async () => {
   });
 });
 
+describe('id update of a did:btcr2 identity', async () => {
+  const NEW_REPOS = ['https://pkgs.example.net/btcr2/'];
+  const created = await createBtcr2({ alias: 'upd', network: 'testnet4', dwn: DWN, repos: REPOS, passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 });
+  const paths = idPaths('upd', env);
+  const before = readIdentity(paths);
+  const beaconOf = (alias: string) => String(readIdentity(idPaths(alias, env)).document.service![0]!.serviceEndpoint).slice('bitcoin:'.length);
+  const net = stubNetwork();
+  const r = await updateBtcr2({ alias: 'upd', repos: NEW_REPOS, updatePassphrase: UPDATE_PASS, env, fetch: net.fetch });
+  const file = new Uint8Array(readFileSync(r.files.update));
+  const sidecar = JSON.parse(readFileSync(r.files.sidecar, 'utf8'));
+  const signals = [{ address: beaconOf('upd'), signal: r.signal }];
+  const pkg = { id: `${r.did}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: NEW_REPOS };
+  const update = (alias: string, o: Partial<Parameters<typeof updateBtcr2>[0]> = {}) => updateBtcr2({
+    alias, updatePassphrase: UPDATE_PASS, env, fetch: stubNetwork().fetch, ...o,
+  });
+
+  test('the update file is the JCS form of the signed update, and its SHA-256 is the Beacon Signal and the CID', () => {
+    expect(r.versionId).toBe(2);
+    expect(r.files.update).toBe(join(tmp, 'ids', 'upd.update-2.json'));
+    expect(bytesToHex(sha256(file))).toBe(r.signal);
+    expect(r.cid).toBe(casCid(r.signal));
+    expect(new TextDecoder().decode(file)).toBe(canonicalize(sidecar.updates[0])!);
+    expect(statSync(r.files.update).mode & 0o777).toBe(0o644);
+  });
+
+  test('the sidecar file gets the update, and the identity keeps it as the pending update', () => {
+    const identity = readIdentity(paths);
+    expect(sidecar.genesisDocument).toEqual(before.btcr2!.genesisDocument);
+    expect(sidecar.updates).toHaveLength(1);
+    expect(identity.btcr2!.pending).toEqual({ versionId: 2, cid: r.cid, update: sidecar.updates[0] });
+    expect(identity.document).toEqual(before.document);
+    expect([statSync(paths.identity).mode & 0o777, statSync(paths.sidecar).mode & 0o777]).toEqual([0o600, 0o644]);
+    expect(existsSync(`${paths.identity}.tmp`) || existsSync(`${paths.sidecar}.tmp`)).toBe(false);
+  });
+
+  test('the request of the current state goes only to Esplora (CAS off)', () => {
+    expect(net.urls.length).toBeGreaterThan(0);
+    expect(net.urls.every((u) => u.startsWith(ESPLORA.testnet4!))).toBe(true);
+  });
+
+  test('with a Beacon Signal of the update, the core driver resolves version 2 from the sidecar file: a new #pkg, and the beacon and #dwn stay', async () => {
+    const driver = btcr2Driver({ cas: [], fetch: stubNetwork({}, signals).fetch, sidecar: async () => sidecar });
+    const doc = await new DidResolver({ drivers: [driver] }).resolve(r.did);
+    expect(doc.didDocumentMetadata.versionId).toBe('2');
+    expect(doc.didDocument!.service).toEqual([before.document.service![0]!, before.document.service![1]!, pkg]);
+  });
+
+  test('a clean resolve gets the genesis file and the update file from CAS alone, and gives version 2', async () => {
+    const blocks = { [created.cid]: new Uint8Array(readFileSync(created.files.genesis)), [r.cid]: file };
+    const driver = btcr2Driver({ cas: [GATEWAY], fetch: stubNetwork(blocks, signals).fetch });
+    const doc = await new DidResolver({ drivers: [driver] }).resolve(r.did);
+    expect(doc.didDocumentMetadata.versionId).toBe('2');
+    expect(doc.didDocument!.service!.at(-1)).toEqual(pkg);
+  });
+
+  test('with no Beacon Signal, the sidecar file with the update still resolves version 1', async () => {
+    const driver = btcr2Driver({ cas: [], fetch: stubNetwork().fetch, sidecar: async () => sidecar });
+    const doc = await new DidResolver({ drivers: [driver] }).resolve(r.did);
+    expect(doc.didDocumentMetadata.versionId).toBe('1');
+    expect(doc.didDocument as object).toEqual(before.document);
+  });
+
+  test('a second update while one is pending fails before a request, and no file changes', async () => {
+    const files = [paths.identity, paths.sidecar].map((f) => readFileSync(f, 'utf8'));
+    const second = stubNetwork({}, signals);
+    await expect(update('upd', { dwn: 'https://dwn2.example.com', fetch: second.fetch })).rejects.toThrow(`the update to version 2 (CID ${r.cid}) is not on Bitcoin yet`);
+    expect(second.urls).toEqual([]);
+    expect(existsSync(paths.btcr2Update(3))).toBe(false);
+    expect([paths.identity, paths.sidecar].map((f) => readFileSync(f, 'utf8'))).toEqual(files);
+  });
+
+  test('a Beacon Signal on Bitcoin that the sidecar file does not have stops the update, with no file write', async () => {
+    await createBtcr2({ alias: 'upd-x', network: 'testnet4', repos: REPOS, passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 });
+    const unknown = stubNetwork({}, [{ address: beaconOf('upd-x'), signal: 'ab'.repeat(32) }]);
+    await expect(update('upd-x', { repos: NEW_REPOS, fetch: unknown.fetch })).rejects.toThrow('MISSING_UPDATE_DATA');
+    expect(existsSync(idPaths('upd-x', env).btcr2Update(2))).toBe(false);
+    expect(readIdentity(idPaths('upd-x', env)).btcr2!.pending).toBeUndefined();
+  });
+
+  test('--remove dwn keeps the beacon and #pkg, and --dwn changes #dwn', async () => {
+    const services = (alias: string) => (readIdentity(idPaths(alias, env)).btcr2!.pending!.update as { patch: { value: unknown[] }[] }).patch[0]!.value;
+    const removed = await createBtcr2({ alias: 'upd-r', network: 'testnet4', dwn: DWN, repos: REPOS, passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 });
+    await update('upd-r', { removeDwn: true });
+    const doc = readIdentity(idPaths('upd-r', env)).document;
+    expect(services('upd-r')).toEqual([doc.service![0]!, doc.service![2]!]);
+    const changed = await createBtcr2({ alias: 'upd-d', network: 'testnet4', dwn: DWN, repos: REPOS, passphrase: PASS, updatePassphrase: UPDATE_PASS, env, iterations: 1000 });
+    await update('upd-d', { dwn: 'https://dwn2.example.com/' });
+    expect(services('upd-d')).toEqual([
+      readIdentity(idPaths('upd-d', env)).document.service![0]!,
+      { id: `${changed.did}#dwn`, type: 'DecentralizedWebNode', serviceEndpoint: ['https://dwn2.example.com/'] },
+      { id: `${changed.did}#pkg`, type: 'DIDPackageRepository', serviceEndpoint: REPOS },
+    ]);
+    expect(removed.did).not.toBe(changed.did);
+  });
+
+  test('bad options and a bad passphrase fail with no file write', async () => {
+    await createBtcr2({ alias: 'upd-b', network: 'testnet4', dwn: DWN, passphrase: PASS, repos: [], updatePassphrase: UPDATE_PASS, env, iterations: 1000 });
+    const cases: [Partial<Parameters<typeof updateBtcr2>[0]>, string][] = [
+      [{}, 'nothing to update'],
+      [{ removeDwn: true, dwn: DWN }, 'remove the DWN, or change it: not both'],
+      [{ removeDwn: true }, 'a did:btcr2 identity needs a DWN or a mirror URL'],
+      [{ repos: ['http://pkgs.example.com/'] }, 'must use https'],
+      [{ repos: NEW_REPOS, updatePassphrase: 'wrong' }, ''],
+    ];
+    for (const [o, error] of cases) await expect(update('upd-b', o)).rejects.toThrow(error);
+    expect(existsSync(idPaths('upd-b', env).btcr2Update(2))).toBe(false);
+    expect(readIdentity(idPaths('upd-b', env)).btcr2!.pending).toBeUndefined();
+  });
+});
+
 describe('the CLI', () => {
   const keys = { DIDPKG_PASSPHRASE: PASS, DIDPKG_UPDATE_PASSPHRASE: UPDATE_PASS };
   const run = async (args: string[], extra: Record<string, string> = {}) => {
@@ -218,6 +340,13 @@ describe('the CLI', () => {
     expect(r.code).toBe(0);
     expect(r.err).toContain('The DWN reads the genesis document only from IPFS. Put it there before "didpkg publish --to dwn".\n');
     expect(readIdentity(idPaths('cli-dwn', env)).document.service!.map((s) => s.type)).toEqual(['SingletonBeacon', 'DecentralizedWebNode']);
+  });
+
+  test('id update of a did:btcr2 identity refuses --rotate, and a second update while one is pending', async () => {
+    const rotate = await run(['id', 'update', 'upd', '--rotate', 'release'], keys);
+    expect([rotate.code === 0, rotate.err]).toEqual([false, expect.stringContaining('--rotate is for a XID identity only')]);
+    const pending = await run(['id', 'update', 'upd', '--repo', REPOS[0]!], keys);
+    expect([pending.code, pending.err]).toEqual([1, expect.stringContaining('the update to version 2 (CID bafkrei')]);
   });
 
   test('--btcr2 with --relay or --plc, with no --dwn and no --repo, or with a bad network fails before a file write', async () => {

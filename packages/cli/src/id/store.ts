@@ -6,6 +6,7 @@
 //   <alias>.did.jsonl        the DID log for the publisher to host (did:webvh only, mode 0644).
 //   <alias>.sidecar.json     the Sidecar Data with the Genesis Document (did:btcr2 only, mode 0644).
 //   <alias>.genesis.json     the JCS bytes of the Genesis Document: the raw block to put in CAS (did:btcr2 only, mode 0644).
+//   <alias>.update-<v>.json  the JCS bytes of the BTCR2 Signed Update to version <v>: the raw block to put in CAS (did:btcr2 only, mode 0644).
 // A did:key or did:jwk publisher (key.ts) has only <alias>.json, with the DWN URLs: its DID document has no services.
 // A XID publisher (xid.ts) has other files:
 //   <alias>.json                 the signed XID document and the locked release and DWN keys.
@@ -35,8 +36,16 @@ export interface Identity {
    * `didpkg id register` sends the genesis operation again. did:plc only.
    */
   plc?: { directory: string; genesis: Record<string, unknown>; updates?: Record<string, unknown>[] };
-  /** The network and the Genesis Document. A resolver needs the Genesis Document of an x1 DID. did:btcr2 only. */
-  btcr2?: { network: string; genesisDocument: Record<string, unknown> };
+  /**
+   * The network and the Genesis Document. A resolver needs the Genesis Document of an x1 DID. did:btcr2 only.
+   * `pending` is the signed update that Bitcoin does not show yet. Its Beacon Signal (the SHA-256 of `update`) must be the
+   * only signal to `versionId`: two different updates to one version make the DID invalid (LATE_PUBLISHING).
+   */
+  btcr2?: {
+    network: string;
+    genesisDocument: Record<string, unknown>;
+    pending?: { versionId: number; cid: string; update: Record<string, unknown> };
+  };
   /** The DWN URLs. The DID document has no services, so a consumer gives one of them to the shim. did:key and did:jwk only. */
   dwn?: string[];
   releaseKey: EncryptedKey;
@@ -64,6 +73,7 @@ export function idPaths(alias: string, env: Record<string, string | undefined> =
     dir, identity: join(dir, `${alias}.json`), updateKey: join(dir, `${alias}.update-key.json`), document: join(dir, `${alias}.did.json`),
     log: join(dir, `${alias}.did.jsonl`), sidecar: join(dir, `${alias}.sidecar.json`), genesis: join(dir, `${alias}.genesis.json`),
     xidUpdate: join(dir, `${alias}.update-key.envelope`), xidDocument: join(dir, `${alias}.xid.envelope`),
+    btcr2Update: (versionId: number) => join(dir, `${alias}.update-${versionId}.json`),
   };
 }
 
