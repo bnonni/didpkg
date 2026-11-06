@@ -38,6 +38,7 @@ didpkg also makes these DIDs:
 - [did:webvh](#didwebvh): a did:web DID with a signed log of its changes, on your HTTPS host.
 - [did:plc](#didplc): a DID in a PLC directory, for example `https://plc.directory`.
 - [did:btcr2](#didbtcr2): a Bitcoin DID. The DID is the hash of a Genesis Document.
+- [did:key and did:jwk](#didkey-and-didjwk): a DID that holds one public key. It cannot change, and it has no services. Each user of the package gives your DWN to the shim.
 
 To publish with a XID in place of a DID, read [A XID publisher](#a-xid-publisher).
 
@@ -50,7 +51,7 @@ For a script or CI, set the passphrases in the environment:
 | Variable | Key | Used by |
 |---|---|---|
 | `DIDPKG_PASSPHRASE` | The release key `#didpkg-1` | `id create`, `publish` |
-| `DIDPKG_UPDATE_PASSPHRASE` | The update key of the DID (each method except did:web) | `id create`, `id update` |
+| `DIDPKG_UPDATE_PASSPHRASE` | The update key of the DID (each method except did:web, did:key and did:jwk) | `id create`, `id update` |
 
 The 2 passphrases must be different. Keep them in a password manager. If you lose a passphrase, nobody can decrypt its key. `didpkg id register` needs no passphrase.
 
@@ -163,6 +164,21 @@ curl -sf -H 'Accept: application/vnd.ipld.raw' 'https://trustless-gateway.link/i
 
 The hash must be the SHA-256 of the genesis file. The did:btcr2 specification recommends one method for the life of the DID.
 
+### did:key and did:jwk
+
+```sh
+didpkg id create pk --key --dwn https://dwn.didpkg.dev
+```
+
+For a did:jwk DID, use `--jwk` in place of `--key`. The DID holds the public key of the release key (Ed25519). The command makes only `pk.json`, with no update key, and it does no network write. Nobody can change the DID. For a new key or a new DWN, make a new identity.
+
+The DID document has no services, so a shim cannot find your DWN from the DID. Thus:
+
+1. Publish only to the DWN (`--to dwn`). A backup mirror has no use, because a shim cannot find it.
+2. Give the DWN URL to each user of the package. The user starts the shim with `didpkg shim start --dwn https://dwn.didpkg.dev`, or puts the URL in the `dwn` list of the [config file](cli.md#config-file).
+
+The install name has the DID in lowercase and a case mask, for example `@didpkg/hello_did_key.ixcqfxbqq_z6mkhaxgbzdvotdkl5257faiztigic2qtklgpbnnegta2dok`. To get it, run `didpkg name <did> hello`. The stock `dwn-server` 0.1.45 also resolves did:key and did:jwk.
+
 ## 4. Keep the key files safe
 
 The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$XDG_CONFIG_HOME/didpkg/ids`, else in `~/.config/didpkg/ids`.
@@ -170,7 +186,7 @@ The files are in `$DIDPKG_HOME/ids`. If `DIDPKG_HOME` is not set, they are in `$
 | File | Content | Mode | Action |
 |---|---|---|---|
 | `<alias>.json` | The DID document and the encrypted release key | `0600` | `didpkg publish` reads only this file. Make a backup copy. |
-| `<alias>.update-key.json` | The encrypted update key of the DID (each method except did:web) | `0600` | Move it offline. You need it to change the DID document. `didpkg id update` uses it for did:webvh and did:plc. |
+| `<alias>.update-key.json` | The encrypted update key of the DID (each method except did:web, did:key and did:jwk) | `0600` | Move it offline. You need it to change the DID document. `didpkg id update` uses it for did:webvh and did:plc. |
 | `<alias>.did.json` | The DID document to host (did:web), or the parallel did:web document (did:webvh) | `0644` | Host it. See step 3. |
 | `<alias>.did.jsonl` | The DID log to host (did:webvh only) | `0644` | Host it. See [did:webvh](#didwebvh). |
 | `<alias>.genesis.json` | The JCS bytes of the Genesis Document (did:btcr2 only) | `0644` | Put it in IPFS as a raw block. See [the CLI reference](cli.md#didpkg-id-create-didbtcr2). |
@@ -205,7 +221,7 @@ npm pack
 didpkg publish main hello-1.0.0.tgz --to dwn
 ```
 
-1. `--to dwn` writes to each DWN in the `#dwn` service of the identity.
+1. `--to dwn` writes to each DWN in the `#dwn` service of the identity. For did:key and did:jwk, it writes to each DWN of the `--dwn` option of `id create`.
 2. `--to dir:<path>` (optional) writes the files of a backup mirror to a local folder. See [Optional backup mirror](#optional-backup-mirror). Give `--to` one time for each target.
 3. `--relay <url>` sets the Pkarr relays for a did:dht identity.
 

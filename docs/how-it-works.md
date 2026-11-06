@@ -8,7 +8,7 @@ A publisher has one of 2 kinds of identifier. The install name holds the kind:
 
 | Kind | Identifier | Document | Install name |
 |---|---|---|---|
-| `did` | A DID: did:dht, did:web, did:webvh, did:plc or did:btcr2 | The DID document, from the DID method | `@didpkg/hello_did_<method>_<id>` |
+| `did` | A DID: did:dht, did:web, did:webvh, did:plc, did:btcr2, did:key or did:jwk | The DID document, from the DID method | `@didpkg/hello_did_<method>_<id>` |
 | `xid` | A XID ([BCR-2024-010](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-010-xid.md)): the hash of the inception key | The XID document: a Gordian Envelope, signed by the inception key | `@didpkg/hello_xid_<64 hex>` |
 
 The parts below are the same for the 2 kinds, with these differences for a XID publisher:
@@ -86,6 +86,7 @@ You trust these parts:
   - A did:dht DID is a public key, and its DID document is a record that the key signs. A relay can hold back a record, but it cannot change a signed record.
   - A did:web DID is as safe as its web host: the person who controls the DNS name and the TLS certificate controls the DID.
   - A did:plc DID is the hash of its first signed operation. One directory (`plc.directory`) keeps the operation log of each DID. didpkg checks each signature in the log, but the directory can hold back an operation.
+  - A did:key or did:jwk DID is a public key. Its DID document cannot change, and it has no services. Thus the shim reads the packages of the publisher only from the DWNs that you set (`didpkg shim start --dwn <url>`).
   - A did:btcr2 DID is a secp256k1 public key or the hash of its genesis document. Bitcoin transactions announce its updates. The shim gets the transactions from an Esplora API (`mempool.space`). It gets the genesis document and the updates from the Sidecar Data: the identity files of the publisher, a mirror that you set, or a copy of an earlier resolve. It gets the other items from IPFS through a gateway (`trustless-gateway.link`, then `ipfs.didpkg.dev`). You can set your own mirrors, gateways and Esplora APIs: see [the config file](cli.md#config-file). didpkg checks each hash and each signature. But the Esplora API can hold back a transaction, and a mirror or a gateway can hold back data.
 - A XID and its XID document. A XID is the hash of its inception key, and the inception key signs each version of the XID document. Provenance marks give the order of the versions. A resolver can hold back a new version, but it cannot change a signed version. The shim keeps the newest version that it saw, and refuses an older version (`XID_ROLLBACK`).
 - The didpkg CLI that you install, from npm or from GitHub.

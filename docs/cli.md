@@ -15,7 +15,7 @@ This page gives each command of `didpkg` 0.1.0. For the steps of a full task, re
 | Variable | Use |
 |---|---|
 | `DIDPKG_HOME` | The config folder. The identity files are in `$DIDPKG_HOME/ids`. The [config file](#config-file) is `$DIDPKG_HOME/config.json`. Default: `$XDG_CONFIG_HOME/didpkg`, else `~/.config/didpkg`. |
-| `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`, and of the release key and the DWN key of a XID publisher. If it is not set, didpkg asks in the terminal. |
+| `DIDPKG_PASSPHRASE` | The passphrase of the release key `#didpkg-1`, and of the key of a did:key or did:jwk publisher. It is also the passphrase of the release key and the DWN key of a XID publisher. If it is not set, didpkg asks in the terminal. |
 | `DIDPKG_UPDATE_PASSPHRASE` | The passphrase of the update key (did:dht, did:webvh, did:plc and did:btcr2), and of the inception key of a XID publisher. If it is not set, didpkg asks in the terminal. |
 
 The install script has its own variables: see [Install didpkg](install.md#environment-variables).
@@ -42,7 +42,7 @@ didpkg name ur:xid/hdcxjsdigtwneocmnybadpdlzobysbstmekteypspeotcfldynlpsfolsbint
 @didpkg/hello_xid_71274df133169a0e2d2ffb11cbc7917732acafa31989f685cca6cb69d473b93c
 ```
 
-The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. A bad `ur:xid` gives `XID_INVALID`. The command does not resolve the DID, and it does not check the DID method. A package installs only from a did:dht, did:web, did:webvh, did:plc or did:btcr2 DID. A did:key or did:jwk DID has no services, so it has no storage. A XID name installs through the shim with a XID resolver ([`--xid-resolver`](#didpkg-shim-start)). `didpkg drl` takes a XID name with the same option.
+The package name must be 1 to 64 characters of `a-z`, `0-9`, `.` and `-`, and it must start with a letter or a digit. Else the error is `E_NAME: bad package name: <name>`. A XID with an uppercase letter gives `E_XID: a XID must be 64 lowercase hex characters`. A bad `ur:xid` gives `XID_INVALID`. The command does not resolve the DID, and it does not check the DID method. A did:key or did:jwk DID has no services. Thus its packages install only through a shim with a DWN list ([`--dwn`](#didpkg-shim-start)). A XID name installs through the shim with a XID resolver ([`--xid-resolver`](#didpkg-shim-start)). `didpkg drl` takes a XID name with the same option.
 
 ## didpkg parse
 
@@ -194,6 +194,36 @@ The did:btcr2 specification recommends one of the two methods for the life of th
 
 stdout gets the JSON result: `alias`, `did`, `keyId`, `network`, `cid` and `files`. stderr tells you to move the update key file offline. It also gives the IPFS command and the name of the Sidecar Data file in the folder. With `--dwn`, it also tells you that the DWN reads the Genesis Document only from IPFS.
 
+## didpkg id create (did:key and did:jwk)
+
+```text
+didpkg id create <alias> --key|--jwk --dwn <url>
+```
+
+Makes a did:key or did:jwk publisher DID with one Ed25519 key. The DID holds the public key. Thus the DID document cannot change, and it has no services. A shim cannot find the DWN from the DID. Each consumer gives the DWN to the shim: [`didpkg shim start --dwn <url>`](#didpkg-shim-start), or the `dwn` list of the [config file](#config-file).
+
+| Option | Default | Use |
+|---|---|---|
+| `--key` | None | Make a did:key DID ([did:key v0.9](https://w3c-ccg.github.io/did-key-spec/)). The release key is `<did>#<key>`, where `<key>` is the DID without `did:key:`. |
+| `--jwk` | None | Make a did:jwk DID ([did:jwk](https://github.com/quartzjer/did-jwk/blob/main/spec.md)). The release key is `<did>#0`. |
+| `--dwn <url>` | None | The DWN that gets the packages. Necessary. One time only. |
+
+Give `--key` or `--jwk`, not both. `--repo` is not permitted: the DID document has no service for the mirror URL. `--relay`, `--web`, `--webvh`, `--plc`, `--btcr2` and `--xid` are not permitted.
+
+The command makes only `<alias>.json`. This file holds the DID, the encrypted release key and the `dwn` list. There is no update key: nobody can change the DID or its key. For a new key or a new DWN, make a new identity. [`didpkg id update`](#didpkg-id-update) refuses a did:key or did:jwk identity. The command asks only for `DIDPKG_PASSPHRASE`, and it does no network write.
+
+stdout gets the JSON result: `alias`, `did`, `keyId`, `dwn` and `files`. stderr gives the `shim start` command for the consumers. Then run [`didpkg id register`](#didpkg-id-register) and [`didpkg publish --to dwn`](#didpkg-publish).
+
+The install name has the DID in lowercase and a case mask, which keeps the uppercase letters of the DID. See [The fold and the case mask](spec/install-names.md#3-the-fold-and-the-case-mask). Use [`didpkg name`](#didpkg-name) to get the install name:
+
+```sh
+didpkg name did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK hello
+```
+
+```text
+@didpkg/hello_did_key.ixcqfxbqq_z6mkhaxgbzdvotdkl5257faiztigic2qtklgpbnnegta2dok
+```
+
 ## didpkg id create (XID)
 
 ```text
@@ -239,7 +269,7 @@ $ didpkg name <xid> hello
 didpkg id update <alias> [--rotate release|dwn]... [--dwn <url>] [--remove dwn] [--repo <url>]...
 ```
 
-Changes the XID document of a XID publisher, or the services of a did:webvh or did:plc publisher. The command takes only a XID, did:webvh or did:plc identity.
+Changes the XID document of a XID publisher, or the services of a did:webvh or did:plc publisher. The command takes only a XID, did:webvh or did:plc identity. A did:key or did:jwk DID cannot change: the command refuses it.
 
 For a XID, the command adds the next provenance mark, and the inception key signs the new document. It replaces the 3 files of [`id create --xid`](#didpkg-id-create-xid).
 
@@ -325,6 +355,8 @@ For a XID identity, the tenant is the `did:key` of the DWN key, and the DWN URL 
 
 For a did:plc identity, the command first sends the genesis operation to the directory again. Use it if the directory did not accept the DID at `didpkg id create`. This step succeeds if the operation log of the directory has this operation. If the step fails, the command stops with exit code 1. Then, if the identity has a DWN service or you give `--dwn`, the command registers the DID on the DWN. The JSON result also has `directory`, the result of the first step. With no DWN, stdout gets only that result, and `--accept-terms` is not permitted.
 
+For a did:key or did:jwk identity, the DWN URL is the `dwn` list of the identity file. The DID document has no services.
+
 For a did:btcr2 identity, the DWN URL is the `#dwn` service of the Genesis Document. The registration does not resolve the DID. Thus, this step does not need the genesis file in IPFS.
 
 | Option | Default | Use |
@@ -357,7 +389,7 @@ After the registration, `didpkg publish` installs the didpkg protocol and writes
 didpkg id show <alias>
 ```
 
-Prints the public data of an identity as JSON: `alias`, `did`, `keyId`, `created`, `assertionMethod`, `service` and `files`. `files.updateKey` is `null` if the update key file is not in the folder. The command asks for no passphrase.
+Prints the public data of an identity as JSON: `alias`, `did`, `keyId`, `created`, `assertionMethod`, `service` and `files`. `files.updateKey` is `null` if the update key file is not in the folder. For a did:key or did:jwk publisher, the JSON also has `dwn`, `service` is empty, and `files.updateKey` is `null`. The command asks for no passphrase.
 
 For a XID publisher, the JSON has `alias`, `kind` (`xid`), `xid`, `ur`, `created` and `provenance` (`seq`, `date`, `chainId`). It also has `keys` (`reference`, `nickname`, `allow`, `deny`, `inception`), `services`, `dereferenceVia` and `files`.
 
@@ -367,11 +399,11 @@ For a XID publisher, the JSON has `alias`, `kind` (`xid`), `xid`, `ur`, `created
 didpkg publish <alias> <tarball> --to dwn|dir:<path>... [--relay <url>]...
 ```
 
-Signs an `npm pack` tarball with the release key (`#didpkg-1` for a DID) and writes it to each target.
+Signs an `npm pack` tarball with the release key (`#didpkg-1` for a DID, the DID key for did:key and did:jwk) and writes it to each target.
 
 | Option | Default | Use |
 |---|---|---|
-| `--to dwn` | None | Write to each DWN URL of the identity: the `#dwn` service of a DID, or the DWN service of a XID document. |
+| `--to dwn` | None | Write to each DWN URL of the identity: the `#dwn` service of a DID, the `dwn` list of a did:key or did:jwk identity, or the DWN service of a XID document. |
 | `--to dir:<path>` | None | Write the mirror files to a local folder. Repeatable. |
 | `--relay <url>` | `https://relay.pkarr.org`, `https://pkarr.pubky.org` | The Pkarr relays that get the stored DID record again (did:dht only). Repeatable. |
 
@@ -384,6 +416,8 @@ The command refuses:
 - A version with build metadata (`1.0.1+build.5`).
 - A published version with a different tarball.
 - `--to dwn` for an identity with no DWN service.
+
+For a did:key or did:jwk identity, use `--to dwn`. A shim cannot find a `dir:<path>` folder of these publishers, because the DID document has no services.
 
 For the full steps and the errors, read [Publish a package](publish.md).
 
@@ -401,7 +435,8 @@ Host the folder at a `--repo` URL of the identity. The XID document has a `deref
 ## didpkg shim start
 
 ```text
-didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--mode enforce|warn] [--allow-loopback]
+didpkg shim start [--port <n>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--mode enforce|warn]
+                  [--dwn <url>]... [--allow-loopback]
 ```
 
 Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` package before npm gets it.
@@ -413,6 +448,7 @@ Starts the shim: an npm registry on `127.0.0.1` that verifies each `@didpkg` pac
 | `--cas <url>` | `cas` of the [config file](#config-file), else `https://trustless-gateway.link` and `https://ipfs.didpkg.dev` | The IPFS gateways ([Trustless Gateway](https://specs.ipfs.tech/http-gateways/trustless-gateway/)) that give the genesis document and the update data of a did:btcr2 DID. The shim tries them in order. The next gateway gets a request if the gateway before it fails or gives no reply in 2 s. Repeatable. The options replace the `cas` list of the config file. |
 | `--sidecar <url>` | `sidecar` of the [config file](#config-file), else none | A mirror of did:btcr2 Sidecar Data. For a DID, the shim gets `<url>/<id>.sidecar.json`, where `<id>` is the DID without `did:btcr2:`. The shim tries the mirrors in order. Repeatable. The options replace the `sidecar` list of the config file. |
 | `--xid-resolver <url>` | `xid-resolver` of the [config file](#config-file), else none | A XID resolver. For a XID, the shim gets `<url>/xid/<hex>.envelope`. A static mirror of a XID publisher is a XID resolver. Repeatable. The options replace the `xid-resolver` list of the config file. See [XID documents](#xid-documents). |
+| `--dwn <url>` | `dwn` of the [config file](#config-file), else none | A DWN for did:key and did:jwk publishers. The DID document of these publishers has no services, so the shim reads their packages only from these DWNs. The shim does not use this list for other DIDs. Repeatable. |
 | `--mode <mode>` | `enforce` | `warn` installs a package with a changed key or a changed release history, and writes a warning to the log. See [Pins](how-it-works.md#pins). |
 | `--allow-loopback` | Off | Read DIDs, DWNs and mirrors on a loopback host. Only for tests and the local demo. This option has no value. |
 
@@ -447,6 +483,7 @@ The shim and `didpkg drl` read `$DIDPKG_HOME/config.json` if the file exists. Ea
 | `cas` | `["https://trustless-gateway.link", "https://ipfs.didpkg.dev"]` | The IPFS gateways for did:btcr2, in order. `--cas` replaces this list. An empty list (`[]`) turns IPFS off: then the shim resolves only a did:btcr2 DID that needs no data from IPFS. |
 | `sidecar` | `[]` | The Sidecar Data mirrors for did:btcr2, in order. `--sidecar` replaces this list. See [did:btcr2 Sidecar Data](#didbtcr2-sidecar-data). |
 | `xid-resolver` | `[]` | The XID resolvers. `--xid-resolver` replaces this list. See [XID documents](#xid-documents). |
+| `dwn` | `[]` | The DWNs for did:key and did:jwk publishers. `--dwn` replaces this list. |
 | `esplora` | `https://mempool.space/api` (`bitcoin`), `https://mempool.space/testnet/api` (`testnet3`), `https://mempool.space/testnet4/api` (`testnet4`), `https://mempool.space/signet/api` (`signet`), `https://mutinynet.com/api` (`mutinynet`) | The Esplora API for each Bitcoin network of did:btcr2. The keys are `bitcoin`, `testnet3`, `testnet4`, `signet`, `mutinynet` and `regtest`. A key replaces the default of its network. `regtest` has no default. |
 
 Example:
@@ -456,7 +493,8 @@ Example:
   "cas": ["https://ipfs.example.com", "https://trustless-gateway.link"],
   "esplora": { "testnet4": "https://esplora.example.com/testnet4/api" },
   "sidecar": ["https://pkgs.example.com/btcr2/"],
-  "xid-resolver": ["https://pkgs.example.com/"]
+  "xid-resolver": ["https://pkgs.example.com/"],
+  "dwn": ["https://dwn.didpkg.dev"]
 }
 ```
 
@@ -465,7 +503,8 @@ An unknown key or a bad value stops the shim before it starts, with exit code 1.
 ## didpkg drl
 
 ```text
-didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]... [--allow-loopback]
+didpkg drl <install-name>[@<version>] [--relay <url>]... [--cas <url>]... [--sidecar <url>]... [--xid-resolver <url>]...
+           [--dwn <url>]... [--allow-loopback]
 ```
 
 Does the checks of the shim for one version. Then it prints the plain HTTPS URL of the signed tarball. npm, pnpm and bun can install the package from this URL with no shim and no `.npmrc` line. For the trade-off, read [Quickstart](quickstart.md#one-off-install-with-no-shim).
